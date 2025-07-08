@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import {
   Breadcrumb,
@@ -14,7 +17,22 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 
+import { CardNombre } from "@/components/CardNombre"
+
 export default function Page() {
+  useEffect(() => {
+    const fetchNombres = async () => {
+      try {
+        const nombres = await window.electronAPI.leerNombres?.()
+        console.log("📋 Nombres en base de datos:", nombres)
+      } catch (error) {
+        console.error("❌ Error al leer nombres:", error)
+      }
+    }
+
+    fetchNombres()
+  }, [])
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -43,6 +61,7 @@ export default function Page() {
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+            <CardNombre />
             <div className="bg-muted/50 aspect-video rounded-xl" />
             <div className="bg-muted/50 aspect-video rounded-xl" />
             <div className="bg-muted/50 aspect-video rounded-xl" />

@@ -1,6 +1,7 @@
+// electron/preload.ts
 import { contextBridge, ipcRenderer } from "electron"
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  leerCursos: () => ipcRenderer.invoke("leer-cursos"),
-  borrarCurso: (id: string) => ipcRenderer.invoke("borrar-curso", id),
+  guardarNombre: (nombre: string) => ipcRenderer.invoke("guardar-nombre", nombre),
+  leerNombres: () => ipcRenderer.invoke("leer-nombres"),
 })
