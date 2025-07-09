@@ -37,12 +37,12 @@ const data = {
   },
   teams: [
     {
-      name: "Acme Inc",
+      name: "SkillForge",
       logo: GalleryVerticalEnd,
       plan: "Enterprise",
     },
     {
-      name: "Acme Corp.",
+      name: "SkillForge",
       logo: AudioWaveform,
       plan: "Startup",
     },
