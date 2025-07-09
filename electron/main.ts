@@ -1,6 +1,9 @@
 import { app, BrowserWindow, ipcMain } from "electron"
 import * as path from "path"
-import { db } from "./database"
+import { db, initDB } from "./database"
+
+// ✅ Garantizamos que las tablas existen al arrancar
+initDB()
 
 const isDev = !app.isPackaged
 
@@ -32,11 +35,13 @@ app.on("window-all-closed", () => {
 // ---------------------------
 // IPC handlers para CURSOS
 // ---------------------------
+
 ipcMain.handle("leer-cursos", () => {
   return db.prepare("SELECT * FROM cursos").all()
 })
 
 ipcMain.handle("guardar-curso", (_event, curso) => {
+  console.log("📥 Curso recibido en main:", curso)
   const { acronimo, nombre, nivel, grado, clase } = curso
 
   if (!acronimo || !nivel || !clase) {
@@ -68,6 +73,7 @@ ipcMain.handle("borrar-curso", (_event, id) => {
 // ---------------------------
 // IPC handlers para NOMBRES
 // ---------------------------
+
 ipcMain.handle("leer-nombres", () => {
   return db.prepare("SELECT * FROM nombres").all()
 })
