@@ -4,20 +4,12 @@ import { db } from "./database"
 
 const isDev = !app.isPackaged
 
-// Aseguramos que la tabla nombres existe al arrancar la app
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS nombres (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT
-  )
-`).run()
-
 const createWindow = () => {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
     webPreferences: {
-      preload: path.join(__dirname, "../dist-electron/preload.js"),
+      preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
     },
@@ -37,23 +29,45 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit()
 })
 
-// IPC handlers para cursos
+// ---------------------------
+// IPC handlers para CURSOS
+// ---------------------------
 ipcMain.handle("leer-cursos", () => {
   return db.prepare("SELECT * FROM cursos").all()
 })
 
 ipcMain.handle("guardar-curso", (_event, curso) => {
+  const { acronimo, nombre, nivel, grado, clase } = curso
+
+  if (!acronimo || !nivel || !clase) {
+    throw new Error("Faltan campos obligatorios: acrónimo, nivel o clase.")
+  }
+
+  const id = `${acronimo}${nivel}${clase}`.toUpperCase()
+
   db.prepare(`
-    INSERT OR REPLACE INTO cursos (id, acronimo, nombre, nivel, grado)
-    VALUES (@id, @acronimo, @nombre, @nivel, @grado)
-  `).run(curso)
+    INSERT OR REPLACE INTO cursos (id, acronimo, nombre, nivel, grado, clase)
+    VALUES (@id, @acronimo, @nombre, @nivel, @grado, @clase)
+  `).run({
+    id,
+    acronimo,
+    nombre,
+    nivel,
+    grado,
+    clase,
+  })
+
+  return { success: true, id }
 })
 
 ipcMain.handle("borrar-curso", (_event, id) => {
   db.prepare("DELETE FROM cursos WHERE id = ?").run(id)
+  return { success: true }
 })
 
-// IPC handlers para nombres
+// ---------------------------
+// IPC handlers para NOMBRES
+// ---------------------------
 ipcMain.handle("leer-nombres", () => {
   return db.prepare("SELECT * FROM nombres").all()
 })

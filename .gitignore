@@ -1,7 +1,6 @@
 node_modules/
 dist/
 dist-electron/
-*.log
-*.sqlite3
+*.log/
 .DS_Store
 .env

@@ -1,16 +1,14 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
     "target": "ES2020",
     "module": "CommonJS",
-    "outDir": "dist-electron",         // 👈 NO pongas /electron aquí
-    "rootDir": "electron",             // 👈 Este sí es el folder de entrada
+    "outDir": "dist-electron",
+    "rootDir": "electron",
     "moduleResolution": "node",
     "esModuleInterop": true,
     "strict": true,
     "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "noEmit": false
+    "skipLibCheck": true
   },
-  "include": ["electron"]
+  "include": ["electron/**/*"]
 }
