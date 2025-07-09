@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import {
+  ChartColumnBig,
+  Settings,
   AudioWaveform,
   BookOpen,
   Bot,
@@ -50,7 +52,18 @@ const data = {
       plan: "Free",
     },
   ],
+
   navMain: [
+    {title: "PanelControl",
+      url: "/",
+      icon: ChartColumnBig,
+      isActive: true,
+    },
+    {title: "Configuración",
+      url: "/configuracion",
+      icon: Settings,
+      isActive: true,
+    },
     {
       title: "Playground",
       url: "#",
