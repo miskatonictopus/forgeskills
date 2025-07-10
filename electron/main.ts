@@ -2,7 +2,6 @@ import { app, BrowserWindow, ipcMain } from "electron"
 import * as path from "path"
 import { db, initDB } from "./database"
 
-// ✅ Garantizamos que las tablas existen al arrancar
 initDB()
 
 const isDev = !app.isPackaged
