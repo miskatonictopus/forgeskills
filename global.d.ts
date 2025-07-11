@@ -20,6 +20,17 @@ declare global {
       guardarAsignatura: (asignatura: {
         id: string
         nombre: string
+        creditos: string
+        descripcion: {
+          duracion: string
+          centro: string
+          empresa: string
+        }
+        RA: {
+          codigo: string
+          descripcion: string
+          CE: { codigo: string; descripcion: string }[]
+        }[]
       }) => Promise<void>
 
       guardarAlumno: (alumno: { nombre: string; curso: string }) => Promise<void>

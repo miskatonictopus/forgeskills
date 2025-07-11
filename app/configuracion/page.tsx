@@ -64,8 +64,7 @@ export default function ConfiguracionPage() {
         {/* Contenido principal */}
         <div className="p-6 space-y-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Configuración</h1>
-
+            <h1 className="text-2xl NotoJp font-light tracking-tight ">Configuración</h1>
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
@@ -77,7 +76,7 @@ export default function ConfiguracionPage() {
               {/* Aquí sí envolvemos correctamente el contenido del modal */}
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Nuevo Curso</DialogTitle>
+                  <DialogTitle className="text-xl NotoJp font-light tracking-tight">Nuevo Curso</DialogTitle>
                 </DialogHeader>
                 <NuevoCurso />
               </DialogContent>
@@ -92,7 +91,7 @@ export default function ConfiguracionPage() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Nueva Asignatura</DialogTitle>
+                  <DialogTitle className="text-xl NotoJp font-light tracking-tight">Nueva Asignatura</DialogTitle>
                 </DialogHeader>
                 <NuevaAsignatura />
               </DialogContent>

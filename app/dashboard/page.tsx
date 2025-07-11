@@ -79,7 +79,7 @@ export default function Page() {
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           {/* 🏷️ Sección de Cursos */}
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl NotoJp font-light tracking-tight text-white">
+            <h1 className="text-2xl NotoJp font-light tracking-tight">
               Mis Cursos
             </h1>
 

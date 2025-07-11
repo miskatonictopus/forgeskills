@@ -21,4 +21,14 @@ export const initDB = () => {
       nombre TEXT
     )
   `).run()
+
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS asignaturas (
+      id TEXT PRIMARY KEY,
+      nombre TEXT,
+      creditos TEXT,
+      descripcion TEXT, 
+      RA TEXT           
+    )
+  `).run()
 }

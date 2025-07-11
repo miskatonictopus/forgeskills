@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from "electron"
 import * as path from "path"
 import { db, initDB } from "./database"
+import type { Asignatura } from "../models/asignatura"
 
 initDB()
 
@@ -83,19 +84,45 @@ ipcMain.handle("guardar-nombre", (_event, nombre: string) => {
 
 ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
   try {
-    // Aquí puedes guardar la asignatura en JSON o SQLite según tu lógica actual
-    // Ejemplo si estás usando JSON por ahora:
-    const fs = require("fs")
-    const path = require("path")
-    const filePath = path.join(__dirname, "asignaturas", `${asignatura.id}_${asignatura.nombre}.json`)
+    const { id, nombre, descripcion, RA } = asignatura
 
-    fs.writeFileSync(filePath, JSON.stringify(asignatura, null, 2), "utf-8")
-    return true
+    if (!id || !nombre || !descripcion || !RA) {
+      throw new Error("Faltan campos en la asignatura.")
+    }
+
+    db.prepare(`
+      INSERT OR REPLACE INTO asignaturas (id, nombre, descripcion, RA)
+      VALUES (@id, @nombre, @descripcion, @RA)
+    `).run({
+      id,
+      nombre,
+      descripcion: JSON.stringify(descripcion),
+      RA: JSON.stringify(RA)
+    })
+
+    return { success: true }
   } catch (error) {
-    console.error("Error al guardar asignatura:", error)
+    console.error("❌ Error al guardar asignatura:", error)
     throw error
   }
 })
+
+ipcMain.handle("leer-asignaturas", () => {
+  const rows = db.prepare("SELECT * FROM asignaturas").all() as {
+    id: string
+    nombre: string
+    descripcion: string
+    RA: string
+  }[]
+
+  return rows.map((row) => ({
+    id: row.id,
+    nombre: row.nombre,
+    descripcion: JSON.parse(row.descripcion),
+    RA: JSON.parse(row.RA)
+  })) satisfies Asignatura[]
+})
+
 
 ipcMain.handle("guardar-alumno", async (_event, alumno) => {
   try {
