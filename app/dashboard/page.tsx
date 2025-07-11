@@ -2,6 +2,13 @@
 
 import { SquarePen, Trash2 } from "lucide-react";
 
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip"
+
 import { useEffect, useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -87,45 +94,53 @@ export default function Page() {
               ) : (
                 <>
                   {cursos.map((curso) => (
-                    <Card
-                      key={curso.id}
-                      className="relative w-auto min-w-[10rem] max-w-[16rem] bg-zinc-900 border border-zinc-700 text-white"
-                    >
-                      <div className="absolute top-2 right-2 flex gap-2 z-10">
-                        <button className="text-zinc-400 hover:text-emerald-400">
-                          <SquarePen className="w-4 h-4" />
-                        </button>
-                        <button className="text-zinc-400 hover:text-emerald-400">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <CardContent className="leading-tight space-y-1">
-                        <p className="text-3xl font-bold truncate uppercase">
-                          {curso.acronimo}
-                          {curso.nivel}
-                        </p>
-                        <p className="text-xs font-light text-zinc-400 uppercase">
-                          {curso.nombre}
-                        </p>
-                        <p>
-                          <span className="text-xs font-light text-zinc-400">
-                            Grado:
-                          </span>
-                          <span className="text-xs font-light text-white uppercase">
-                            {curso.grado}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-xs font-light text-zinc-400">
-                            Clase:
-                          </span>
-                          <span className="text-xs font-light text-white uppercase">
-                            {curso.clase}
-                          </span>
-                        </p>
-                      </CardContent>
-                    </Card>
+                   <Card
+                   key={curso.id}
+                   className="relative w-auto min-w-[10rem] max-w-[16rem] bg-zinc-900 border border-zinc-700 text-white"
+                 >
+                   <div className="absolute top-2 right-2 flex gap-2 z-10">
+                     <Tooltip>
+                       <TooltipTrigger asChild>
+                         <button className="text-zinc-400 hover:text-emerald-400">
+                           <SquarePen className="w-4 h-4" />
+                         </button>
+                       </TooltipTrigger>
+                       <TooltipContent side="top">Editar</TooltipContent>
+                     </Tooltip>
+                 
+                     <Tooltip>
+                       <TooltipTrigger asChild>
+                         <button className="text-zinc-400 hover:text-emerald-400">
+                           <Trash2 className="w-4 h-4" />
+                         </button>
+                       </TooltipTrigger>
+                       <TooltipContent side="top">Borrar</TooltipContent>
+                     </Tooltip>
+                   </div>
+                 
+                   <CardContent className="leading-tight space-y-1">
+                     <p className="text-3xl font-bold truncate uppercase">
+                       {curso.acronimo}
+                       {curso.nivel}
+                     </p>
+                     <p className="text-xs font-light text-zinc-400 uppercase">
+                       {curso.nombre}
+                     </p>
+                     <p>
+                       <span className="text-xs font-light text-zinc-400">Grado:</span>
+                       <span className="text-xs font-light text-white uppercase">
+                         {curso.grado}
+                       </span>
+                     </p>
+                     <p>
+                       <span className="text-xs font-light text-zinc-400">Clase:</span>
+                       <span className="text-xs font-light text-white uppercase">
+                         {curso.clase}
+                       </span>
+                     </p>
+                   </CardContent>
+                 </Card>
+                 
                   ))}
 
                   {/* 🧩 Línea vertical como tarjeta final */}

@@ -4,7 +4,7 @@ declare global {
   interface Window {
     electronAPI: {
       guardarNombre: (nombre: string) => Promise<void>
-      leerNombres: () => Promise<any[]>
+      leerNombres: () => Promise<string[]>
 
       guardarCurso: (curso: {
         acronimo: string
@@ -12,10 +12,17 @@ declare global {
         nivel: string
         grado: string
         clase: string
-      }) => Promise<{ success: boolean; id: string }>
+      }) => Promise<void>
 
       leerCursos: () => Promise<any[]>
-      borrarCurso: (id: string) => Promise<{ success: boolean }>
+      borrarCurso: (id: string) => Promise<void>
+
+      guardarAsignatura: (asignatura: {
+        id: string
+        nombre: string
+      }) => Promise<void>
+
+      guardarAlumno: (alumno: { nombre: string; curso: string }) => Promise<void>
     }
   }
 }

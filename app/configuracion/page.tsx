@@ -1,37 +1,42 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { PlusCircle } from "lucide-react"
+import { useState, useEffect } from "react";
+import { PlusCircle } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Button } from "@/components/ui/button"
-import { SidebarProvider } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/app-sidebar"
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { NuevoCurso } from "@/components/NuevoCurso"
+} from "@/components/ui/dialog";
+import { NuevoCurso } from "@/components/NuevoCurso";
+import NuevaAsignatura from "@/components/NuevaAsignatura";
+import NuevoAlumno from "@/components/NuevoAlumno";
 
 export default function ConfiguracionPage() {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false);
+  const [openAsignatura, setOpenAsignatura] = useState(false);
+  const [openAlumno, setOpenAlumno] = useState(false);
 
   // ✅ Escucha el evento de cierre del modal
   useEffect(() => {
-    const handleClose = () => setOpen(false)
-    document.addEventListener("cerrar-curso-modal", handleClose)
-    return () => document.removeEventListener("cerrar-curso-modal", handleClose)
-  }, [])
+    const handleClose = () => setOpen(false);
+    document.addEventListener("cerrar-curso-modal", handleClose);
+    return () =>
+      document.removeEventListener("cerrar-curso-modal", handleClose);
+  }, []);
 
   return (
     <SidebarProvider>
@@ -77,11 +82,41 @@ export default function ConfiguracionPage() {
                 <NuevoCurso />
               </DialogContent>
             </Dialog>
+
+            <Dialog open={openAsignatura} onOpenChange={setOpenAsignatura}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                  Nueva Asignatura
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nueva Asignatura</DialogTitle>
+                </DialogHeader>
+                <NuevaAsignatura />
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={openAlumno} onOpenChange={setOpenAlumno}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                  Nuevo Alumno
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nuevo Alumno</DialogTitle>
+                </DialogHeader>
+                <NuevoAlumno />
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Aquí puedes añadir más contenido relacionado con configuración */}
         </div>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }

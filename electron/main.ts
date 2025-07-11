@@ -80,3 +80,38 @@ ipcMain.handle("leer-nombres", () => {
 ipcMain.handle("guardar-nombre", (_event, nombre: string) => {
   db.prepare("INSERT INTO nombres (nombre) VALUES (?)").run(nombre)
 })
+
+ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
+  try {
+    // Aquí puedes guardar la asignatura en JSON o SQLite según tu lógica actual
+    // Ejemplo si estás usando JSON por ahora:
+    const fs = require("fs")
+    const path = require("path")
+    const filePath = path.join(__dirname, "asignaturas", `${asignatura.id}_${asignatura.nombre}.json`)
+
+    fs.writeFileSync(filePath, JSON.stringify(asignatura, null, 2), "utf-8")
+    return true
+  } catch (error) {
+    console.error("Error al guardar asignatura:", error)
+    throw error
+  }
+})
+
+ipcMain.handle("guardar-alumno", async (_event, alumno) => {
+  try {
+    const fs = require("fs")
+    const path = require("path")
+    const basePath = path.join(__dirname, "alumnos")
+    if (!fs.existsSync(basePath)) fs.mkdirSync(basePath)
+
+    const filename = `${alumno.nombre}_${alumno.curso}.json`
+    const filePath = path.join(basePath, filename)
+
+    fs.writeFileSync(filePath, JSON.stringify(alumno, null, 2), "utf-8")
+    return true
+  } catch (error) {
+    console.error("❌ Error al guardar alumno:", error)
+    throw error
+  }
+})
+
