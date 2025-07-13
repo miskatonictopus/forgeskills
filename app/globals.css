@@ -121,3 +121,11 @@
     @apply bg-background text-foreground;
   }
 }
+
+.font-notojp {
+  font-family: var(--font-notojp);
+}
+
+.font-geist {
+  font-family: var(--font-geist);
+}

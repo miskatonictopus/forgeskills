@@ -102,14 +102,15 @@ export default function Page() {
               orientation="vertical"
               className="mr-2 data-[orientation=vertical]:h-4"
             />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">Panel de Control</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-              </BreadcrumbList>
-            </Breadcrumb>
+            <div className="flex items-center justify-between w-full px-2">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem className="hidden md:block">
+                    <BreadcrumbLink href="#">Panel de Control</BreadcrumbLink>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
           </div>
         </header>
 
@@ -117,11 +118,8 @@ export default function Page() {
           <div className="flex flex-row gap-6 items-start">
             {/* Cursos */}
             <div className="flex flex-col gap-2">
-              <h2 className="text-2xl font-jp font-light tracking-tight flex items-center gap-2">
+              <h2 className="text-2xl font-notojp font-light tracking-tight flex items-center gap-2">
                 Mis Cursos
-                <span className="text-xs Geist bg-zinc-900 text-white rounded-full w-6 h-6 flex items-center justify-center">
-                  {cursos.length}
-                </span>
               </h2>
               <div className="flex flex-wrap gap-3">
                 {cursos.map((curso) => (
@@ -156,19 +154,19 @@ export default function Page() {
                         {curso.nombre}
                       </p>
                       <div className="flex items-center gap-4">
-                          <p className="text-xs font-light text-zinc-400">
-                            Grado:{" "}
-                            <span className="text-white uppercase">
-                              {curso.grado}
-                            </span>
-                          </p>
-                          <p className="text-xs font-light text-zinc-400">
-                            Clase:{" "}
-                            <span className="text-white uppercase">
-                              {curso.clase}
-                            </span>
-                          </p>
-                        </div>
+                        <p className="text-xs font-light text-zinc-400">
+                          Grado:{" "}
+                          <span className="text-white uppercase">
+                            {curso.grado}
+                          </span>
+                        </p>
+                        <p className="text-xs font-light text-zinc-400">
+                          Clase:{" "}
+                          <span className="text-white uppercase">
+                            {curso.clase}
+                          </span>
+                        </p>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -180,7 +178,7 @@ export default function Page() {
 
             {/* Asignaturas */}
             <div className="flex flex-col gap-2">
-              <h2 className="text-2xl font-jp font-light tracking-tight">
+              <h2 className="text-2xl font-notojp font-light tracking-tight">
                 Mis Asignaturas
               </h2>
               <div className="flex flex-wrap gap-3">

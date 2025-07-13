@@ -9,7 +9,7 @@ const geist = localFont({
   src: [
     {
       path: "../fonts/Geist/Geist-VariableFont_wght.ttf",
-      weight: "400",
+      weight: "100 900",
       style: "normal",
     },
   ],
@@ -21,7 +21,7 @@ const notoJp = localFont({
   src: [
     {
       path: "../fonts/NotoJp/NotoSerifJP-VariableFont_wght.ttf",
-      weight: "400",
+      weight: "100 900",
       style: "normal",
     },
   ],
@@ -35,18 +35,12 @@ export const metadata: Metadata = {
   description: "Sistema de gestión de asignaturas",
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className="dark">
-      <body
-        className={`${geist.variable} ${notoJp.variable} antialiased font-sans bg-zinc-950 text-white`}
-      >
+    <html lang="es" className={`${geist.variable} ${notoJp.variable} dark`}>
+  <body className="bg-background text-foreground font-geist">
         {children}
-        <Toaster position="top-right" richColors closeButton duration={4000} />
+        <Toaster />
       </body>
     </html>
   )

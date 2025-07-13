@@ -10,8 +10,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-geist)', 'sans-serif'],
-        jp: ['var(--font-notojp)', 'serif'], 
+        geist: ["var(--font-geist)"],
+        notojp: ["var(--font-notojp)"], 
       }
       
 
