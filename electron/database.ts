@@ -1,7 +1,9 @@
 import Database from "better-sqlite3"
 import * as path from "path"
 
-export const db = new Database(path.join(__dirname, "../data/db.sqlite"))
+const dbPath = path.join(process.cwd(), "data", "db.sqlite")
+export const db = new Database(dbPath)
+
 
 export const initDB = () => {
   db.prepare(`

@@ -5,6 +5,7 @@ declare global {
     electronAPI: {
       guardarNombre: (nombre: string) => Promise<void>
       leerNombres: () => Promise<string[]>
+      leerAsignaturas: () => Promise<any[]>
 
       guardarCurso: (curso: {
         acronimo: string

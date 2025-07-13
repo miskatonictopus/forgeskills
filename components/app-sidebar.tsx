@@ -1,5 +1,7 @@
 "use client"
 
+import skillforge_black from "@/public/images/logo-white.png"
+
 import * as React from "react"
 import {
   ChartColumnBig,
@@ -173,7 +175,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+      <SidebarHeader>
+  <img
+    src={skillforge_black.src}
+    alt="SkillForge"
+    className="h-8 mx-auto"
+  />
+</SidebarHeader>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />

@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧭 Guía de Rutas y Estructura - Proyecto Electron + Next.js
 
-## Getting Started
+Esta guía documenta la estructura oficial y definitiva para el desarrollo con Electron + Next.js + SQLite en este proyecto. Sigue esta estructura para evitar errores de rutas, conflictos de compilación o confusión entre entornos.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 📁 Estructura de Carpetas
+
+```
+.
+├── electron/                 ← Código fuente TypeScript para Electron
+│   ├── main.ts             ← Proceso principal
+│   ├── preload.ts          ← API expuesta al frontend
+│   └── database.ts         ← Inicialización de SQLite
+├── data/
+│   └── db.sqlite           ← Base de datos persistente
+├── dist-electron/            ← Salida de compilación JS
+│   └── electron/
+│       ├── main.js
+│       ├── preload.js
+│       └── database.js
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## ⚙️ tsconfig.electron.json
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "outDir": "dist-electron",
+    "rootDir": "./",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  },
+  "include": ["electron/**/*", "models/**/*"]
+}
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🔌 Referencias en main.ts (correctas)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```ts
+webPreferences: {
+  preload: path.join(__dirname, "electron/preload.js"),
+  nodeIntegration: false,
+  contextIsolation: true,
+}
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+> \_\_dirname en tiempo de ejecución apunta a `dist-electron/`, por eso esta ruta es válida.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📦 package.json
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```json
+{
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "compile:electron": "tsc -p tsconfig.electron.json",
+    "launch:electron": "electron .",
+    "dev:electron": "concurrently -k -n \"NEXT,ELECTRON\" -c \"cyan,green\" \"next dev\" \"wait-on http://localhost:3000 && electron .\""
+  }
+}
+```
+
+---
+
+## ✅ Buenas prácticas
+
+* Compila siempre antes de lanzar Electron:
+
+  ```bash
+  npm run compile:electron && npm run dev:electron
+  ```
+
+* Nunca referencies archivos `.ts` desde Electron: usa los `.js` compilados.
+
+* Nunca modifiques directamente nada dentro de `dist-electron/`.
+
+* Si tienes dudas sobre la ruta de un archivo, imprime `__dirname` y mira dónde está el `main.js`.
+
+---
+
+> Esta guía es obligatoria para futuros desarrolladores. Evita retrocesos innecesarios y asegura estabilidad.

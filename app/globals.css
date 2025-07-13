@@ -3,24 +3,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@font-face {
-  font-family: 'Geist';
-  src: url('/fonts/Geist/Geist-VariableFont_wght.ttf') format('truetype');
-  font-weight: 100 900;
-  font-display: swap;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'NotoJp';
-  src: url('/fonts/NotoJp/NotoSerifJP-VariableFont_wght.ttf') format('truetype');
-  font-weight: 100 900;
-  font-display: swap;
-  font-style: normal;
-}
-
-.NotoJp{font-family: 'NotoJp', serif;;}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

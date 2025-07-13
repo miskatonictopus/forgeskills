@@ -82,11 +82,15 @@ ipcMain.handle("guardar-nombre", (_event, nombre: string) => {
   db.prepare("INSERT INTO nombres (nombre) VALUES (?)").run(nombre)
 })
 
+// ---------------------------
+// IPC handler para ASIGNATURAS
+// ---------------------------
+
 ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
   try {
-    const { id, nombre, descripcion, RA } = asignatura
+    const { id, nombre, creditos, descripcion, RA } = asignatura
 
-    if (!id || !nombre || !descripcion || !RA) {
+    if (!id || !nombre || !creditos || !descripcion || !RA) {
       throw new Error("Faltan campos en la asignatura.")
     }
 
@@ -96,6 +100,7 @@ ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
     `).run({
       id,
       nombre,
+      creditos,
       descripcion: JSON.stringify(descripcion),
       RA: JSON.stringify(RA)
     })
@@ -111,18 +116,23 @@ ipcMain.handle("leer-asignaturas", () => {
   const rows = db.prepare("SELECT * FROM asignaturas").all() as {
     id: string
     nombre: string
+    creditos: string
     descripcion: string
     RA: string
-  }[]
+  }[];
 
   return rows.map((row) => ({
     id: row.id,
     nombre: row.nombre,
+    creditos: row.creditos, 
     descripcion: JSON.parse(row.descripcion),
-    RA: JSON.parse(row.RA)
-  })) satisfies Asignatura[]
-})
+    RA: JSON.parse(row.RA),
+  })) satisfies Asignatura[];
+});
 
+// ---------------------------
+// IPC handler para ALUMNOS
+// ---------------------------
 
 ipcMain.handle("guardar-alumno", async (_event, alumno) => {
   try {
@@ -141,4 +151,3 @@ ipcMain.handle("guardar-alumno", async (_event, alumno) => {
     throw error
   }
 })
-

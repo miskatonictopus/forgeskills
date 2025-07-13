@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Nombres (para pruebas)
   guardarNombre: (nombre: string) => ipcRenderer.invoke("guardar-nombre", nombre),
   leerNombres: () => ipcRenderer.invoke("leer-nombres"),
+  leerAsignaturas: () => ipcRenderer.invoke("leer-asignaturas"),
 
   // Cursos (con clase e ID compuesto)
   guardarCurso: (curso: {
@@ -14,6 +15,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     grado: string
     clase: string
   }) => ipcRenderer.invoke("guardar-curso", curso),
+  
 
   leerCursos: () => ipcRenderer.invoke("leer-cursos"),
   borrarCurso: (id: string) => ipcRenderer.invoke("borrar-curso", id),
