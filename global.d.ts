@@ -35,6 +35,7 @@ declare global {
       }) => Promise<void>
 
       guardarAlumno: (alumno: { nombre: string; curso: string }) => Promise<void>
+      leerAlumnos: () => Promise<any[]>
     }
   }
 }

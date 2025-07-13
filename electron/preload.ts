@@ -26,5 +26,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("guardar-asignatura", asignatura),
 
     guardarAlumno: (alumno: Alumno) => ipcRenderer.invoke("guardar-alumno", alumno),
+
+    leerAlumnos: () => ipcRenderer.invoke("leer-alumnos"),
 })
 

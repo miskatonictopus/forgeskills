@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { SquarePen, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import TablaAlumnos from "@/components/TablaAlumnos"
+
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarProvider,
@@ -240,8 +242,9 @@ export default function Page() {
               </div>
             </div>
           </div>
-
-          <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
+          <TablaAlumnos />
+          {/* <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" /> */}
+          
         </div>
       </SidebarInset>
     </SidebarProvider>

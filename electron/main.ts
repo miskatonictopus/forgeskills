@@ -5,6 +5,8 @@ import type { Asignatura } from "../models/asignatura"
 
 initDB()
 
+// Tabla ALUMNOS
+
 db.prepare(`
   CREATE TABLE IF NOT EXISTS alumnos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,7 +53,7 @@ ipcMain.handle("leer-cursos", () => {
 })
 
 ipcMain.handle("guardar-curso", (_event, curso) => {
-  console.log("📥 Curso recibido en main:", curso)
+  console.log("📅 Curso recibido en main:", curso)
   const { acronimo, nombre, nivel, grado, clase } = curso
 
   if (!acronimo || !nivel || !clase) {
@@ -112,7 +114,7 @@ ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
       nombre,
       creditos,
       descripcion: JSON.stringify(descripcion),
-      RA: JSON.stringify(RA)
+      RA: JSON.stringify(RA),
     })
 
     return { success: true }
@@ -129,16 +131,16 @@ ipcMain.handle("leer-asignaturas", () => {
     creditos: string
     descripcion: string
     RA: string
-  }[];
+  }[]
 
   return rows.map((row) => ({
     id: row.id,
     nombre: row.nombre,
-    creditos: row.creditos, 
+    creditos: row.creditos,
     descripcion: JSON.parse(row.descripcion),
     RA: JSON.parse(row.RA),
-  })) satisfies Asignatura[];
-});
+  })) satisfies Asignatura[]
+})
 
 // ---------------------------
 // IPC handler para ALUMNOS
@@ -164,4 +166,8 @@ ipcMain.handle("guardar-alumno", async (_event, alumno) => {
     console.error("❌ Error al guardar alumno en SQLite:", error)
     throw error
   }
+})
+
+ipcMain.handle("leer-alumnos", () => {
+  return db.prepare("SELECT * FROM alumnos").all()
 })
