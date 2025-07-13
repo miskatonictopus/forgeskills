@@ -27,18 +27,19 @@ export default function NuevoAlumno() {
   }, [])
 
   const handleGuardar = async () => {
-    if (!nombre || !curso) {
+    if (!nombre || !curso || !apellidos || !mail) {
       toast.error("Rellena todos los campos")
       return
     }
-    
-
+  
     try {
       const alumno = {
         nombre: nombre.trim(),
+        apellidos: apellidos.trim(),
         curso: curso.trim(),
+        mail: mail.trim(),
       }
-
+  
       await window.electronAPI.guardarAlumno(alumno)
       toast.success("Alumno guardado")
     } catch (error) {
@@ -46,6 +47,7 @@ export default function NuevoAlumno() {
       console.error(error)
     }
   }
+  
 
   return (
     <div className="space-y-4">

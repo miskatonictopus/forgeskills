@@ -5,6 +5,16 @@ import type { Asignatura } from "../models/asignatura"
 
 initDB()
 
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS alumnos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT,
+    apellidos TEXT,
+    curso TEXT,
+    mail TEXT
+  )
+`).run()
+
 const isDev = !app.isPackaged
 
 const createWindow = () => {
@@ -135,19 +145,23 @@ ipcMain.handle("leer-asignaturas", () => {
 // ---------------------------
 
 ipcMain.handle("guardar-alumno", async (_event, alumno) => {
+  console.log("📩 Guardando alumno en SQLite:", alumno)
   try {
-    const fs = require("fs")
-    const path = require("path")
-    const basePath = path.join(__dirname, "alumnos")
-    if (!fs.existsSync(basePath)) fs.mkdirSync(basePath)
+    const stmt = db.prepare(`
+      INSERT INTO alumnos (nombre, apellidos, curso, mail)
+      VALUES (?, ?, ?, ?)
+    `)
 
-    const filename = `${alumno.nombre}_${alumno.curso}.json`
-    const filePath = path.join(basePath, filename)
+    stmt.run(
+      alumno.nombre,
+      alumno.apellidos,
+      alumno.curso,
+      alumno.mail
+    )
 
-    fs.writeFileSync(filePath, JSON.stringify(alumno, null, 2), "utf-8")
-    return true
+    return { success: true }
   } catch (error) {
-    console.error("❌ Error al guardar alumno:", error)
+    console.error("❌ Error al guardar alumno en SQLite:", error)
     throw error
   }
 })
