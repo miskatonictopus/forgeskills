@@ -74,7 +74,7 @@ export default function TablaAlumnos() {
       </div>
 
       {/* 📋 Tabla */}
-      <div className="border border-zinc-800 rounded-xl overflow-auto bg-zinc-900">
+      <div className="border border-zinc-800 rounded-xl overflow-auto bg-zinc-900 overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -119,7 +119,7 @@ export default function TablaAlumnos() {
                       className="w-8 h-8 rounded-full object-cover shadow"
                     />
 
-                    {/* ✅ Checkbox */}
+                    {/* ✅ Checkbox */}  
                     <Checkbox
                       checked={seleccionados.includes(alumno.id)}
                       onCheckedChange={() => toggleSeleccion(alumno.id)}

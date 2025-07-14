@@ -21,8 +21,11 @@ const isDev = !app.isPackaged
 
 const createWindow = () => {
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: 1600,
+    height: 1000,
+    minWidth: 1400, 
+    minHeight: 800,
+    resizable: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,

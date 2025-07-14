@@ -117,7 +117,7 @@ export default function Page() {
         </header>
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <div className="flex flex-row gap-6 items-start">
+        <div className="flex flex-wrap gap-6 items-start justify-between">
             {/* Cursos */}
             <div className="flex flex-col gap-2">
               <h2 className="text-2xl font-notojp font-light tracking-tight flex items-center gap-2">
@@ -242,7 +242,9 @@ export default function Page() {
               </div>
             </div>
           </div>
+          <div className="mt-5">
           <TablaAlumnos />
+          </div>
           {/* <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" /> */}
           
         </div>

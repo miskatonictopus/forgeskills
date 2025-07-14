@@ -22,9 +22,8 @@ export default function NuevaAsignatura() {
   const [asignaturasRemotas, setAsignaturasRemotas] = useState<AsignaturaRemota[]>([])
   const [asignaturaSeleccionada, setAsignaturaSeleccionada] = useState<AsignaturaRemota | null>(null)
 
-  // 🔄 Cargar asignaturas desde el JSON remoto
   useEffect(() => {
-    fetch("https://raw.githubusercontent.com/miskatonictopus/Auswertecontroller/refs/heads/main/asignaturas_FP.json")
+    fetch("https://raw.githubusercontent.com/miskatonictopus/asignaturas_fp/refs/heads/main/asignaturas_FP.json")
       .then((res) => res.json())
       .then((data: AsignaturaRemota[]) => setAsignaturasRemotas(data))
       .catch((err) => {
