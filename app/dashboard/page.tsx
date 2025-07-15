@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SquarePen, Trash2, Clock } from "lucide-react";
+import { SquarePen, Trash2, Clock, PlusCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import TablaAlumnos from "@/components/TablaAlumnos";
@@ -25,17 +25,12 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+import { HorarioDialog } from "@/components/HorarioDialog";
+
+import React from "react";
+
+
+// Tipos de datos
 
 type Curso = {
   id: string;
@@ -71,41 +66,24 @@ type Asignatura = {
   RA: RA[];
 };
 
-function generarIntervalosHora(inicio: string, fin: string): string[] {
-  const resultado: string[] = [];
-  let [hora, minuto] = inicio.split(":").map(Number);
-  const [horaFin, minutoFin] = fin.split(":").map(Number);
-
-  while (hora < horaFin || (hora === horaFin && minuto <= minutoFin)) {
-    const h = hora.toString().padStart(2, "0");
-    const m = minuto.toString().padStart(2, "0");
-    resultado.push(`${h}:${m}`);
-
-    minuto += 30;
-    if (minuto >= 60) {
-      minuto = 0;
-      hora += 1;
-    }
-  }
-
-  return resultado;
-}
-
+type Horario = {
+  dia: string;
+  horaInicio: string;
+  horaFin: string;
+};
 
 export default function Page() {
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [openHorario, setOpenHorario] = useState<string | null>(null);
-  const [dia, setDia] = useState("");
-  const [horaInicio, setHoraInicio] = useState("");
-  const [horaFin, setHoraFin] = useState("");
+  const [horariosPorAsignatura, setHorariosPorAsignatura] = useState<Record<string, Horario[]>>({});
 
+  // Cargar cursos
   useEffect(() => {
     const fetchCursos = async () => {
       try {
         const cursosBD = await window.electronAPI.leerCursos?.();
         setCursos(cursosBD || []);
-        console.log("📘 Cursos en BDD:", cursosBD);
       } catch (error) {
         console.error("❌ Error al leer cursos:", error);
         toast.error("No se pudieron cargar los cursos");
@@ -114,12 +92,12 @@ export default function Page() {
     fetchCursos();
   }, []);
 
+  // Cargar asignaturas
   useEffect(() => {
     const fetchAsignaturas = async () => {
       try {
         const asignaturasBD = await window.electronAPI?.leerAsignaturas();
         setAsignaturas(asignaturasBD || []);
-        console.log("📗 Asignaturas en BDD:", asignaturasBD);
       } catch (error) {
         console.error("❌ Error al leer asignaturas:", error);
         toast.error("No se pudieron cargar las asignaturas");
@@ -128,17 +106,17 @@ export default function Page() {
     fetchAsignaturas();
   }, []);
 
-  const handleGuardarHorario = () => {
-    if (!dia || !horaInicio || !horaFin) {
-      toast.error("Completa todos los campos del horario");
-      return;
-    }
-    console.log("📅 Nuevo horario:", { dia, horaInicio, horaFin });
+  // Guardar horarios en memoria
+  const handleGuardarHorario = (asignaturaId: string, nuevosHorarios: Horario[]) => {
+    setHorariosPorAsignatura((prev) => ({
+      ...prev,
+      [asignaturaId]: nuevosHorarios,
+    }));
+
     toast.success("Horario guardado correctamente");
-    setOpenHorario(null);
-    setDia("");
-    setHoraInicio("");
-    setHoraFin("");
+    console.log("✅ Horario guardado para", asignaturaId, nuevosHorarios);
+
+    // Aquí podrías usar: await window.electronAPI.guardarHorario(asignaturaId, nuevosHorarios)
   };
 
   return (
@@ -224,9 +202,8 @@ export default function Page() {
               </h2>
               <div className="flex flex-wrap gap-3">
                 {asignaturas.map((asig) => (
-                  <>
+                  <React.Fragment key={asig.id}>      
                     <Card
-                      key={asig.id}
                       className="relative w-auto min-w-[10rem] max-w-[16rem] h-[170px] bg-zinc-900 border border-zinc-700 text-white"
                     >
                       <Tooltip>
@@ -273,71 +250,13 @@ export default function Page() {
                       </CardContent>
                     </Card>
 
-                    <Dialog open={openHorario === asig.id} onOpenChange={() => setOpenHorario(null)}>
-                      <DialogContent className="bg-zinc-900 border border-zinc-700 text-white">
-                        <DialogHeader>
-                          <DialogTitle>
-                            Insertar horario para {asig.id}</DialogTitle>
-                          <DialogDescription className="text-zinc-400 uppercase">
-                            {asig.nombre}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 mt-4">
-                        <div className="flex gap-4">
-  {/* Día de la semana: 1/2 */}
-  <div className="w-1/2 space-y-1">
-  <Label className="mb-2">Día de la semana</Label>
-    <Select value={dia} onValueChange={setDia}>
-      <SelectTrigger className="w-full">
-        <SelectValue placeholder="Selecciona un día" />
-      </SelectTrigger>
-      <SelectContent>
-        {["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"].map((dia) => (
-          <SelectItem key={dia} value={dia}>{dia}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  </div>
-
-  {/* Hora de inicio y fin: 1/2 (25% + 25%) */}
-  <div className="w-1/2 flex gap-4">
-    {/* Hora de inicio */}
-    <div className="w-1/2 space-y-1">
-      <Label className="mb-2">inicio</Label>
-      <Select value={horaInicio} onValueChange={setHoraInicio}>
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="inicio" />
-        </SelectTrigger>
-        <SelectContent>
-          {generarIntervalosHora("08:00", "21:00").map((hora) => (
-            <SelectItem key={hora} value={hora}>{hora}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-
-    {/* Hora de fin */}
-    <div className="w-1/2 space-y-1">
-      <Label className="mb-2">fin</Label>
-      <Select value={horaFin} onValueChange={setHoraFin}>
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="Hora fin" />
-        </SelectTrigger>
-        <SelectContent>
-          {generarIntervalosHora("08:30", "21:00").map((hora) => (
-            <SelectItem key={hora} value={hora}>{hora}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
-</div>
-
-                          <Button onClick={handleGuardarHorario} className="w-full mt-2">Guardar horario</Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </>
+                    <HorarioDialog
+                      open={openHorario === asig.id}
+                      onClose={() => setOpenHorario(null)}
+                      asignatura={asig}
+                      onGuardar={handleGuardarHorario}
+                    />
+                  </React.Fragment>
                 ))}
               </div>
             </div>
