@@ -49,6 +49,13 @@ declare global {
       }) => Promise<void>
 
       leerHorarios: (asignaturaId: string) => Promise<Horario[]>
+
+      borrarHorario: (datos: {
+        asignaturaId: string
+        dia: string
+        horaInicio: string
+      }) => Promise<void>
+      
     }
   }
 
@@ -58,3 +65,5 @@ declare global {
     horaFin: string
   }
 }
+
+

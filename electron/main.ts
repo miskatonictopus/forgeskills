@@ -223,3 +223,13 @@ ipcMain.handle("leer-horarios", (event, asignaturaId: string) => {
   }))
 })
 
+ipcMain.handle("borrar-horario", (event, datos: { asignaturaId: string; dia: string; horaInicio: string }) => {
+  const stmt = db.prepare(`
+    DELETE FROM horarios
+    WHERE asignatura_id = ? AND dia = ? AND hora_inicio = ?
+  `)
+
+  stmt.run(datos.asignaturaId, datos.dia, datos.horaInicio)
+  return { success: true }
+})
+

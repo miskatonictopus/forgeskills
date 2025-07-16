@@ -102,6 +102,23 @@ export function HorarioDialog({ open, onClose, asignatura }: Props) {
     }
   }
 
+  const handleEliminar = async (dia: string, horaInicio: string) => {
+    try {
+      await window.electronAPI.borrarHorario({
+        asignaturaId: asignatura.id,
+        dia,
+        horaInicio,
+      })
+  
+      const actualizados = await window.electronAPI.leerHorarios(asignatura.id)
+      setHorarios(actualizados)
+      toast.success("Horario eliminado")
+    } catch (error) {
+      toast.error("Error al borrar horario")
+      console.error(error)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="w-full max-w-3xl bg-zinc-900 border border-zinc-700 text-white">
@@ -188,9 +205,12 @@ export function HorarioDialog({ open, onClose, asignatura }: Props) {
                       {calcularDuracion(h.horaInicio, h.horaFin)}h
                     </span>
                   </span>
-                  <button className="text-zinc-400 hover:text-red-400" disabled>
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <button
+  onClick={() => handleEliminar(h.dia, h.horaInicio)}
+  className="text-zinc-400 hover:text-red-400"
+>
+  <Trash2 className="w-4 h-4" />
+</button>
                 </li>
               ))}
             </ul>
