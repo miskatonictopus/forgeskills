@@ -16,17 +16,26 @@ contextBridge.exposeInMainWorld("electronAPI", {
     grado: string
     clase: string
   }) => ipcRenderer.invoke("guardar-curso", curso),
-  
 
   leerCursos: () => ipcRenderer.invoke("leer-cursos"),
   borrarCurso: (id: string) => ipcRenderer.invoke("borrar-curso", id),
 
-
+  // Asignaturas
   guardarAsignatura: (asignatura: Asignatura) =>
     ipcRenderer.invoke("guardar-asignatura", asignatura),
 
-    guardarAlumno: (alumno: Alumno) => ipcRenderer.invoke("guardar-alumno", alumno),
+  // Alumnos
+  guardarAlumno: (alumno: Alumno) => ipcRenderer.invoke("guardar-alumno", alumno),
+  leerAlumnos: () => ipcRenderer.invoke("leer-alumnos"),
 
-    leerAlumnos: () => ipcRenderer.invoke("leer-alumnos"),
+  // 🕒 Horarios
+  guardarHorario: (horario: {
+    asignaturaId: string
+    dia: string
+    horaInicio: string
+    horaFin: string
+  }) => ipcRenderer.invoke("guardar-horario", horario),
+
+  leerHorarios: (asignaturaId: string) =>
+    ipcRenderer.invoke("leer-horarios", asignaturaId),
 })
-

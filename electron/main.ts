@@ -17,6 +17,18 @@ db.prepare(`
   )
 `).run()
 
+// Tabla HORARIOS
+
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS horarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asignatura_id TEXT NOT NULL,
+    dia TEXT NOT NULL,
+    hora_inicio TEXT NOT NULL,
+    hora_fin TEXT NOT NULL
+  )
+`).run()
+
 const isDev = !app.isPackaged
 
 const createWindow = () => {
@@ -174,3 +186,40 @@ ipcMain.handle("guardar-alumno", async (_event, alumno) => {
 ipcMain.handle("leer-alumnos", () => {
   return db.prepare("SELECT * FROM alumnos").all()
 })
+
+// ---------------------------
+// IPC handler para HORARIOS
+// ---------------------------
+
+
+ipcMain.handle("guardar-horario", (event, horario) => {
+  const stmt = db.prepare(`
+    INSERT INTO horarios (asignatura_id, dia, hora_inicio, hora_fin)
+    VALUES (?, ?, ?, ?)
+  `)
+
+  stmt.run(horario.asignaturaId, horario.dia, horario.horaInicio, horario.horaFin)
+
+  return { success: true }
+})
+
+ipcMain.handle("leer-horarios", (event, asignaturaId: string) => {
+  const stmt = db.prepare(`
+    SELECT dia, hora_inicio, hora_fin
+    FROM horarios
+    WHERE asignatura_id = ?
+  `)
+
+  const resultados = stmt.all(asignaturaId) as {
+    dia: string
+    hora_inicio: string
+    hora_fin: string
+  }[]
+
+  return resultados.map((h) => ({
+    dia: h.dia,
+    horaInicio: h.hora_inicio,
+    horaFin: h.hora_fin,
+  }))
+})
+
