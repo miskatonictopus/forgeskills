@@ -62,9 +62,10 @@ type Props = {
   open: boolean
   onClose: () => void
   asignatura: { id: string; nombre: string }
+  onSave?: (id: string) => void
 }
 
-export function HorarioDialog({ open, onClose, asignatura }: Props) {
+export function HorarioDialog({ open, onClose, asignatura, onSave }: Props) {
   const [dia, setDia] = useState("")
   const [horaInicio, setHoraInicio] = useState("")
   const [horaFin, setHoraFin] = useState("")
@@ -80,26 +81,43 @@ export function HorarioDialog({ open, onClose, asignatura }: Props) {
   }, [open, asignatura.id])
 
   const handleAñadir = async () => {
-    if (!dia || !horaInicio || !horaFin) return
-
+    if (!dia || !horaInicio || !horaFin) return;
+  
+    // ✅ Validación: la hora de fin debe ser posterior a la de inicio
+    const [h1, m1] = horaInicio.split(":").map(Number);
+    const [h2, m2] = horaFin.split(":").map(Number);
+    const minutosInicio = h1 * 60 + m1;
+    const minutosFin = h2 * 60 + m2;
+  
+    if (minutosFin <= minutosInicio) {
+      toast.error("Nuestra aplicación todavía no puede viajar atrás en el tiempo, estamos trabajando en ello, la hora fin no puede ser menor que la hora inicio");
+      return;
+    }
+  
     try {
       await window.electronAPI.guardarHorario({
         asignaturaId: asignatura.id,
         dia,
         horaInicio,
         horaFin,
-      })
-
-      const nuevos = await window.electronAPI.leerHorarios(asignatura.id)
-      setHorarios(nuevos)
-      toast.success("Horario añadido correctamente")
-      setDia("")
-      setHoraInicio("")
-      setHoraFin("")
+      });
+  
+      await cargarHorarios(asignatura.id); // ✅ refresca tras guardar
+      toast.success("Horario añadido correctamente");
+  
+      setDia("");
+      setHoraInicio("");
+      setHoraFin("");
+      onSave?.(asignatura.id);
     } catch (err) {
-      toast.error("Error al guardar horario")
-      console.error(err)
+      toast.error("Error al guardar horario");
+      console.error(err);
     }
+  };
+
+  const cargarHorarios = async (id: string) => {
+    const nuevos = await window.electronAPI.leerHorarios(id)
+    setHorarios(nuevos)
   }
 
   const handleEliminar = async (dia: string, horaInicio: string) => {
@@ -112,6 +130,7 @@ export function HorarioDialog({ open, onClose, asignatura }: Props) {
   
       const actualizados = await window.electronAPI.leerHorarios(asignatura.id)
       setHorarios(actualizados)
+      onSave?.(asignatura.id)
       toast.success("Horario eliminado")
     } catch (error) {
       toast.error("Error al borrar horario")
@@ -124,7 +143,7 @@ export function HorarioDialog({ open, onClose, asignatura }: Props) {
       <DialogContent className="w-full max-w-3xl bg-zinc-900 border border-zinc-700 text-white">
         <DialogHeader>
           <div className="flex justify-between items-center">
-            <DialogTitle>Insertar horario para {asignatura.id}</DialogTitle>
+            <DialogTitle>Insertar / Eliminar horario para {asignatura.id}</DialogTitle>
             <span className="text-emerald-200 text-4xl font-bold mr-4 whitespace-nowrap">
               {calcularTotalHoras(horarios)}h
             </span>
