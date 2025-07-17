@@ -247,7 +247,7 @@ export default function Page() {
                   style={{ fontFamily: "var(--font-geist)" }}
                   className="text-zinc-400 ml-3 !text-xs font-light uppercase"
                 >
-                  total horas:
+                  total horas / semana:
                 </span>
                 <span
                   style={{ fontFamily: "var(--font-geist)" }}

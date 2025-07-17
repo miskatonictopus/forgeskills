@@ -66,25 +66,10 @@ const data = {
       icon: Settings,
       isActive: true,
     },
-    {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
+    {title: "Calendario",
+      url: "/calendario",
+      icon: Settings,
       isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
     },
     {
       title: "Models",
