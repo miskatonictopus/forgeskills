@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   leerHorarios: (asignaturaId: string) =>
     ipcRenderer.invoke("leer-horarios", asignaturaId),
+  leerHorariosTodos: () => ipcRenderer.invoke("leer-horarios-todos"),
+
 
   borrarHorario: (datos: {
     asignaturaId: string;

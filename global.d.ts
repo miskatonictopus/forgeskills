@@ -50,6 +50,15 @@ declare global {
 
       leerHorarios: (asignaturaId: string) => Promise<Horario[]>
 
+      leerHorariosTodos: () => Promise<
+  {
+    asignaturaId: string
+    dia: string
+    horaInicio: string
+    horaFin: string
+  }[]
+>
+
       borrarHorario: (datos: {
         asignaturaId: string
         dia: string

@@ -1,12 +1,83 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import esLocale from "@fullcalendar/core/locales/es"
 
+declare global {
+    interface Window {
+      electronAPI: {
+        leerHorariosTodos: () => Promise<
+          {
+            title: string
+            start: string
+            end: string
+          }[]
+        >
+      }
+    }
+  }
+
+type Evento = {
+  title: string
+  start: Date
+  end: Date
+}
+
+type EventoBase = {
+  title: string
+  start: string
+  end: string
+}
+
 export default function MiCalendario() {
+  const [eventos, setEventos] = useState<Evento[]>([])
+
+  useEffect(() => {
+    // 👇 Esta función sí es async y se llama correctamente
+    const obtenerEventos = async () => {
+      try {
+        const resultado = await window.electronAPI.leerHorariosTodos() as EventoBase[]
+        console.log("📅 Resultado horarios:", resultado)
+
+        const eventosProcesados: Evento[] = []
+
+        for (const h of resultado) {
+          console.log("🔍 Analizando horario:", h)
+
+          const startBase = new Date(h.start)
+          const endBase = new Date(h.end)
+          const nombre = h.title || "Clase sin título"
+
+          // 🔁 Genera 20 repeticiones semanales (luego lo cambiaremos por fechaInicio y fechaFin)
+          for (let i = 0; i < 20; i++) {
+            const start = new Date(startBase)
+            const end = new Date(endBase)
+
+            start.setDate(start.getDate() + i * 7)
+            end.setDate(end.getDate() + i * 7)
+
+            eventosProcesados.push({
+              title: `📘 ${nombre}`,
+              start,
+              end,
+            })
+          }
+        }
+
+        console.log("✅ Eventos procesados:", eventosProcesados)
+        setEventos(eventosProcesados)
+      } catch (error) {
+        console.error("❌ Error leyendo horarios:", error)
+      }
+    }
+
+    obtenerEventos() // ✅ llamada correcta
+  }, [])
+
   return (
     <div className="bg-white rounded-xl p-4 shadow-xl text-black">
       <FullCalendar
@@ -19,23 +90,12 @@ export default function MiCalendario() {
         }}
         locales={[esLocale]}
         locale="es"
-        events={[
-          {
-            title: "📘 Clase de 0612",
-            start: "2025-07-18T10:00:00",
-            end: "2025-07-18T12:00:00",
-          },
-          {
-            title: "🧪 Examen final",
-            start: "2025-07-19T09:00:00",
-            end: "2025-07-19T11:00:00",
-          },
-        ]}
-        editable={true}
-        selectable={true}
+        events={eventos}
+        editable={false}
+        selectable={false}
         height="auto"
+        nowIndicator={true}
       />
     </div>
   )
 }
-

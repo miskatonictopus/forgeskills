@@ -233,3 +233,53 @@ ipcMain.handle("borrar-horario", (event, datos: { asignaturaId: string; dia: str
   return { success: true }
 })
 
+// ---------------------------
+// IPC handler para HORARIOS de FULLCALENDAR
+// ---------------------------
+
+ipcMain.handle("leer-horarios-todos", () => {
+  const stmt = db.prepare(`
+    SELECT h.dia, h.hora_inicio, h.hora_fin, a.nombre
+    FROM horarios h
+    JOIN asignaturas a ON h.asignatura_id = a.id
+  `);
+
+  const resultados = stmt.all() as {
+    dia: string;
+    hora_inicio: string;
+    hora_fin: string;
+    nombre: string;
+  }[];
+
+  return resultados.map((h) => ({
+    title: `📘 ${h.nombre}`,
+    start: generarFecha(h.dia, h.hora_inicio),
+    end: generarFecha(h.dia, h.hora_fin),
+  }));
+
+  function generarFecha(dia: string, hora: string): string {
+    const diasSemana: Record<string, number> = {
+      lunes: 1,
+      martes: 2,
+      miercoles: 3,
+      miércoles: 3,
+      jueves: 4,
+      viernes: 5,
+      sabado: 6,
+      sábado: 6,
+      domingo: 0,
+    };
+
+    const base = new Date("2025-07-14"); // lunes como día de referencia
+    const offset = diasSemana[dia.toLowerCase()] ?? 1;
+    const fecha = new Date(base);
+    fecha.setDate(base.getDate() + (offset - 1));
+
+    const [hh, mm] = hora.split(":");
+    fecha.setHours(Number(hh), Number(mm), 0, 0);
+
+    return fecha.toISOString();
+  }
+});
+
+
