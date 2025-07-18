@@ -12,13 +12,67 @@
   /* 📅 Celda de día en vista timeGrid */
   .fc-timegrid-slot,
   .fc-daygrid-day {
-    border-color: #27272a !important; /* border-zinc-800 */
+    border-color: #27272a !important;
   }
   
   /* 🧭 Encabezado */
   .fc-toolbar {
     padding: 0.5rem 1rem;
   }
+
+  #colgroup{
+    background-color: #09090b;
+  }
+
+  .fc-timegrid-axis{background-color: #09090b;}
+  
+  .fc-theme-standard .fc-scrollgrid{
+    border: none !important;
+  }
+  
+  .fc-theme-standard td{
+    border: none !important;
+  }
+
+  .fc .fc-event {
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  .fc .fc-event * {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0.25em !important;
+  }
+  
+  .fc .fc-event-main,
+  .fc .fc-event-main-frame {
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .fc-timegrid-event .fc-event-time {
+    font-weight: 700;
+    font-size: 16px;
+  }
+
+  .fc-event-title-container{
+    font-weight: 200;
+    text-transform: uppercase;
+    font-size: 14px;
+  }
+
+  .fc .fc-event {
+    background-color: #134e4a !important; 
+    border: none !important;
+    color: #000 !important;
+  }
+
+  .fc, .fc *, .fc ::after, .fc ::before{
+    text-align: left !important;
+    border: none !important;
+  }
+
   
   .fc-toolbar-title {
     font-size: 1rem;
@@ -27,12 +81,16 @@
     font-weight: 700;
     letter-spacing: -0.05em;
   }
-  
-  /* ⏰ Hora en columna izquierda */
-  .fc-timegrid-slot-label {
-    color: #a1a1aa !important; /* text-zinc-400 */
+  .fc-timegrid-allday {
+    display: none !important;
+  }
+
+  .fc-timegrid-col.fc-day-today {
+    background-color: #18181b !important; /* Ejemplo: zinc-950 */
   }
   
+  /* ⏰ Hora en columna izquierda */
+
   /* 📌 Eventos */
   .fc-event {
     background-color: #3b82f6 !important; /* bg-blue-500 */
@@ -50,9 +108,10 @@
   
   /* 📆 Encabezado de los días */
   .fc-col-header-cell {
-    background-color: #18181b !important; /* bg-zinc-900 */
-    color: #e4e4e7 !important; /* text-zinc-200 */
-    font-weight: 500;
+    background-color: #09090b !important;
+    color: #ffffff;
+    font-weight: 700;
+    border: none !important;
   }
   
   /* Línea del "ahora" */
@@ -81,5 +140,14 @@
   
   .fc-button-primary:not(:disabled).fc-button-active {
     background: #22c55e !important; /* emerald-500 */
+  }
+
+  .fc-timeGridDay-view .fc-col-header-cell-cushion {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .fc-theme-standard .fc-scrollgrid{
+    border: none !important;
   }
   

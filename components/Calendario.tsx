@@ -76,8 +76,13 @@ export default function MiCalendario() {
             start.setDate(start.getDate() + i * 7);
             end.setDate(end.getDate() + i * 7);
 
+            const nombreSinEmojis = nombre.replace(
+  /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu,
+  ""
+).trim();
+
             eventosProcesados.push({
-              title: `📘 ${nombre}`,
+              title:nombreSinEmojis,
               start,
               end,
             });
@@ -100,29 +105,40 @@ export default function MiCalendario() {
           variant={vista === "timeGridDay" ? "default" : "secondary"}
           onClick={() => cambiarVista("timeGridDay")}
         >
-          Día
+          <span className="font-light uppercase">Día</span>
         </Button>
 
         <Button
           variant={vista === "timeGridWeek" ? "default" : "secondary"}
           onClick={() => cambiarVista("timeGridWeek")}
         >
-          Semana
+          <span className="font-light uppercase">Semana</span>
         </Button>
 
         <Button
           variant={vista === "dayGridMonth" ? "default" : "secondary"}
           onClick={() => cambiarVista("dayGridMonth")}
         >
-          Mes
+          <span className="font-light uppercase">Mes</span>
         </Button>
       </div>
 
       <FullCalendar
   ref={calendarRef}
+  eventContent={(arg) => {
+    return (
+      <div className="flex flex-col w-full h-full px-2 py-1 text-white font-medium text-sm">
+        <div className="truncate">
+          <span className="font-bold">{arg.timeText}</span> – <span className="uppercase font-light text-xs">{arg.event.title}</span>
+        </div>
+      </div>
+    );
+  }}
   plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
   initialView={vista}
   headerToolbar={false}
+  slotMinTime="08:00:00"
+  slotMaxTime="22:00:00"
   locales={[esLocale]}
   locale="es"
   events={eventos}
@@ -130,6 +146,8 @@ export default function MiCalendario() {
   selectable={false}
   height="auto"
   nowIndicator={true}
+  allDaySlot={false}
+  hiddenDays={[0, 6]}
   views={{
     timeGridWeek: {
       slotLabelFormat: [
