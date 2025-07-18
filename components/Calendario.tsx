@@ -33,12 +33,16 @@ type Evento = {
   title: string;
   start: Date;
   end: Date;
+  extendedProps: {
+    asignaturaId?: string;
+  };
 };
 
 type EventoBase = {
   title: string;
   start: string;
   end: string;
+  asignaturaId?: string;
 };
 
 export default function MiCalendario() {
@@ -64,8 +68,10 @@ export default function MiCalendario() {
         const resultado =
           (await window.electronAPI.leerHorariosTodos()) as EventoBase[];
         const eventosProcesados: Evento[] = [];
+        console.log("📦 Resultado de leerHorariosTodos:", resultado);
 
         for (const h of resultado) {
+          console.log("🧪 Horario:", h);
           const startBase = new Date(h.start);
           const endBase = new Date(h.end);
           const nombre = h.title || "Clase sin título";
@@ -85,6 +91,9 @@ export default function MiCalendario() {
               title:nombreSinEmojis,
               start,
               end,
+              extendedProps: {
+                asignaturaId: h.asignaturaId || "",
+              },
             });
           }
         }
@@ -126,10 +135,15 @@ export default function MiCalendario() {
       <FullCalendar
   ref={calendarRef}
   eventContent={(arg) => {
+    const id = arg.event.extendedProps?.asignaturaId || "";
+  
     return (
       <div className="flex flex-col w-full h-full px-2 py-1 text-white font-medium text-sm">
         <div className="truncate">
-          <span className="font-bold">{arg.timeText}</span> – <span className="uppercase font-light text-xs">{arg.event.title}</span>
+          <span className="font-bold">{arg.timeText}</span> –{" "}
+          <span className="uppercase font-bold text-xs">
+            {id && `[${id}] `}</span><span className="uppercase font-light text-xs">{arg.event.title}</span>
+          
         </div>
       </div>
     );

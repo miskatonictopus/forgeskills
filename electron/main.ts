@@ -239,7 +239,7 @@ ipcMain.handle("borrar-horario", (event, datos: { asignaturaId: string; dia: str
 
 ipcMain.handle("leer-horarios-todos", () => {
   const stmt = db.prepare(`
-    SELECT h.dia, h.hora_inicio, h.hora_fin, a.nombre
+    SELECT h.dia, h.hora_inicio, h.hora_fin, a.nombre, asignatura_id
     FROM horarios h
     JOIN asignaturas a ON h.asignatura_id = a.id
   `);
@@ -249,12 +249,14 @@ ipcMain.handle("leer-horarios-todos", () => {
     hora_inicio: string;
     hora_fin: string;
     nombre: string;
+    asignatura_id: string;
   }[];
 
   return resultados.map((h) => ({
     title: `📘 ${h.nombre}`,
     start: generarFecha(h.dia, h.hora_inicio),
     end: generarFecha(h.dia, h.hora_fin),
+    asignaturaId: h.asignatura_id,
   }));
 
   function generarFecha(dia: string, hora: string): string {
