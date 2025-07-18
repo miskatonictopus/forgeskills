@@ -1,0 +1,85 @@
+/* Estilos personalizados para FullCalendar integrados visualmente con ShadCN y Tailwind */
+
+/* 🔲 Contenedor general del calendario */
+.fc {
+    background-color: #09090b !important; /* bg-zinc-950 */
+    color: #f4f4f5 !important; /* text-zinc-100 */
+    border-radius: 0.75rem; /* rounded-xl */
+    font-family: var(--font-geist), sans-serif;
+    font-size: 0.85rem;
+  }
+  
+  /* 📅 Celda de día en vista timeGrid */
+  .fc-timegrid-slot,
+  .fc-daygrid-day {
+    border-color: #27272a !important; /* border-zinc-800 */
+  }
+  
+  /* 🧭 Encabezado */
+  .fc-toolbar {
+    padding: 0.5rem 1rem;
+  }
+  
+  .fc-toolbar-title {
+    font-size: 1rem;
+    text-transform: uppercase;
+    color: white;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+  
+  /* ⏰ Hora en columna izquierda */
+  .fc-timegrid-slot-label {
+    color: #a1a1aa !important; /* text-zinc-400 */
+  }
+  
+  /* 📌 Eventos */
+  .fc-event {
+    background-color: #3b82f6 !important; /* bg-blue-500 */
+    border: none;
+    border-radius: 0.5rem;
+    padding: 2px 4px;
+    font-size: 0.75rem; /* text-xs */
+    font-weight: 500;
+  }
+  
+  .fc-event-title {
+    padding: 0 4px;
+    color: white !important;
+  }
+  
+  /* 📆 Encabezado de los días */
+  .fc-col-header-cell {
+    background-color: #18181b !important; /* bg-zinc-900 */
+    color: #e4e4e7 !important; /* text-zinc-200 */
+    font-weight: 500;
+  }
+  
+  /* Línea del "ahora" */
+  .fc-now-indicator-line {
+    border-color: #ef4444 !important; /* red-500 */
+  }
+  
+  /* 👉 Botones del toolbar */
+  .fc-button {
+    background: #1e293b; /* bg-slate-800 */
+    color: white;
+    border: none;
+    border-radius: 0.375rem; /* rounded-md */
+    padding: 0.25rem 0.75rem;
+    margin-left: 0.25rem;
+    margin-right: 0.25rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s ease-in-out;
+  }
+  
+  .fc-button:hover {
+    background: #334155; /* slate-700 */
+  }
+  
+  .fc-button-primary:not(:disabled).fc-button-active {
+    background: #22c55e !important; /* emerald-500 */
+  }
+  

@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { SquarePen, Trash2, Clock, PlusCircle } from "lucide-react";
 import { toast } from "sonner";
-import { MensajeSinHorarios } from "@/components/MensajeSinHorarios"
-
+import { MensajeSinHorarios } from "@/components/MensajeSinHorarios";
 
 import TablaAlumnos from "@/components/TablaAlumnos";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -80,18 +79,19 @@ export default function Page() {
   const [horariosPorAsignatura, setHorariosPorAsignatura] = useState<
     Record<string, Horario[]>
   >({});
-  
+
   // Cargar cursos
   useEffect(() => {
     const fetchCursos = async () => {
       try {
-        const cursosBD = await window.electronAPI.leerCursos?.();
-        setCursos(cursosBD || []);
+        const cursosBD = await window.electronAPI.leerCursos() as Curso[];
+        setCursos(cursosBD);
       } catch (error) {
         console.error("❌ Error al leer cursos:", error);
         toast.error("No se pudieron cargar los cursos");
       }
     };
+  
     fetchCursos();
   }, []);
 
@@ -99,8 +99,8 @@ export default function Page() {
   useEffect(() => {
     const fetchAsignaturas = async () => {
       try {
-        const asignaturasBD = await window.electronAPI?.leerAsignaturas();
-        setAsignaturas(asignaturasBD || []);
+        const asignaturasBD = await window.electronAPI?.leerAsignaturas() as Asignatura[];
+setAsignaturas(asignaturasBD || []);
       } catch (error) {
         console.error("❌ Error al leer asignaturas:", error);
         toast.error("No se pudieron cargar las asignaturas");
@@ -116,8 +116,9 @@ export default function Page() {
       const mapa: Record<string, Horario[]> = {};
 
       for (const asignatura of asignaturas) {
-        const horarios = await window.electronAPI.leerHorarios(asignatura.id);
-        mapa[asignatura.id] = horarios;
+        const horarios = await window.electronAPI.leerHorarios(asignatura.id) as Horario[];
+mapa[asignatura.id] = horarios;
+
       }
 
       setHorariosPorAsignatura(mapa);
@@ -143,8 +144,8 @@ export default function Page() {
   };
 
   const cargarAsignaturas = async (id: string) => {
-    const nuevas = await window.electronAPI.leerAsignaturas();
-    setAsignaturas(nuevas);
+    const nuevas = await window.electronAPI.leerAsignaturas() as Asignatura[];
+setAsignaturas(nuevas);
   };
 
   const totalHoras = Object.values(horariosPorAsignatura)
@@ -154,8 +155,6 @@ export default function Page() {
       const [h2, m2] = h.horaFin.split(":").map(Number);
       return total + (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
     }, 0);
-
-  
 
   return (
     <SidebarProvider>
@@ -324,36 +323,40 @@ export default function Page() {
 
                         {/* // HORARIOS // */}
                         {horariosPorAsignatura[asig.id]?.length > 0 ? (
-  <div className="h-px bg-zinc-700 my-2">
-    <div className="mt-1 space-y-1 text-xs text-emerald-200 leading-tight pt-2">
-      {horariosPorAsignatura[asig.id].map(
-        (h) => (
-          <div key={`${h.dia}-${h.horaInicio}`}>
-            {h.dia} {h.horaInicio}–{h.horaFin}
-          </div>
-        )
-      )}
-      <div className="text-xl font-bold">
-        {horariosPorAsignatura[asig.id].reduce(
-          (total, h) => {
-            const [h1, m1] = h.horaInicio.split(":").map(Number)
-            const [h2, m2] = h.horaFin.split(":").map(Number)
-            return total + (h2 * 60 + m2 - (h1 * 60 + m1)) / 60
-          },
-          0
-        ).toFixed(1)}{" "}
-        h
-      </div>
-    </div>
-  </div>
-) : (
-  <>
-  <div className="h-px bg-zinc-700 my-2 mb-2"></div>
-  <p className="text-xs text-muted-foreground mt-2 text-red-200">
-  <MensajeSinHorarios />
-  </p>
-  </>
-)}
+                          <div className="h-px bg-zinc-700 my-2">
+                            <div className="mt-1 space-y-1 text-xs text-emerald-200 leading-tight pt-2">
+                              {horariosPorAsignatura[asig.id].map((h) => (
+                                <div key={`${h.dia}-${h.horaInicio}`}>
+                                  {h.dia} {h.horaInicio}–{h.horaFin}
+                                </div>
+                              ))}
+                              <div className="text-xl font-bold">
+                                {horariosPorAsignatura[asig.id]
+                                  .reduce((total, h) => {
+                                    const [h1, m1] = h.horaInicio
+                                      .split(":")
+                                      .map(Number);
+                                    const [h2, m2] = h.horaFin
+                                      .split(":")
+                                      .map(Number);
+                                    return (
+                                      total +
+                                      (h2 * 60 + m2 - (h1 * 60 + m1)) / 60
+                                    );
+                                  }, 0)
+                                  .toFixed(1)}{" "}
+                                h
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="h-px bg-zinc-700 my-2 mb-2"></div>
+                            <div className="text-xs text-muted-foreground mt-2 text-red-200">
+                              <MensajeSinHorarios />
+                            </div>
+                          </>
+                        )}
                       </CardContent>
                     </Card>
                     <HorarioDialog

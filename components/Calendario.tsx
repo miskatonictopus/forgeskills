@@ -7,9 +7,18 @@ import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import esLocale from "@fullcalendar/core/locales/es"
 
+import "@fullcalendar/core/index.js";
+import "@fullcalendar/daygrid/index.js";
+import "@fullcalendar/timegrid/index.js";
+import "../src/styles/fullcalendar-overrides.css";
+
+
 declare global {
     interface Window {
       electronAPI: {
+        leerHorarios(id: string): unknown
+        leerAsignaturas(): unknown
+        leerCursos(): unknown
         leerHorariosTodos: () => Promise<
           {
             title: string
@@ -79,7 +88,7 @@ export default function MiCalendario() {
   }, [])
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-xl text-black">
+    <div className="bg-zinc-950 rounded-xl p-4 shadow-xl text-black">
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
