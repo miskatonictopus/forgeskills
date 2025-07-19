@@ -23,6 +23,7 @@ declare global {
           title: string;
           start: string;
           end: string;
+          asignaturaId?: string;
         }[]
       >;
     };
@@ -35,14 +36,8 @@ type Evento = {
   end: Date;
   extendedProps: {
     asignaturaId?: string;
+    color?: string;
   };
-};
-
-type EventoBase = {
-  title: string;
-  start: string;
-  end: string;
-  asignaturaId?: string;
 };
 
 export default function MiCalendario() {
@@ -61,51 +56,59 @@ export default function MiCalendario() {
       setVista(nuevaVista);
     }
   };
-
+  
+  type Asignatura = {
+    id: string;
+    nombre: string;
+    color?: string;
+  };
+  
   useEffect(() => {
     const obtenerEventos = async () => {
       try {
-        const resultado =
-          (await window.electronAPI.leerHorariosTodos()) as EventoBase[];
+        const resultado = await window.electronAPI.leerHorariosTodos();
+        const asignaturas = await window.electronAPI.leerAsignaturas() as Asignatura[];
+  
         const eventosProcesados: Evento[] = [];
-        console.log("📦 Resultado de leerHorariosTodos:", resultado);
-
+  
         for (const h of resultado) {
-          console.log("🧪 Horario:", h);
+          const asignatura = asignaturas.find(a => a.id === h.asignaturaId); // 👈 AQUÍ estaba el fallo: no se definía
+          const color = asignatura?.color || "#666";
+          const nombre = asignatura?.nombre || h.title || "Clase";
+  
           const startBase = new Date(h.start);
           const endBase = new Date(h.end);
-          const nombre = h.title || "Clase sin título";
-
+  
           for (let i = 0; i < 20; i++) {
             const start = new Date(startBase);
             const end = new Date(endBase);
             start.setDate(start.getDate() + i * 7);
             end.setDate(end.getDate() + i * 7);
-
-            const nombreSinEmojis = nombre.replace(
-  /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu,
-  ""
-).trim();
-
+  
             eventosProcesados.push({
-              title:nombreSinEmojis,
+              title: nombre.replace(
+                /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu,
+                ""
+              ).trim(),
               start,
               end,
               extendedProps: {
                 asignaturaId: h.asignaturaId || "",
+                color,
               },
             });
           }
         }
-
+  
         setEventos(eventosProcesados);
       } catch (error) {
         console.error("❌ Error leyendo horarios:", error);
       }
     };
-
+  
     obtenerEventos();
   }, []);
+  
 
   return (
     <div className="bg-zinc-950 rounded-xl p-4 shadow-xl text-black">
@@ -133,55 +136,62 @@ export default function MiCalendario() {
       </div>
 
       <FullCalendar
-  ref={calendarRef}
-  eventContent={(arg) => {
-    const id = arg.event.extendedProps?.asignaturaId || "";
-  
-    return (
-      <div className="flex flex-col w-full h-full px-2 py-1 text-white font-medium text-sm">
-        <div className="truncate">
-          <span className="font-bold">{arg.timeText}</span> –{" "}
-          <span className="uppercase font-bold text-xs">
-            {id && `[${id}] `}</span><span className="uppercase font-light text-xs">{arg.event.title}</span>
-          
-        </div>
-      </div>
-    );
-  }}
-  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-  initialView={vista}
-  headerToolbar={false}
-  slotMinTime="08:00:00"
-  slotMaxTime="22:00:00"
-  locales={[esLocale]}
-  locale="es"
-  events={eventos}
-  editable={false}
-  selectable={false}
-  height="auto"
-  nowIndicator={true}
-  allDaySlot={false}
-  hiddenDays={[0, 6]}
-  views={{
-    timeGridWeek: {
-      slotLabelFormat: [
-        { hour: "2-digit", minute: "2-digit", hour12: false },
-      ],
-      dayHeaderFormat: {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      },
-    },
-    timeGridDay: {
-      dayHeaderFormat: {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      },
-    },
-  }}
-/>
+        ref={calendarRef}
+        eventContent={(arg) => {
+          const id = arg.event.extendedProps?.asignaturaId || "";
+          const bgColor = arg.event.extendedProps?.color || "#666";
+
+          return (
+            <div
+              className="flex flex-col w-full h-full px-2 py-1 text-sm font-medium text-white rounded"
+              style={{ backgroundColor: bgColor }}
+            >
+              <div className="truncate">
+                <span className="font-bold">{arg.timeText}</span> –{" "}
+                <span className="uppercase font-bold text-xs">
+                  {id && `[${id}] `}
+                </span>
+                <span className="uppercase font-light text-xs">
+                  {arg.event.title}
+                </span>
+              </div>
+            </div>
+          );
+        }}
+        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+        initialView={vista}
+        headerToolbar={false}
+        slotMinTime="08:00:00"
+        slotMaxTime="22:00:00"
+        locales={[esLocale]}
+        locale="es"
+        events={eventos}
+        editable={false}
+        selectable={false}
+        height="auto"
+        nowIndicator={true}
+        allDaySlot={false}
+        hiddenDays={[0, 6]}
+        views={{
+          timeGridWeek: {
+            slotLabelFormat: [
+              { hour: "2-digit", minute: "2-digit", hour12: false },
+            ],
+            dayHeaderFormat: {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            },
+          },
+          timeGridDay: {
+            dayHeaderFormat: {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            },
+          },
+        }}
+      />
     </div>
   );
 }
