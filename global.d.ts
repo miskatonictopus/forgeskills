@@ -1,8 +1,7 @@
-export {};
-
 declare global {
   interface Window {
     electronAPI: {
+      actualizarColorAsignatura: (id: string, color: string) => Promise<void>
       guardarNombre: (nombre: string) => Promise<void>;
       leerNombres: () => Promise<string[]>;
       leerAsignaturas: () => Promise<any[]>;

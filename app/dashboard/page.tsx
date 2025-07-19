@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { SquarePen, Trash2, Clock, PlusCircle } from "lucide-react";
 import { toast } from "sonner";
 import { MensajeSinHorarios } from "@/components/MensajeSinHorarios";
-
+import { Button } from "@/components/ui/button"
 import TablaAlumnos from "@/components/TablaAlumnos";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ColorSelector } from "@/components/ColorSelector"
+import { AsignaturaCard } from "@/components/AsignaturaCard"
 import {
   SidebarProvider,
   SidebarInset,
@@ -139,8 +141,6 @@ mapa[asignatura.id] = horarios;
 
     toast.success("Horario guardado correctamente");
     console.log("✅ Horario guardado para", asignaturaId, nuevosHorarios);
-
-    // Aquí podrías usar: await window.electronAPI.guardarHorario(asignaturaId, nuevosHorarios)
   };
 
   const cargarAsignaturas = async (id: string) => {
@@ -155,6 +155,8 @@ setAsignaturas(nuevas);
       const [h2, m2] = h.horaFin.split(":").map(Number);
       return total + (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
     }, 0);
+
+  
 
   return (
     <SidebarProvider>
@@ -256,117 +258,23 @@ setAsignaturas(nuevas);
                 </span>
               </h2>
               <div className="flex flex-wrap gap-3">
-                {asignaturas.map((asig) => (
-                  <React.Fragment key={asig.id}>
-                    <Card className="w-auto min-w-[10rem] max-w-[16rem] h-[15rem] bg-zinc-900 border border-zinc-700 text-white relative overflow-visible">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={() => {
-                              console.log("Click en reloj", asig.id);
-                              setOpenHorario(asig.id);
-                            }}
-                            className="absolute top-2 left-2"
-                          >
-                            <Clock className="h-4 w-4 text-zinc-400 hover:text-emerald-200 transition-colors cursor-pointer" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">Horario</TooltipContent>
-                      </Tooltip>
+              {asignaturas.map((asig) => (
+  <React.Fragment key={asig.id}>
+    <AsignaturaCard
+      asignatura={asig}
+      horarios={horariosPorAsignatura[asig.id] || []}
+      onOpenHorario={setOpenHorario}
+      onReload={() => cargarAsignaturas(asig.id)}
+    />
+    <HorarioDialog
+      open={openHorario === asig.id}
+      onClose={() => setOpenHorario(null)}
+      asignatura={asig}
+      onSave={() => cargarAsignaturas(asig.id)}
+    />
+  </React.Fragment>
+))}
 
-                      <div className="absolute top-2 right-2 flex gap-2 z-10">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button className="text-zinc-400 hover:text-emerald-400">
-                              <SquarePen className="w-4 h-4" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">Editar</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button className="text-zinc-400 hover:text-emerald-400">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">Borrar</TooltipContent>
-                        </Tooltip>
-                      </div>
-
-                      <CardContent className="leading-tight space-y-1">
-                        <p className="text-3xl font-bold truncate uppercase">
-                          {asig.id}
-                        </p>
-                        <p className="text-xs font-light text-zinc-400 uppercase">
-                          {asig.nombre}
-                        </p>
-
-                        <div className="flex gap-2 text-xs font-light">
-                          <p className="text-zinc-400">
-                            Créditos:{" "}
-                            <span className="text-white">{asig.creditos}</span>
-                          </p>
-                          <p className="text-zinc-400">
-                            Horas:{" "}
-                            <span className="text-white">
-                              {asig.descripcion?.duracion}
-                            </span>
-                          </p>
-                        </div>
-
-                        <p className="text-xs font-bold text-white">
-                          RA:{" "}
-                          <span className="text-white font-light">
-                            {asig.RA?.length || 0}
-                          </span>
-                        </p>
-
-                        {/* // HORARIOS // */}
-                        {horariosPorAsignatura[asig.id]?.length > 0 ? (
-                          <div className="h-px bg-zinc-700 my-2">
-                            <div className="mt-1 space-y-1 text-xs text-emerald-200 leading-tight pt-2">
-                              {horariosPorAsignatura[asig.id].map((h) => (
-                                <div key={`${h.dia}-${h.horaInicio}`}>
-                                  {h.dia} {h.horaInicio}–{h.horaFin}
-                                </div>
-                              ))}
-                              <div className="text-xl font-bold">
-                                {horariosPorAsignatura[asig.id]
-                                  .reduce((total, h) => {
-                                    const [h1, m1] = h.horaInicio
-                                      .split(":")
-                                      .map(Number);
-                                    const [h2, m2] = h.horaFin
-                                      .split(":")
-                                      .map(Number);
-                                    return (
-                                      total +
-                                      (h2 * 60 + m2 - (h1 * 60 + m1)) / 60
-                                    );
-                                  }, 0)
-                                  .toFixed(1)}{" "}
-                                h
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="h-px bg-zinc-700 my-2 mb-2"></div>
-                            <div className="text-xs text-muted-foreground mt-2 text-red-200">
-                              <MensajeSinHorarios />
-                            </div>
-                          </>
-                        )}
-                      </CardContent>
-                    </Card>
-                    <HorarioDialog
-                      open={openHorario === asig.id}
-                      onClose={() => setOpenHorario(null)}
-                      asignatura={asig}
-                      onSave={() => cargarAsignaturas(asig.id)}
-                    />
-                  </React.Fragment>
-                ))}
               </div>
             </div>
           </div>

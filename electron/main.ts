@@ -113,6 +113,12 @@ ipcMain.handle("guardar-nombre", (_event, nombre: string) => {
 // IPC handler para ASIGNATURAS
 // ---------------------------
 
+ipcMain.handle("actualizar-color-asignatura", (event, id: string, color: string) => {
+  const stmt = db.prepare(`UPDATE asignaturas SET color = ? WHERE id = ?`)
+  stmt.run(color, id)
+})
+
+
 ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
   try {
     const { id, nombre, creditos, descripcion, RA } = asignatura
@@ -146,6 +152,7 @@ ipcMain.handle("leer-asignaturas", () => {
     creditos: string
     descripcion: string
     RA: string
+    color: string // ✅ añadimos color aquí también
   }[]
 
   return rows.map((row) => ({
@@ -154,8 +161,10 @@ ipcMain.handle("leer-asignaturas", () => {
     creditos: row.creditos,
     descripcion: JSON.parse(row.descripcion),
     RA: JSON.parse(row.RA),
+    color: row.color, // ✅ ahora se incluye en el resultado
   })) satisfies Asignatura[]
 })
+
 
 // ---------------------------
 // IPC handler para ALUMNOS
