@@ -37,6 +37,21 @@
   .fc .fc-event {
     border: none !important;
     box-shadow: none !important;
+    background-color: none !important;
+  }
+
+  .fc-v-event{
+    background-color: none !important;
+  } 
+
+  .fc .fc-timegrid-slot {
+    height: 80px !important; /* antes era ~40px */
+  }
+
+  .fc-event{
+    --fc-event-bg-color: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
   }
   
   .fc .fc-event * {
@@ -62,11 +77,11 @@
     font-size: 14px;
   }
 
-  .fc .fc-event {
+  /* .fc .fc-event {
     background-color: #134e4a !important; 
     border: none !important;
     color: #000 !important;
-  }
+  } */
 
   .fc, .fc *, .fc ::after, .fc ::before{
     text-align: left !important;
@@ -93,7 +108,6 @@
 
   /* 📌 Eventos */
   .fc-event {
-    background-color: #3b82f6 !important; /* bg-blue-500 */
     border: none;
     border-radius: 0.5rem;
     padding: 2px 4px;

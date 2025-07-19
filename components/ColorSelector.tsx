@@ -7,19 +7,12 @@ type Props = {
   
   export function ColorSelector({ colorActual, onSelect }: Props) {
     const colores = [
-      "#262626", // Neutral-800
-      "#292524", // Stone-800
-      "#1e293b", // Slate-800
-      "#991b1b", // Red-800
-      "#9a3412", // Orange-800
-      "#854d0e", // Yellow-800
-      "#065f46", // Emerald-800
-      "#115e59", // Teal-800
-      "#155e75", // Cyan-800
-      "#5b21b6", // Violet-800
-      "#86198f", // fucksia-800
-      "#9d174d", // Pink-800
-      "#9f1239", // Rose-800
+      "#042f2e", // Teal-950
+      "#292524", // Teal-900
+      "#164e63", // Teal-800
+      "#0f766e", // Teal-700
+      "#881337", // Zinc-900
+      "#27272a", // Zinc-800
     ]
   
     return (
