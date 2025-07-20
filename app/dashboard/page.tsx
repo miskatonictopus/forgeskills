@@ -3,11 +3,8 @@
 import { useEffect, useState } from "react";
 import { SquarePen, Trash2, Clock, PlusCircle } from "lucide-react";
 import { toast } from "sonner";
-import { MensajeSinHorarios } from "@/components/MensajeSinHorarios";
-import { Button } from "@/components/ui/button"
 import TablaAlumnos from "@/components/TablaAlumnos";
 import { AppSidebar } from "@/components/app-sidebar";
-import { ColorSelector } from "@/components/ColorSelector"
 import { AsignaturaCard } from "@/components/AsignaturaCard"
 import {
   SidebarProvider,
@@ -184,14 +181,14 @@ setAsignaturas(nuevas);
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <div className="flex flex-wrap gap-6 items-start justify-between">
             <div className="flex flex-col gap-2">
-              <h2 className="text-2xl font-notojp font-light tracking-tight flex items-center gap-2">
+              <h2 className="text-2xl font-notojp font-light tracking-tight flex items-center gap-2 mb-2">
                 Mis Cursos
               </h2>
               <div className="flex flex-wrap gap-3">
                 {cursos.map((curso) => (
                   <Card
                     key={curso.id}
-                    className="relative w-auto min-w-[10rem] max-w-[16rem] h-[170px] bg-zinc-900 border border-zinc-700 text-white"
+                    className="relative w-[17rem] h-[170px] bg-zinc-900 border border-zinc-700 text-white"
                   >
                     <div className="absolute top-2 right-2 flex gap-2 z-10">
                       <Tooltip>
@@ -238,11 +235,8 @@ setAsignaturas(nuevas);
                 ))}
               </div>
             </div>
-
-            <div className="w-px bg-zinc-700 self-stretch" />
-
             <div className="flex flex-col gap-2">
-              <h2 className="text-2xl font-notojp font-light tracking-tight">
+              <h2 className="text-2xl font-notojp font-light tracking-tight mb-2">
                 Mis Asignaturas
                 <span
                   style={{ fontFamily: "var(--font-geist)" }}

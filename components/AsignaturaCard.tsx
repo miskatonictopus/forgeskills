@@ -73,8 +73,8 @@ export function AsignaturaCard({
 
   return (
     <Card
-      className="w-auto min-w-[10rem] max-w-[16rem] h-[15rem] bg-zinc-900 border border-zinc-700 text-white relative overflow-visible"
-      style={{ borderLeft: `8px solid ${colorActual}` }}
+      className="w-[17rem] h-[15rem] bg-zinc-900 border border-zinc-700 text-white relative overflow-visible"
+      // style={{ borderLeft: `8px solid ${colorActual}` }}
     >
       {/* Botón Horario */}
       <Tooltip>
