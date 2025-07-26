@@ -1,3 +1,7 @@
+import type { Alumno } from "@/models/alumno"
+
+export {}
+
 declare global {
   interface Window {
     electronAPI: {
@@ -33,7 +37,6 @@ declare global {
         nombre: string;
         curso: string;
       }) => Promise<void>;
-      leerAlumnos: () => Promise<any[]>;
       guardarHorario: (horario: {
         asignaturaId: string;
         dia: string;
@@ -61,5 +64,12 @@ declare global {
     dia: string;
     horaInicio: string;
     horaFin: string;
+  };
+
+  type Alumno = {
+    nombre: string;
+    apellidos: string;
+    curso: string;
+    correo: string;
   };
 }

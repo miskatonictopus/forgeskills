@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { crearSlugAlumno } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import {
   Table,
@@ -119,7 +121,7 @@ export default function TablaAlumnos() {
                       className="w-8 h-8 rounded-full object-cover shadow"
                     />
 
-                    {/* ✅ Checkbox */}  
+                    {/* ✅ Checkbox */}
                     <Checkbox
                       checked={seleccionados.includes(alumno.id)}
                       onCheckedChange={() => toggleSeleccion(alumno.id)}
@@ -127,8 +129,26 @@ export default function TablaAlumnos() {
                     />
                   </div>
                 </TableCell>
-                <TableCell className="uppercase">{alumno.apellidos}</TableCell>
-                <TableCell className="uppercase">{alumno.nombre}</TableCell>
+                <TableCell className="uppercase text-blue-400 hover:underline cursor-pointer">
+                  <Link
+                    href={`/alumnos/${crearSlugAlumno(
+                      alumno.nombre,
+                      alumno.apellidos
+                    )}`}
+                  >
+                    {alumno.apellidos}
+                  </Link>
+                </TableCell>
+                <TableCell className="uppercase text-blue-400 hover:underline cursor-pointer">
+                  <Link
+                    href={`/alumnos/${crearSlugAlumno(
+                      alumno.nombre,
+                      alumno.apellidos
+                    )}`}
+                  >
+                    {alumno.nombre}
+                  </Link>
+                </TableCell>
                 <TableCell className="uppercase">{alumno.curso}</TableCell>
                 <TableCell>{alumno.mail}</TableCell>
               </TableRow>
