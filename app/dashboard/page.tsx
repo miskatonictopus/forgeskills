@@ -1,11 +1,16 @@
 "use client";
 
+import { cursoStore } from "@/store/cursoStore";
+import { useSnapshot } from "valtio";
+import { DialogEliminarFlow } from "@/components/DialogEliminarFlow";
+
+
 import { useEffect, useState } from "react";
-import { SquarePen, Trash2, Users} from "lucide-react";
+import { SquarePen, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import TablaAlumnos from "@/components/TablaAlumnos";
 import { AppSidebar } from "@/components/app-sidebar";
-import { AsignaturaCard } from "@/components/AsignaturaCard"
+import { AsignaturaCard } from "@/components/AsignaturaCard";
 import {
   SidebarProvider,
   SidebarInset,
@@ -27,8 +32,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { HorarioDialog } from "@/components/HorarioDialog";
 import React from "react";
-import Link from "next/link"
-
+import Link from "next/link";
 
 // Tipos de datos
 
@@ -73,7 +77,11 @@ type Horario = {
 };
 
 export default function Page() {
-  const [cursos, setCursos] = useState<Curso[]>([]);
+  const snap = useSnapshot(cursoStore);
+const [cursoAEliminar, setCursoAEliminar] = useState<{
+  id: string;
+  nombre: string;
+} | null>(null);
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [openHorario, setOpenHorario] = useState<string | null>(null);
@@ -81,27 +89,13 @@ export default function Page() {
     Record<string, Horario[]>
   >({});
 
-  // Cargar cursos
-  useEffect(() => {
-    const fetchCursos = async () => {
-      try {
-        const cursosBD = await window.electronAPI.leerCursos() as Curso[];
-        setCursos(cursosBD);
-      } catch (error) {
-        console.error("❌ Error al leer cursos:", error);
-        toast.error("No se pudieron cargar los cursos");
-      }
-    };
-  
-    fetchCursos();
-  }, []);
-
   // Cargar asignaturas
   useEffect(() => {
     const fetchAsignaturas = async () => {
       try {
-        const asignaturasBD = await window.electronAPI?.leerAsignaturas() as Asignatura[];
-setAsignaturas(asignaturasBD || []);
+        const asignaturasBD =
+          (await window.electronAPI?.leerAsignaturas()) as Asignatura[];
+        setAsignaturas(asignaturasBD || []);
       } catch (error) {
         console.error("❌ Error al leer asignaturas:", error);
         toast.error("No se pudieron cargar las asignaturas");
@@ -117,9 +111,10 @@ setAsignaturas(asignaturasBD || []);
       const mapa: Record<string, Horario[]> = {};
 
       for (const asignatura of asignaturas) {
-        const horarios = await window.electronAPI.leerHorarios(asignatura.id) as Horario[];
-mapa[asignatura.id] = horarios;
-
+        const horarios = (await window.electronAPI.leerHorarios(
+          asignatura.id
+        )) as Horario[];
+        mapa[asignatura.id] = horarios;
       }
 
       setHorariosPorAsignatura(mapa);
@@ -143,8 +138,8 @@ mapa[asignatura.id] = horarios;
   };
 
   const cargarAsignaturas = async (id: string) => {
-    const nuevas = await window.electronAPI.leerAsignaturas() as Asignatura[];
-setAsignaturas(nuevas);
+    const nuevas = (await window.electronAPI.leerAsignaturas()) as Asignatura[];
+    setAsignaturas(nuevas);
   };
 
   const totalHoras = Object.values(horariosPorAsignatura)
@@ -154,8 +149,6 @@ setAsignaturas(nuevas);
       const [h2, m2] = h.horaFin.split(":").map(Number);
       return total + (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
     }, 0);
-
-  
 
   return (
     <SidebarProvider>
@@ -187,60 +180,72 @@ setAsignaturas(nuevas);
                 Mis Cursos
               </h2>
               <div className="flex flex-wrap gap-3">
-                {cursos.map((curso) => (
+              {snap.cursos.map((curso) => (
                   <Card
-                  key={curso.id}
-                  className="relative w-[17rem] h-[170px] bg-zinc-900 border border-zinc-700 text-white"
-                >
-                  <div className="absolute top-2 right-2 flex gap-2 z-10">
-                  <Tooltip>
-  <TooltipTrigger asChild>
-    <Link href={`/alumnos/${curso.id}`} className="text-zinc-400 hover:text-emerald-400">
-      <Users className="w-4 h-4" />
-    </Link>
-  </TooltipTrigger>
-  <TooltipContent side="top">Ver alumnos</TooltipContent>
-</Tooltip>
-                
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button className="text-zinc-400 hover:text-emerald-400">
-                          <SquarePen className="w-4 h-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">Editar</TooltipContent>
-                    </Tooltip>
-                
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button className="text-zinc-400 hover:text-emerald-400">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">Borrar</TooltipContent>
-                    </Tooltip>
-                  </div>
-                
-                  <CardContent className="leading-tight space-y-1">
-                    <p className="text-3xl font-bold truncate uppercase">
-                      {curso.acronimo}
-                      {curso.nivel}
-                    </p>
-                    <p className="text-xs font-light text-zinc-400 uppercase">
-                      {curso.nombre}
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <p className="text-xs font-light text-zinc-400">
-                        Grado:{" "}
-                        <span className="text-white uppercase">{curso.grado}</span>
-                      </p>
-                      <p className="text-xs font-light text-zinc-400">
-                        Clase:{" "}
-                        <span className="text-white uppercase">{curso.clase}</span>
-                      </p>
+                    key={curso.id}
+                    className="relative w-[17rem] h-[170px] bg-zinc-900 border border-zinc-700 text-white"
+                  >
+                    <div className="absolute top-2 right-2 flex gap-2 z-10">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link
+                            href={`/alumnos/${curso.id}`}
+                            className="text-zinc-400 hover:text-emerald-400"
+                          >
+                            <Users className="w-4 h-4" />
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Ver alumnos</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button className="text-zinc-400 hover:text-emerald-400">
+                            <SquarePen className="w-4 h-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Editar</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                        <button
+  onClick={() =>
+    setCursoAEliminar({ id: curso.id, nombre: curso.acronimo })
+  }
+  className="text-zinc-400 hover:text-emerald-400"
+>
+  <Trash2 className="w-4 h-4" />
+</button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">Borrar</TooltipContent>
+                      </Tooltip>
                     </div>
-                  </CardContent>
-                </Card>
+
+                    <CardContent className="leading-tight space-y-1">
+                      <p className="text-3xl font-bold truncate uppercase">
+                        {curso.acronimo}
+                        {curso.nivel}
+                      </p>
+                      <p className="text-xs font-light text-zinc-400 uppercase">
+                        {curso.nombre}
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <p className="text-xs font-light text-zinc-400">
+                          Grado:{" "}
+                          <span className="text-white uppercase">
+                            {curso.grado}
+                          </span>
+                        </p>
+                        <p className="text-xs font-light text-zinc-400">
+                          Clase:{" "}
+                          <span className="text-white uppercase">
+                            {curso.clase}
+                          </span>
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             </div>
@@ -261,23 +266,22 @@ setAsignaturas(nuevas);
                 </span>
               </h2>
               <div className="flex flex-wrap gap-3">
-              {asignaturas.map((asig) => (
-  <React.Fragment key={asig.id}>
-    <AsignaturaCard
-      asignatura={asig}
-      horarios={horariosPorAsignatura[asig.id] || []}
-      onOpenHorario={setOpenHorario}
-      onReload={() => cargarAsignaturas(asig.id)}
-    />
-    <HorarioDialog
-      open={openHorario === asig.id}
-      onClose={() => setOpenHorario(null)}
-      asignatura={asig}
-      onSave={() => cargarAsignaturas(asig.id)}
-    />
-  </React.Fragment>
-))}
-
+                {asignaturas.map((asig) => (
+                  <React.Fragment key={asig.id}>
+                    <AsignaturaCard
+                      asignatura={asig}
+                      horarios={horariosPorAsignatura[asig.id] || []}
+                      onOpenHorario={setOpenHorario}
+                      onReload={() => cargarAsignaturas(asig.id)}
+                    />
+                    <HorarioDialog
+                      open={openHorario === asig.id}
+                      onClose={() => setOpenHorario(null)}
+                      asignatura={asig}
+                      onSave={() => cargarAsignaturas(asig.id)}
+                    />
+                  </React.Fragment>
+                ))}
               </div>
             </div>
           </div>
@@ -286,6 +290,14 @@ setAsignaturas(nuevas);
             <TablaAlumnos />
           </div>
         </div>
+        {cursoAEliminar && (
+  <DialogEliminarFlow
+    entidad="curso"
+    id={cursoAEliminar.id}
+    nombre={cursoAEliminar.nombre}
+    onClose={() => setCursoAEliminar(null)}
+  />
+)}
       </SidebarInset>
     </SidebarProvider>
   );
