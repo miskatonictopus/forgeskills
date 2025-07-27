@@ -63,8 +63,8 @@ export default function AlumnosCursoPage() {
 
         {/* Contenido principal */}
         <div className="p-6 space-y-4">
-          <h1 className="text-2xl font-bold tracking-tight">
-            Alumnos del curso: <span className="uppercase">{cursoId}</span>
+          <h1 className="text-3xl font-bold tracking-tight">
+            <span className="uppercase">{cursoId}</span>
           </h1>
 
           <ul className="space-y-2">

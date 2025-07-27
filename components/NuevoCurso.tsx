@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { cursoStore } from "@/store/cursoStore"
 import {
   Select,
   SelectTrigger,
@@ -47,6 +48,8 @@ export function NuevoCurso() {
       console.log("📤 Enviando curso a Electron:", curso)
   
       const resultado = await window.electronAPI.guardarCurso(curso)
+
+      await cursoStore.refrescar()
   
       console.log("✅ Curso guardado:", resultado)
   
