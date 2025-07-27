@@ -196,6 +196,12 @@ ipcMain.handle("leer-alumnos", () => {
   return db.prepare("SELECT * FROM alumnos").all()
 })
 
+ipcMain.handle("leer-alumnos-por-curso", (event, cursoId: string) => {
+  const stmt = db.prepare(`SELECT * FROM alumnos WHERE curso = ?`)
+  const alumnos = stmt.all(cursoId)
+  return alumnos
+})
+
 // ---------------------------
 // IPC handler para HORARIOS
 // ---------------------------

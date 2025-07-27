@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { Asignatura } from "../models/asignatura";
-import type { Alumno } from "../models/alumno";
+import type { Alumno, AlumnoEntrada } from "../models/alumno"
 
 contextBridge.exposeInMainWorld("electronAPI", {
   // Nombres (para pruebas)
@@ -27,9 +27,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("guardar-asignatura", asignatura),
 
   // Alumnos
-  guardarAlumno: (alumno: Alumno) =>
-    ipcRenderer.invoke("guardar-alumno", alumno),
+  guardarAlumno: (alumno: AlumnoEntrada) =>
+  ipcRenderer.invoke("guardar-alumno", alumno),
   leerAlumnos: () => ipcRenderer.invoke("leer-alumnos"),
+  leerAlumnosPorCurso: (cursoId: string) =>
+  ipcRenderer.invoke("leer-alumnos-por-curso", cursoId),
+
 
   // 🕒 Horarios
   guardarHorario: (horario: {

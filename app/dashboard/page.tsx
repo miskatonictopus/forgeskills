@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SquarePen, Trash2, Clock, PlusCircle } from "lucide-react";
+import { SquarePen, Trash2, Users} from "lucide-react";
 import { toast } from "sonner";
 import TablaAlumnos from "@/components/TablaAlumnos";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -27,6 +27,8 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { HorarioDialog } from "@/components/HorarioDialog";
 import React from "react";
+import Link from "next/link"
+
 
 // Tipos de datos
 
@@ -187,51 +189,58 @@ setAsignaturas(nuevas);
               <div className="flex flex-wrap gap-3">
                 {cursos.map((curso) => (
                   <Card
-                    key={curso.id}
-                    className="relative w-[17rem] h-[170px] bg-zinc-900 border border-zinc-700 text-white"
-                  >
-                    <div className="absolute top-2 right-2 flex gap-2 z-10">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button className="text-zinc-400 hover:text-emerald-400">
-                            <SquarePen className="w-4 h-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">Editar</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button className="text-zinc-400 hover:text-emerald-400">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">Borrar</TooltipContent>
-                      </Tooltip>
+                  key={curso.id}
+                  className="relative w-[17rem] h-[170px] bg-zinc-900 border border-zinc-700 text-white"
+                >
+                  <div className="absolute top-2 right-2 flex gap-2 z-10">
+                  <Tooltip>
+  <TooltipTrigger asChild>
+    <Link href={`/alumnos/${curso.id}`} className="text-zinc-400 hover:text-emerald-400">
+      <Users className="w-4 h-4" />
+    </Link>
+  </TooltipTrigger>
+  <TooltipContent side="top">Ver alumnos</TooltipContent>
+</Tooltip>
+                
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button className="text-zinc-400 hover:text-emerald-400">
+                          <SquarePen className="w-4 h-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Editar</TooltipContent>
+                    </Tooltip>
+                
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button className="text-zinc-400 hover:text-emerald-400">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Borrar</TooltipContent>
+                    </Tooltip>
+                  </div>
+                
+                  <CardContent className="leading-tight space-y-1">
+                    <p className="text-3xl font-bold truncate uppercase">
+                      {curso.acronimo}
+                      {curso.nivel}
+                    </p>
+                    <p className="text-xs font-light text-zinc-400 uppercase">
+                      {curso.nombre}
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <p className="text-xs font-light text-zinc-400">
+                        Grado:{" "}
+                        <span className="text-white uppercase">{curso.grado}</span>
+                      </p>
+                      <p className="text-xs font-light text-zinc-400">
+                        Clase:{" "}
+                        <span className="text-white uppercase">{curso.clase}</span>
+                      </p>
                     </div>
-                    <CardContent className="leading-tight space-y-1">
-                      <p className="text-3xl font-bold truncate uppercase">
-                        {curso.acronimo}
-                        {curso.nivel}
-                      </p>
-                      <p className="text-xs font-light text-zinc-400 uppercase">
-                        {curso.nombre}
-                      </p>
-                      <div className="flex items-center gap-4">
-                        <p className="text-xs font-light text-zinc-400">
-                          Grado:{" "}
-                          <span className="text-white uppercase">
-                            {curso.grado}
-                          </span>
-                        </p>
-                        <p className="text-xs font-light text-zinc-400">
-                          Clase:{" "}
-                          <span className="text-white uppercase">
-                            {curso.clase}
-                          </span>
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  </CardContent>
+                </Card>
                 ))}
               </div>
             </div>

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type { AlumnoEntrada } from "@/models/alumno"
 
 
 export default function NuevoAlumno() {
@@ -33,7 +34,7 @@ export default function NuevoAlumno() {
     }
   
     try {
-      const alumno = {
+      const alumno: AlumnoEntrada = {
         nombre: nombre.trim(),
         apellidos: apellidos.trim(),
         curso: curso.trim(),

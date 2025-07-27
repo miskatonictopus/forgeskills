@@ -2,10 +2,11 @@
 
 export type Alumno = {
   id: number
-    nombre: string
-    apellidos: string
-    curso: string
-    mail: string
-    correo: string
-  }
+  nombre: string
+  apellidos: string
+  curso: string
+  mail: string
+}
+
+export type AlumnoEntrada = Omit<Alumno, "id">
   
