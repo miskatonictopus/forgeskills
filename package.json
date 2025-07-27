@@ -10,7 +10,8 @@
     "lint": "next lint",
     "compile:electron": "tsc -p tsconfig.electron.json",
     "launch:electron": "electron .",
-    "dev:electron": "concurrently -k -n \"NEXT,ELECTRON\" -c \"cyan,green\" \"next dev\" \"wait-on http://localhost:3000 && electron .\""
+    "dev:electron": "concurrently -k -n \"NEXT,ELECTRON\" -c \"cyan,green\" \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "clean": "bash ./scripts/clean.sh"
   },
   "dependencies": {
     "@fullcalendar/common": "^5.11.5",

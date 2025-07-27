@@ -10,14 +10,10 @@ type Curso = {
 }
 
 export const cursoStore = proxy({
-  cursos: [] as Curso[],
-
-  async cargarCursos() {
-    const datos = await window.electronAPI.leerCursos()
-    cursoStore.cursos = datos
-  },
-
-  async refrescar() {
-    await cursoStore.cargarCursos()
-  },
-})
+    cursos: [] as Curso[],
+    async cargarCursos() {
+      const data = await window.electronAPI.leerCursos()
+      this.cursos = data
+    },
+  })
+  

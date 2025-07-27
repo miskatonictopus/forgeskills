@@ -92,10 +92,11 @@ ipcMain.handle("guardar-curso", (_event, curso) => {
   return { success: true, id }
 })
 
-ipcMain.handle("borrar-curso", (_event, id) => {
-  db.prepare("DELETE FROM cursos WHERE id = ?").run(id)
-  return { success: true }
+ipcMain.handle("borrar-curso", (event, id: string) => {
+  const stmt = db.prepare("DELETE FROM cursos WHERE id = ?")
+  return stmt.run(id)
 })
+
 
 // ---------------------------
 // IPC handlers para NOMBRES

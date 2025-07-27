@@ -49,7 +49,7 @@ export function NuevoCurso() {
   
       const resultado = await window.electronAPI.guardarCurso(curso)
 
-      await cursoStore.refrescar()
+      await cursoStore.cargarCursos()
   
       console.log("✅ Curso guardado:", resultado)
   
