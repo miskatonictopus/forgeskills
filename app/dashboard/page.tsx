@@ -3,7 +3,7 @@
 import { cursoStore } from "@/store/cursoStore";
 import { useSnapshot } from "valtio";
 import { DialogEliminarFlow } from "@/components/DialogEliminarFlow";
-
+import { useRef } from "react"
 
 import { useEffect, useState } from "react";
 import { SquarePen, Trash2, Users } from "lucide-react";
@@ -149,6 +149,7 @@ const [cursoAEliminar, setCursoAEliminar] = useState<{
       const [h2, m2] = h.horaFin.split(":").map(Number);
       return total + (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
     }, 0);
+    const refs = useRef<Record<string, HTMLDivElement | null>>({})
 
   return (
     <SidebarProvider>

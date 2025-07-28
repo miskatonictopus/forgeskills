@@ -129,3 +129,18 @@
 .font-geist {
   font-family: var(--font-geist);
 }
+
+@keyframes zoomOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+
+.animate-zoom-out {
+  animation: zoomOut 300ms ease-out forwards;
+}
