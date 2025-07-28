@@ -1,33 +1,43 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { Mail, User } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import { SidebarProvider } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/app-sidebar"
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
 
 export default function AlumnosCursoPage() {
-  const params = useParams()
-  const cursoId = params.cursoId as string
+  const params = useParams();
+  const cursoId = params.cursoId as string;
 
-  const [alumnos, setAlumnos] = useState<any[]>([])
+  const [alumnos, setAlumnos] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchAlumnos = async () => {
-      const res = await window.electronAPI.leerAlumnosPorCurso(cursoId)
-      setAlumnos(res)
-    }
+      const res = await window.electronAPI.leerAlumnosPorCurso(cursoId);
+      setAlumnos(res);
+    };
 
-    fetchAlumnos()
-  }, [cursoId])
+    fetchAlumnos();
+  }, [cursoId]);
 
   return (
     <SidebarProvider>
@@ -67,15 +77,43 @@ export default function AlumnosCursoPage() {
             <span className="uppercase">{cursoId}</span>
           </h1>
 
-          <ul className="space-y-2">
-            {alumnos.map((a) => (
-              <li key={a.id} className="text-white">
-                {a.apellidos}, {a.nombre} — {a.mail}
-              </li>
-            ))}
-          </ul>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[200px]">
+                <div className="flex items-center gap-1">
+                <User className="w-4 h-4 mr-1" />
+                Nombre
+                </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-1">
+                    <Mail className="w-4 h-4 mr-1" />
+                    Email
+                  </div>
+                </TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="font-light">
+              {alumnos.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell>
+                    {a.apellidos}, {a.nombre}
+                  </TableCell>
+                  <TableCell>{a.mail}</TableCell>
+                  <TableCell className="text-right">
+                    {/* Aquí irán acciones futuras: puntuaciones, ranking, etc. */}
+                    <span className="text-muted-foreground italic">
+                      pendiente…
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }
