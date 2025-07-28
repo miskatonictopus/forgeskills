@@ -1,5 +1,5 @@
 "use client";
-
+import React from "react";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Mail, User } from "lucide-react";
@@ -29,6 +29,7 @@ export default function AlumnosCursoPage() {
   const cursoId = params.cursoId as string;
 
   const [alumnos, setAlumnos] = useState<any[]>([]);
+  const [alumnoExpandido, setAlumnoExpandido] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchAlumnos = async () => {
@@ -73,18 +74,24 @@ export default function AlumnosCursoPage() {
 
         {/* Contenido principal */}
         <div className="p-6 space-y-4">
-          <h1 className="text-3xl font-bold tracking-tight">
-            <span className="uppercase">{cursoId}</span>
-          </h1>
+        <div className="flex items-center justify-between">
+  <h1 className="text-3xl font-bold tracking-tight">
+    <span className="uppercase">{cursoId}</span>
+  </h1>
+  <span className="flex items-center gap-1 text-muted-foreground text-sm font-light">
+    <User className="w-4 h-4" />
+    <span className="text-white">{alumnos.length}</span> alumno{alumnos.length !== 1 && "s"}
+  </span>
+</div>
 
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[200px]">
-                <div className="flex items-center gap-1">
-                <User className="w-4 h-4 mr-1" />
-                Nombre
-                </div>
+                  <div className="flex items-center gap-1">
+                    <User className="w-4 h-4 mr-1" />
+                    Nombre
+                  </div>
                 </TableHead>
                 <TableHead>
                   <div className="flex items-center gap-1">
@@ -95,20 +102,44 @@ export default function AlumnosCursoPage() {
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody className="font-light">
+            <TableBody>
               {alumnos.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell>
-                    {a.apellidos}, {a.nombre}
-                  </TableCell>
-                  <TableCell>{a.mail}</TableCell>
-                  <TableCell className="text-right">
-                    {/* Aquí irán acciones futuras: puntuaciones, ranking, etc. */}
-                    <span className="text-muted-foreground italic">
-                      pendiente…
-                    </span>
-                  </TableCell>
-                </TableRow>
+                <React.Fragment key={a.id}>
+                  <TableRow
+                    onClick={() =>
+                      setAlumnoExpandido((prev) =>
+                        prev === a.id ? null : a.id
+                      )
+                    }
+                    className="cursor-pointer hover:bg-muted transition"
+                  >
+                    <TableCell>
+                      {a.apellidos}, {a.nombre}
+                    </TableCell>
+                    <TableCell>{a.mail}</TableCell>
+                    <TableCell className="text-right">
+                      <span className="text-muted-foreground italic">
+                        pendiente…
+                      </span>
+                    </TableCell>
+                  </TableRow>
+
+                  {alumnoExpandido === a.id && (
+                    <TableRow className="bg-muted/50 animate-slide-fade-in">
+                      <TableCell colSpan={3}>
+                        <div className="p-4 text-sm text-muted-foreground animate-fade-in">
+                          {/* Aquí irá el panel de datos del alumno */}
+                          <p>
+                            Panel de alumno{" "}
+                            <strong>
+                              {a.nombre} {a.apellidos}
+                            </strong>
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>

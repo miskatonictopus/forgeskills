@@ -3,7 +3,7 @@
 import { cursoStore } from "@/store/cursoStore";
 import { useSnapshot } from "valtio";
 import { DialogEliminarFlow } from "@/components/DialogEliminarFlow";
-import { useRef } from "react"
+import { useRef } from "react";
 
 import { useEffect, useState } from "react";
 import { SquarePen, Trash2, Users } from "lucide-react";
@@ -78,10 +78,10 @@ type Horario = {
 
 export default function Page() {
   const snap = useSnapshot(cursoStore);
-const [cursoAEliminar, setCursoAEliminar] = useState<{
-  id: string;
-  nombre: string;
-} | null>(null);
+  const [cursoAEliminar, setCursoAEliminar] = useState<{
+    id: string;
+    nombre: string;
+  } | null>(null);
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [openHorario, setOpenHorario] = useState<string | null>(null);
@@ -149,7 +149,7 @@ const [cursoAEliminar, setCursoAEliminar] = useState<{
       const [h2, m2] = h.horaFin.split(":").map(Number);
       return total + (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
     }, 0);
-    const refs = useRef<Record<string, HTMLDivElement | null>>({})
+  const refs = useRef<Record<string, HTMLDivElement | null>>({});
 
   return (
     <SidebarProvider>
@@ -181,7 +181,7 @@ const [cursoAEliminar, setCursoAEliminar] = useState<{
                 Mis Cursos
               </h2>
               <div className="flex flex-wrap gap-3">
-              {snap.cursos.map((curso) => (
+                {snap.cursos.map((curso) => (
                   <Card
                     key={curso.id}
                     className="relative w-[17rem] h-[170px] bg-zinc-900 border border-zinc-700 text-white"
@@ -210,14 +210,17 @@ const [cursoAEliminar, setCursoAEliminar] = useState<{
 
                       <Tooltip>
                         <TooltipTrigger asChild>
-                        <button
-  onClick={() =>
-    setCursoAEliminar({ id: curso.id, nombre: curso.acronimo })
-  }
-  className="text-zinc-400 hover:text-emerald-400"
->
-  <Trash2 className="w-4 h-4" />
-</button>
+                          <button
+                            onClick={() =>
+                              setCursoAEliminar({
+                                id: curso.id,
+                                nombre: curso.acronimo,
+                              })
+                            }
+                            className="text-zinc-400 hover:text-emerald-400"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </TooltipTrigger>
                         <TooltipContent side="top">Borrar</TooltipContent>
                       </Tooltip>
@@ -292,13 +295,13 @@ const [cursoAEliminar, setCursoAEliminar] = useState<{
           </div>
         </div>
         {cursoAEliminar && (
-  <DialogEliminarFlow
-    entidad="curso"
-    id={cursoAEliminar.id}
-    nombre={cursoAEliminar.nombre}
-    onClose={() => setCursoAEliminar(null)}
-  />
-)}
+          <DialogEliminarFlow
+            entidad="curso"
+            id={cursoAEliminar.id}
+            nombre={cursoAEliminar.nombre}
+            onClose={() => setCursoAEliminar(null)}
+          />
+        )}
       </SidebarInset>
     </SidebarProvider>
   );

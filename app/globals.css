@@ -130,17 +130,19 @@
   font-family: var(--font-geist);
 }
 
-@keyframes zoomOut {
-  0% {
-    opacity: 1;
-    transform: scale(1);
+@layer utilities {
+  .animate-slide-fade-in {
+    animation: slideFadeIn 0.3s ease-out both;
   }
-  100% {
-    opacity: 0;
-    transform: scale(0.7);
-  }
-}
 
-.animate-zoom-out {
-  animation: zoomOut 300ms ease-out forwards;
+  @keyframes slideFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
