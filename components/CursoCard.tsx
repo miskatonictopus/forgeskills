@@ -1,47 +1,50 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import { Users, SquarePen, Trash2 } from "lucide-react"
-import { DialogAsignarAsignaturas } from "@/components/DialogAsignarAsignaturas"
-import { asignaturasPorCurso } from "@/store/asignaturasPorCurso"
+import { useState } from "react";
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import { Users, SquarePen, Trash2 } from "lucide-react";
+import { DialogAsignarAsignaturas } from "@/components/DialogAsignarAsignaturas";
+import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 // import { setCursoAEliminar } from "@/store/cursoAEliminar"
-import { cn } from "@/lib/utils"
-import { useEffect } from "react"
-import { setAsignaturasCurso } from "@/store/asignaturasPorCurso"
-
+import { cn } from "@/lib/utils";
+import { useEffect } from "react";
+import { setAsignaturasCurso } from "@/store/asignaturasPorCurso";
 
 type Curso = {
-  id: string
-  acronimo: string
-  nombre: string
-  grado: string
-  clase: string
-  nivel: string
-}
+  id: string;
+  acronimo: string;
+  nombre: string;
+  grado: string;
+  clase: string;
+  nivel: string;
+};
 
 type Props = {
-  curso: Curso
-}
+  curso: Curso;
+};
 
 export function CursoCard({ curso }: Props) {
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const asignaturas = asignaturasPorCurso[curso.id] || []
-  const tieneAsignaturas = asignaturas.length > 0
+  const asignaturas = asignaturasPorCurso[curso.id] || [];
+  const tieneAsignaturas = asignaturas.length > 0;
 
   useEffect(() => {
     window.electronAPI.asignaturasDeCurso(curso.id).then((asignaturas) => {
-      setAsignaturasCurso(curso.id, asignaturas)
-    })
-  }, [curso.id])
+      setAsignaturasCurso(curso.id, asignaturas);
+    });
+  }, [curso.id]);
 
   return (
     <>
-      <Card className="relative w-[17rem] h-[auto] bg-zinc-900 border border-zinc-700 text-white">
+      <Card className="relative flex flex-col justify-between w-[17rem] h-[auto] bg-zinc-900 border border-zinc-700 text-white">
         {/* ICONOS ACCIONES */}
         <div className="absolute top-2 right-2 flex gap-2 z-10">
           <Tooltip>
@@ -85,33 +88,49 @@ export function CursoCard({ curso }: Props) {
 
         {/* CONTENIDO */}
         <CardContent className="leading-tight space-y-1 mt-0">
-            <div className="h-[80px]">
-          <p className="text-3xl font-bold truncate uppercase">
-            {curso.acronimo}
-            {curso.nivel}
-          </p>
-          <p className="text-xs font-light text-zinc-400 uppercase">
-            {curso.nombre}
-          </p>
-          <div className="flex items-center gap-4">
-            <p className="text-xs font-light text-zinc-400">
-              Grado:{" "}
-              <span className="text-white uppercase">{curso.grado}</span>
+          <div className="h-[80px]">
+            <p className="text-3xl font-bold truncate uppercase">
+              {curso.acronimo}
+              {curso.nivel}
             </p>
-            <p className="text-xs font-light text-zinc-400">
-              Clase:{" "}
-              <span className="text-white uppercase">{curso.clase}</span>
+            <p className="text-xs font-light text-zinc-400 uppercase">
+              {curso.nombre}
             </p>
+            <div className="flex items-center gap-4">
+              <p className="text-xs font-light text-zinc-400">
+                Grado:{" "}
+                <span className="text-white uppercase">{curso.grado}</span>
+              </p>
+              <p className="text-xs font-light text-zinc-400">
+                Clase:{" "}
+                <span className="text-white uppercase">{curso.clase}</span>
+              </p>
+            </div>
           </div>
+          <div className="flex items-center gap-2 my-4">
+            <div className="h-px flex-1 bg-zinc-700" />
+            <span className="text-xs uppercase text-muted-foreground">
+              Asignaturas
+            </span>
+            <div className="h-px flex-1 bg-zinc-700" />
           </div>
-          <div className="h-px w-full bg-zinc-700 my-4" />
+          {asignaturas.length > 0 && (
+            <div className="mt-2">
+              <ul className="list-disc list-outside pl-4 text-xs text-white space-y-0.5">
+                {asignaturas.map((a) => (
+                  <li key={a.id}>{a.nombre}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {/* BOTÓN ASIGNATURAS */}
-          <div className="mt-2">
+        </CardContent>
+        <div className="p-1 mt-auto ml-4">
             <Button
               variant={tieneAsignaturas ? "outline" : "secondary"}
               size="sm"
               className={cn(
-                "w-full transition-all",
+                "w-auto transition-all uppercase font-light text-xs",
                 !tieneAsignaturas &&
                   "border-dashed text-destructive animate-pulse"
               )}
@@ -122,7 +141,6 @@ export function CursoCard({ curso }: Props) {
                 : "+ Asociar asignaturas"}
             </Button>
           </div>
-        </CardContent>
       </Card>
 
       <DialogAsignarAsignaturas
@@ -131,5 +149,5 @@ export function CursoCard({ curso }: Props) {
         onOpenChange={setDialogOpen}
       />
     </>
-  )
+  );
 }
