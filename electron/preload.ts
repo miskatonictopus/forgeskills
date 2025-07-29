@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { Asignatura } from "../models/asignatura";
-import type { Alumno, AlumnoEntrada } from "../models/alumno"
+import type { Alumno, AlumnoEntrada } from "../models/alumno";
 
 contextBridge.exposeInMainWorld("electronAPI", {
   // Nombres (para pruebas)
@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   leerNombres: () => ipcRenderer.invoke("leer-nombres"),
   leerAsignaturas: () => ipcRenderer.invoke("leer-asignaturas"),
   actualizarColorAsignatura: (id: string, color: string) =>
-  ipcRenderer.invoke("actualizar-color-asignatura", id, color),
+    ipcRenderer.invoke("actualizar-color-asignatura", id, color),
   // Cursos (con clase e ID compuesto)
   guardarCurso: (curso: {
     acronimo: string;
@@ -25,14 +25,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Asignaturas
   guardarAsignatura: (asignatura: Asignatura) =>
     ipcRenderer.invoke("guardar-asignatura", asignatura),
+  asociarAsignaturasACurso: (cursoId: string, asignaturaIds: string[]) =>
+    ipcRenderer.invoke("asociar-asignaturas-curso", cursoId, asignaturaIds),
+  asignaturasDeCurso: (
+    cursoId: string
+  ): Promise<{ id: string; nombre: string }[]> =>
+    ipcRenderer.invoke("leer-asignaturas-curso", cursoId),
 
   // Alumnos
   guardarAlumno: (alumno: AlumnoEntrada) =>
-  ipcRenderer.invoke("guardar-alumno", alumno),
+    ipcRenderer.invoke("guardar-alumno", alumno),
   leerAlumnos: () => ipcRenderer.invoke("leer-alumnos"),
   leerAlumnosPorCurso: (cursoId: string) =>
-  ipcRenderer.invoke("leer-alumnos-por-curso", cursoId),
-
+    ipcRenderer.invoke("leer-alumnos-por-curso", cursoId),
 
   // 🕒 Horarios
   guardarHorario: (horario: {

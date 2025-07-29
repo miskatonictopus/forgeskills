@@ -300,4 +300,38 @@ ipcMain.handle("leer-horarios-todos", () => {
   }
 });
 
+// ---------------------------
+// IPC handler para ASOCIAR ASIGNATURAS A LOS CURSOS
+// ---------------------------
+
+ipcMain.handle("asociar-asignaturas-curso", (event, cursoId: string, asignaturaIds: string[]) => {
+  db.prepare("DELETE FROM curso_asignatura WHERE curso_id = ?").run(cursoId)
+
+  const insert = db.prepare(
+    "INSERT INTO curso_asignatura (curso_id, asignatura_id) VALUES (?, ?)"
+  )
+
+  for (const asigId of asignaturaIds) {
+    insert.run(cursoId, asigId)
+  }
+
+  return true
+})
+
+// ---------------------------
+// IPC handler para LEER LAS ASIGNATURAS DE LOS CURSOS
+// ---------------------------
+
+ipcMain.handle("leer-asignaturas-curso", (event, cursoId: string) => {
+  const stmt = db.prepare(`
+    SELECT a.id, a.nombre
+    FROM asignaturas a
+    JOIN curso_asignatura ca ON a.id = ca.asignatura_id
+    WHERE ca.curso_id = ?
+  `)
+
+  return stmt.all(cursoId)
+})
+
+
 
