@@ -126,7 +126,7 @@ export function DialogAsignarAsignaturas({
             </div>
 
             <DialogFooter>
-              <Button onClick={handleGuardar} disabled={seleccionadas.size === 0}>
+            <Button onClick={handleGuardar} disabled={asignaturasDisponibles.length === 0}>
                 Guardar
               </Button>
             </DialogFooter>

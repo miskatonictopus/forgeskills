@@ -10,10 +10,11 @@ type Store = {
   setAsignaturasCurso: (cursoId: string, asignaturas: Asignatura[]) => void
 }
 
-export const store = proxy<Store>({
-  asignaturasPorCurso: {},
-  setAsignaturasCurso(cursoId, asignaturas) {
-    store.asignaturasPorCurso[cursoId] = asignaturas
+export const store = proxy({
+  asignaturasPorCurso: {} as Record<string, Asignatura[]>,
+  
+  setAsignaturasCurso(cursoId: string, asignaturas: Asignatura[]) {
+    Reflect.set(store.asignaturasPorCurso, cursoId, asignaturas) // 🧠 clave reactiva
   },
 })
 
