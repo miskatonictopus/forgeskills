@@ -44,7 +44,7 @@ export function CursoCard({ curso }: Props) {
 
   return (
     <>
-      <Card className="relative flex flex-col justify-between w-[17rem] h-[auto] bg-zinc-900 border border-zinc-700 text-white">
+      <Card className="relative flex flex-col justify-between w-[19rem] h-[auto] bg-zinc-900 border border-zinc-700 text-white">
         {/* ICONOS ACCIONES */}
         <div className="absolute top-2 right-2 flex gap-2 z-10">
           <Tooltip>
@@ -109,7 +109,7 @@ export function CursoCard({ curso }: Props) {
           </div>
           <div className="flex items-center gap-2 my-4">
             <div className="h-px flex-1 bg-zinc-700" />
-            <span className="text-xs uppercase text-muted-foreground">
+            <span className="text-xs uppercase text-muted-foreground mt-1">
               Asignaturas
             </span>
             <div className="h-px flex-1 bg-zinc-700" />
@@ -118,7 +118,10 @@ export function CursoCard({ curso }: Props) {
             <div className="mt-2">
               <ul className="list-disc list-outside pl-4 text-xs text-white space-y-0.5">
                 {asignaturas.map((a) => (
-                  <li key={a.id}>{a.nombre}</li>
+                  <li key={a.id}>
+                  <span className="font-mono text-muted-foreground mr-1">{a.id}</span>
+                  {a.nombre}
+                </li>
                 ))}
               </ul>
             </div>
