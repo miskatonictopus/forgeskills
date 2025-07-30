@@ -4,8 +4,16 @@ import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useSnapshot } from "valtio"
 import { cursoStore } from "@/store/cursoStore"
+import TablaNotasCEAlumnos from "@/components/TablaNotasCEAlumnos"
 
 // Tipos
+
+type Alumno = {
+  id: string
+  nombre: string
+  apellidos: string
+}
+
 type CE = {
   codigo: string
   descripcion: string
@@ -14,7 +22,7 @@ type CE = {
 type RA = {
   codigo: string
   descripcion: string
-  ce: CE[]
+  CE: CE[]
 }
 
 type Asignatura = {
@@ -40,24 +48,32 @@ export default function AsignaturaPage() {
 
   const [asignatura, setAsignatura] = useState<Asignatura | null>(null)
   const [curso, setCurso] = useState<Curso | null>(null)
+  const [alumnos, setAlumnos] = useState<Alumno[]>([])
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const asignaturaCompleta = await window.electronAPI.leerAsignatura(asignaturaId)
-        console.log("🎯 Resultado directo de leerAsignatura:", asignaturaCompleta)
-
         setAsignatura(asignaturaCompleta)
+  
         const cursoEncontrado = snapCursos.cursos.find((c) => c.id === cursoId)
         setCurso(cursoEncontrado || null)
+  
+        const alumnosCurso = await window.electronAPI.leerAlumnosPorCurso(cursoId)
+        const alumnosTransformados = alumnosCurso.map((a: any) => ({
+          ...a,
+          id: String(a.id),
+        }))
+        setAlumnos(alumnosTransformados)
       } catch (error) {
-        console.error("❌ Error al cargar asignatura:", error)
+        console.error("❌ Error al cargar datos de asignatura:", error)
         setAsignatura(null)
       }
     }
-
+  
     fetchData()
   }, [cursoId, asignaturaId, snapCursos])
+  
 
   if (!curso) {
     return <p className="p-4 text-sm text-muted-foreground">Cargando curso...</p>
@@ -84,44 +100,16 @@ export default function AsignaturaPage() {
         </p>
       )}
 
-      {asignatura.ra?.length > 0 && (
-        <div className="space-y-8">
-          {asignatura.ra.map((ra, index) => (
-            <div key={index} className="space-y-2">
-              <h3 className="text-base font-semibold text-white">
-                {ra.codigo} – {ra.descripcion}
-              </h3>
+      {asignatura.ra?.length > 0 && alumnos.length === 0 && (
+        <p className="text-sm text-muted-foreground">Cargando alumnos…</p>
+      )}
 
-              {ra.ce?.length > 0 ? (
-                <div className="overflow-x-auto rounded-xl border border-muted">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-muted/50 text-left">
-                      <tr>
-                        <th className="px-4 py-2 font-medium">Código CE</th>
-                        <th className="px-4 py-2 font-medium">Descripción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ra.ce.map((ce, i) => (
-                        <tr key={i} className="border-t hover:bg-muted/10">
-                          <td className="px-4 py-2 font-mono text-muted-foreground">
-                            {ce.codigo}
-                          </td>
-                          <td className="px-4 py-2 text-muted-foreground">
-                            {ce.descripcion}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">
-                  Sin criterios de evaluación definidos.
-                </p>
-              )}
-            </div>
-          ))}
+      {asignatura.ra?.length > 0 && alumnos.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold mb-4">
+            Notas por Criterio de Evaluación
+          </h2>
+          <TablaNotasCEAlumnos alumnos={alumnos} ra={asignatura.ra} />
         </div>
       )}
     </div>
