@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   guardarNombre: (nombre: string) =>
     ipcRenderer.invoke("guardar-nombre", nombre),
   leerNombres: () => ipcRenderer.invoke("leer-nombres"),
+  leerAsignatura: (id: string) => ipcRenderer.invoke("leer-asignatura", id),
   leerAsignaturas: () => ipcRenderer.invoke("leer-asignaturas"),
   actualizarColorAsignatura: (id: string, color: string) =>
     ipcRenderer.invoke("actualizar-color-asignatura", id, color),

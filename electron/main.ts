@@ -166,6 +166,48 @@ ipcMain.handle("leer-asignaturas", () => {
   })) satisfies Asignatura[]
 })
 
+ipcMain.handle("leer-asignatura", (event, asignaturaId: string) => {
+  const stmt = db.prepare(`SELECT * FROM asignaturas WHERE id = ?`)
+  const row = stmt.get(asignaturaId)
+  const typedRow = row as {
+    id: string
+    nombre: string
+    descripcion: string
+    creditos: string
+    color: string
+    RA: string
+  }
+
+  if (!row) return null
+
+  const asignatura = {
+    id: typedRow.id,
+    nombre: typedRow.nombre,
+    descripcion: typedRow.descripcion,
+    creditos: typedRow.creditos,
+    color: typedRow.color,
+    ra: [],
+  }
+
+  try {
+    if (typeof typedRow.RA === "string") {
+      const rawRA = JSON.parse(typedRow.RA)
+      asignatura.ra = rawRA.map((ra: any) => ({
+        ...ra,
+        ce: ra.CE, // <- Renombramos aquí
+      }))
+    }
+  } catch (err) {
+    console.error("Error al parsear RA:", err)
+    asignatura.ra = []
+  }
+
+  console.log("🚀 Asignatura enviada al frontend:", asignatura)
+  return asignatura
+})
+
+
+
 
 // ---------------------------
 // IPC handler para ALUMNOS

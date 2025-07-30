@@ -11,6 +11,7 @@ export interface ElectronAPI {
 
   // Asignaturas
   leerAsignaturas: () => Promise<Asignatura[]>
+  leerAsignatura: (id: string) => Promise<any>
   guardarAsignatura: (asignatura: Asignatura) => Promise<void>
   actualizarColorAsignatura: (id: string, color: string) => Promise<void>
   asociarAsignaturasACurso: (cursoId: string, asignaturaIds: string[]) => Promise<void>

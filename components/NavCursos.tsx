@@ -53,7 +53,7 @@ export function NavCursos({ setCursoAEliminar }: Props) {
               <SidebarMenuButton asChild>
                 <Link href={`/cursos/${curso.id}`}>
                   <GraduationCap className="w-4 h-4" />
-                  <span>{curso.acronimo}</span>
+                  <span>{curso.acronimo}{curso.nivel}</span>
                 </Link>
               </SidebarMenuButton>
 
