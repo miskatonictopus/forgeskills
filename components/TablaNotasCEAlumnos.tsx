@@ -25,6 +25,15 @@ type Props = {
   ra: RA[]
 }
 
+function getNotaColor(nota: string) {
+    const valor = parseFloat(nota)
+    if (isNaN(valor)) return "bg-background"
+    if (valor < 5) return "bg-red-100 text-red-800 dark:bg-rose-700 dark:text-red-200"
+    if (valor < 6) return "bg-yellow-100 text-yellow-800 dark:bg-amber-700 dark:text-yellow-200"
+    return "bg-green-100 text-green-800 dark:bg-emerald-700 dark:text-green-200"
+  }
+  
+
 export default function TablaNotasCEAlumnos({ alumnos, ra }: Props) {
   const [notas, setNotas] = useState<Record<string, Record<string, string>>>({})
   const [notasRA, setNotasRA] = useState<Record<string, Record<string, string>>>({})
@@ -100,17 +109,18 @@ export default function TablaNotasCEAlumnos({ alumnos, ra }: Props) {
   {alumnos.map((alumno) => (
     <td key={alumno.id} className="px-2 py-1">
       <input
-        type="number"
-        inputMode="decimal"
-        step="0.1"
-        min="0"
-        max="10"
-        className="w-full border rounded px-2 py-1 text-xs bg-background"
-        value={notasRA[raItem.codigo]?.[alumno.id] || ""}
-        onChange={(e) =>
-          handleNotaRAChange(raItem.codigo, alumno.id, e.target.value)
-        }
-      />
+  type="number"
+  inputMode="decimal"
+  step="0.1"
+  min="0"
+  max="10"
+  className={`w-full border rounded px-2 py-1 text-xs font-semibold ${getNotaColor(notasRA[raItem.codigo]?.[alumno.id] || "")}`}
+  value={notasRA[raItem.codigo]?.[alumno.id] || ""}
+  onChange={(e) =>
+    handleNotaRAChange(raItem.codigo, alumno.id, e.target.value)
+  }
+/>
+
     </td>
   ))}
 </tr>
@@ -123,17 +133,18 @@ export default function TablaNotasCEAlumnos({ alumnos, ra }: Props) {
               {alumnos.map((alumno) => (
                 <td key={alumno.id} className="px-2 py-1">
                   <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.1"
-                    min="0"
-                    max="10"
-                    className="w-full border rounded px-2 py-1 text-xs bg-background"
-                    value={notas[ce.codigo]?.[alumno.id] || ""}
-                    onChange={(e) =>
-                      handleNotaChange(ce.codigo, alumno.id, e.target.value)
-                    }
-                  />
+  type="number"
+  inputMode="decimal"
+  step="0.1"
+  min="0"
+  max="10"
+  className={`w-full border rounded px-2 py-1 text-xs ${getNotaColor(notasRA[raItem.codigo]?.[alumno.id] || "")}`}
+  value={notasRA[raItem.codigo]?.[alumno.id] || ""}
+  onChange={(e) =>
+    handleNotaRAChange(raItem.codigo, alumno.id, e.target.value)
+  }
+/>
+
                 </td>
               ))}
             </tr>
