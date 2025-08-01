@@ -127,20 +127,20 @@ export default function TablaNotasCEAlumnos({ alumnos, ra }: Props) {
                   {raItem.codigo} – {raItem.descripcion}
                 </td>
                 {alumnos.map((alumno, index) => (
-                  <td
-                    key={alumno.id}
-                    className={`px-2 py-1 ${
-                      index !== 0 ? "border-l border-white/10" : ""
-                    }`}
+                <td
+                key={alumno.id}
+                className={`px-2 py-1 ${index !== 0 ? "border-l border-white/10" : ""}`}
+              >
+                <div className="w-full h-full m-[2px]">
+                  <div
+                    className="w-full h-full rounded bg-white text-center text-2xl font-bold text-black shadow-sm"
                   >
-                    <div
-                      className={`w-full text-center font-bold text-2xl mt-1 ${getNotaColor(
-                        notasRA[raItem.codigo]?.[alumno.id] || ""
-                      )}`}
-                    >
-                      {notasRA[raItem.codigo]?.[alumno.id] || "-"}
-                    </div>
-                  </td>
+                    {notasRA[raItem.codigo]?.[alumno.id] || "-"}
+                  </div>
+                </div>
+              </td>
+              
+               
                 ))}
               </tr>
               {raItem.CE.map((ce) => (

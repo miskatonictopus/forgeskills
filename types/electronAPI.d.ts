@@ -41,6 +41,10 @@ export interface ElectronAPI {
   // Otros
   leerNombres?: () => Promise<string[]>
   guardarNombre?: (nombre: string) => Promise<void>
+
+  guardarActividad: (actividad: Actividad) => Promise<{ success: boolean }>
+  actividadesDeCurso: (cursoId: string) => Promise<Actividad[]>;
+  
 }
 
 declare global {

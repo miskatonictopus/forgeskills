@@ -375,5 +375,38 @@ ipcMain.handle("leer-asignaturas-curso", (event, cursoId: string) => {
   return stmt.all(cursoId)
 })
 
+// ---------------------------
+// IPC handler para ACTIVIDADES POR ASIGNATURA / CURSO
+// ---------------------------
+
+ipcMain.handle("actividades-de-curso", (event, cursoId: string) => {
+  const stmt = db.prepare(`
+    SELECT id, nombre, fecha, asignatura_id 
+    FROM actividades 
+    WHERE curso_id = ?
+    ORDER BY fecha ASC
+  `);
+  const actividades = stmt.all(cursoId);
+  return actividades;
+})
+
+ipcMain.handle("guardar-actividad", (event, actividad) => {
+  const stmt = db.prepare(`
+    INSERT INTO actividades (id, nombre, fecha, curso_id, asignatura_id)
+    VALUES (?, ?, ?, ?, ?)
+  `)
+
+  stmt.run(
+    actividad.id,
+    actividad.nombre,
+    actividad.fecha,
+    actividad.cursoId,
+    actividad.asignaturaId
+  )
+
+  return { success: true }
+})
+
+
 
 

@@ -33,4 +33,16 @@ export const initDB = () => {
       RA TEXT           
     )
   `).run()
+
+  db.prepare(`
+  CREATE TABLE IF NOT EXISTS actividades (
+    id TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    fecha TEXT NOT NULL,
+    curso_id TEXT NOT NULL,
+    asignatura_id TEXT NOT NULL,
+    FOREIGN KEY (curso_id) REFERENCES cursos(id),
+    FOREIGN KEY (asignatura_id) REFERENCES asignaturas(id)
+  )
+`).run();
 }

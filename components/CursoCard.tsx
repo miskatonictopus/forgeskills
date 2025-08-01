@@ -9,7 +9,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
-import { Users, SquarePen, Trash2 } from "lucide-react";
+import { Users, SquarePen, Trash2, ClipboardList } from "lucide-react";
 import { DialogAsignarAsignaturas } from "@/components/DialogAsignarAsignaturas";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 // import { setCursoAEliminar } from "@/store/cursoAEliminar"
@@ -144,6 +144,17 @@ export function CursoCard({ curso }: Props) {
                 : "+ Asociar asignaturas"}
             </Button>
           </div>
+          <div className="p-1 mt-2 ml-4">
+  <Link
+    href={`/cursos/${curso.id}/actividades`}
+    className="text-xs font-light uppercase text-muted-foreground hover:text-white transition-colors inline-flex items-center gap-1"
+  >
+    <ClipboardList className="w-4 h-4" />
+    Ver actividades
+    <span className="text-xs text-zinc-400 ml-1">(0)</span>
+  </Link>
+</div>
+
       </Card>
 
       <DialogAsignarAsignaturas

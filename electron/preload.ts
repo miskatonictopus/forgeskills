@@ -57,4 +57,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     dia: string;
     horaInicio: string;
   }) => ipcRenderer.invoke("borrar-horario", datos),
+
+  actividadesDeCurso: (cursoId: string) =>
+    ipcRenderer.invoke("actividades-de-curso", cursoId),
+
+    guardarActividad: (actividad: { id: string; nombre: string; fecha: string; cursoId: string; asignaturaId: string }) =>
+    ipcRenderer.invoke("guardar-actividad", actividad),
+  
 });
