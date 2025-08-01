@@ -1,12 +1,13 @@
 import { proxy } from "valtio"
 
-type Actividad = {
-  id: string
-  nombre: string
-  fecha: string
-  cursoId: string
-  asignaturaId: string
-}
+export type Actividad = {
+    id: string;
+    nombre: string;
+    fecha: string;
+    cursoId: string;
+    asignaturaId: string;
+    descripcion?: string;
+  };
 
 type ActividadesPorCurso = Record<string, Actividad[]>
 
@@ -23,3 +24,4 @@ export function añadirActividad(cursoId: string, actividad: Actividad) {
   }
   actividadesPorCurso[cursoId].push(actividad)
 }
+

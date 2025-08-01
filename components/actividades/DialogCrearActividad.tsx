@@ -33,7 +33,7 @@ export function DialogCrearActividad({
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
   const [asignaturaId, setAsignaturaId] = useState("");
-
+  const [descripcion, setDescripcion] = useState("");
   const asignaturas = snap[cursoId] || [];
 
   const handleGuardar = async () => {
@@ -48,6 +48,7 @@ export function DialogCrearActividad({
       fecha,
       cursoId,
       asignaturaId,
+      descripcion,
     };
 
     try {
@@ -110,6 +111,15 @@ export function DialogCrearActividad({
               ))}
             </select>
           </div>
+          <div>
+  <Label>Descripción de la actividad</Label>
+  <textarea
+    value={descripcion}
+    onChange={(e) => setDescripcion(e.target.value)}
+    placeholder="Describe aquí la actividad con detalle para detectar los CE automáticamente"
+    className="w-full border rounded px-2 py-1 text-sm bg-background min-h-[120px]"
+  />
+</div>
 
           <Button className="w-full mt-4" onClick={handleGuardar}>
             Guardar actividad

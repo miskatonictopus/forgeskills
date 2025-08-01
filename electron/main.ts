@@ -385,11 +385,12 @@ type ActividadCruda = {
   fecha: string;
   curso_id: string;
   asignatura_id: string;
+  descripcion?: string;
 };
 
 ipcMain.handle("actividades-de-curso", (event, cursoId: string) => {
   const stmt = db.prepare(`
-    SELECT id, nombre, fecha, curso_id, asignatura_id
+    SELECT id, nombre, fecha, curso_id, asignatura_id, descripcion
     FROM actividades
     WHERE curso_id = ?
     ORDER BY fecha ASC
@@ -404,13 +405,14 @@ ipcMain.handle("actividades-de-curso", (event, cursoId: string) => {
     fecha: a.fecha,
     cursoId: a.curso_id,
     asignaturaId: a.asignatura_id,
+    descripcion: a.descripcion ?? "",
   }));
 });
 
 ipcMain.handle("guardar-actividad", (event, actividad) => {
   const stmt = db.prepare(`
-    INSERT INTO actividades (id, nombre, fecha, curso_id, asignatura_id)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO actividades (id, nombre, fecha, curso_id, asignatura_id, descripcion)
+    VALUES (?, ?, ?, ?, ?, ?)
   `)
 
   stmt.run(
@@ -418,7 +420,8 @@ ipcMain.handle("guardar-actividad", (event, actividad) => {
     actividad.nombre,
     actividad.fecha,
     actividad.cursoId,
-    actividad.asignaturaId
+    actividad.asignaturaId,
+    actividad.descripcion || null 
   )
 
   return { success: true }

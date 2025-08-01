@@ -5,39 +5,49 @@ import { useParams } from "next/navigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbLink, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbLink,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Plus, CalendarDays } from "lucide-react";
 import { DialogCrearActividad } from "@/components/actividades/DialogCrearActividad";
+import { DialogVerActividad } from "@/components/actividades/DialogVerActividad";
 import { useSnapshot } from "valtio";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import { actividadesPorCurso, cargarActividades } from "@/store/actividadesPorCurso";
+
+// ✅ Tipo fuera del componente
+type Actividad = {
+  id: string;
+  nombre: string;
+  fecha: string;
+  cursoId: string;
+  asignaturaId: string;
+  descripcion?: string;
+};
 
 export default function ActividadesCursoPage() {
   const { cursoId } = useParams<{ cursoId: string }>();
   const snapAsignaturas = useSnapshot(asignaturasPorCurso);
   const snapActividades = useSnapshot(actividadesPorCurso);
-  const [open, setOpen] = useState(false);
 
+  const [open, setOpen] = useState(false);
+  const [verDialogOpen, setVerDialogOpen] = useState(false);
+  const [actividadSeleccionada, setActividadSeleccionada] = useState<Actividad | null>(null);
 
   const asignaturas = snapAsignaturas[cursoId] || [];
   const actividades = snapActividades[cursoId] || [];
 
-  type Actividad = {
-    id: string;
-    nombre: string;
-    fecha: string;
-    cursoId: string;
-    asignaturaId: string;
-  };
-
   useEffect(() => {
     if (cursoId) {
-      cargarActividades(cursoId); // Esto carga las actividades en Valtio
+      cargarActividades(cursoId);
     }
   }, [cursoId]);
 
-  // Agrupar por asignatura
   const actividadesAgrupadas: Record<string, Actividad[]> = {};
   actividades.forEach((actividad) => {
     if (!actividadesAgrupadas[actividad.asignaturaId]) {
@@ -88,7 +98,11 @@ export default function ActividadesCursoPage() {
                     {actividadesAsignatura.map((actividad) => (
                       <li
                         key={actividad.id}
-                        className="border border-zinc-700 bg-zinc-900 rounded-md px-4 py-2 flex items-center justify-between"
+                        onClick={() => {
+                          setActividadSeleccionada(actividad);
+                          setVerDialogOpen(true);
+                        }}
+                        className="cursor-pointer border border-zinc-700 bg-zinc-900 rounded-md px-4 py-2 flex items-center justify-between hover:bg-zinc-800 transition"
                       >
                         <div>
                           <p className="text-white font-medium">{actividad.nombre}</p>
@@ -111,6 +125,12 @@ export default function ActividadesCursoPage() {
           onOpenChange={setOpen}
           cursoId={cursoId}
           setRefreshKey={() => cargarActividades(cursoId)}
+        />
+
+        <DialogVerActividad
+          open={verDialogOpen}
+          onOpenChange={setVerDialogOpen}
+          actividad={actividadSeleccionada}
         />
       </SidebarInset>
     </SidebarProvider>
