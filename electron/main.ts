@@ -379,16 +379,33 @@ ipcMain.handle("leer-asignaturas-curso", (event, cursoId: string) => {
 // IPC handler para ACTIVIDADES POR ASIGNATURA / CURSO
 // ---------------------------
 
+type ActividadCruda = {
+  id: string;
+  nombre: string;
+  fecha: string;
+  curso_id: string;
+  asignatura_id: string;
+};
+
 ipcMain.handle("actividades-de-curso", (event, cursoId: string) => {
   const stmt = db.prepare(`
-    SELECT id, nombre, fecha, asignatura_id 
-    FROM actividades 
+    SELECT id, nombre, fecha, curso_id, asignatura_id
+    FROM actividades
     WHERE curso_id = ?
     ORDER BY fecha ASC
   `);
-  const actividades = stmt.all(cursoId);
-  return actividades;
-})
+
+  const actividades = stmt.all(cursoId) as ActividadCruda[];
+
+  // Mapeamos los nombres para que coincidan con el modelo del front
+  return actividades.map((a) => ({
+    id: a.id,
+    nombre: a.nombre,
+    fecha: a.fecha,
+    cursoId: a.curso_id,
+    asignaturaId: a.asignatura_id,
+  }));
+});
 
 ipcMain.handle("guardar-actividad", (event, actividad) => {
   const stmt = db.prepare(`

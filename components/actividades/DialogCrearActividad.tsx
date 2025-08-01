@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import { useSnapshot } from "valtio";
+import { cargarActividades } from "@/store/actividadesPorCurso";
+import { añadirActividad } from "@/store/actividadesPorCurso";
 
 type Props = {
   open: boolean;
@@ -49,17 +51,22 @@ export function DialogCrearActividad({
     };
 
     try {
-      await window.electronAPI.guardarActividad(nuevaActividad);
-      toast.success("Actividad guardada correctamente.");
-      onOpenChange(false);
-      setRefreshKey((prev) => prev + 1);
-      setNombre("");
-      setFecha("");
-      setAsignaturaId("");
-    } catch (err) {
-      toast.error("Error al guardar la actividad.");
-      console.error(err);
-    }
+  await window.electronAPI.guardarActividad(nuevaActividad); 
+  añadirActividad(cursoId, nuevaActividad);
+  toast.success("Actividad guardada correctamente.");
+
+
+
+  // Cerrar modal y reset
+  onOpenChange(false);
+  setNombre("");
+  setFecha("");
+  setAsignaturaId("");
+} catch (err) {
+  toast.error("Error al guardar la actividad.");
+  console.error(err);
+}
+
   };
 
   return (

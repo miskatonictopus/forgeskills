@@ -11,30 +11,33 @@ import { Plus, CalendarDays } from "lucide-react";
 import { DialogCrearActividad } from "@/components/actividades/DialogCrearActividad";
 import { useSnapshot } from "valtio";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
-
-type Actividad = {
-  id: string;
-  nombre: string;
-  fecha: string;
-  cursoId: string;
-  asignaturaId: string;
-};
+import { actividadesPorCurso, cargarActividades } from "@/store/actividadesPorCurso";
 
 export default function ActividadesCursoPage() {
   const { cursoId } = useParams<{ cursoId: string }>();
-  const [actividades, setActividades] = useState<Actividad[]>([]);
+  const snapAsignaturas = useSnapshot(asignaturasPorCurso);
+  const snapActividades = useSnapshot(actividadesPorCurso);
   const [open, setOpen] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  const snap = useSnapshot(asignaturasPorCurso);
-  const asignaturas = snap[cursoId] || [];
+
+  const asignaturas = snapAsignaturas[cursoId] || [];
+  const actividades = snapActividades[cursoId] || [];
+
+  type Actividad = {
+    id: string;
+    nombre: string;
+    fecha: string;
+    cursoId: string;
+    asignaturaId: string;
+  };
 
   useEffect(() => {
-    if (!cursoId) return;
-    window.electronAPI.actividadesDeCurso(cursoId).then(setActividades);
-  }, [cursoId, refreshKey]);
+    if (cursoId) {
+      cargarActividades(cursoId); // Esto carga las actividades en Valtio
+    }
+  }, [cursoId]);
 
-  // Agrupar actividades por asignaturaId
+  // Agrupar por asignatura
   const actividadesAgrupadas: Record<string, Actividad[]> = {};
   actividades.forEach((actividad) => {
     if (!actividadesAgrupadas[actividad.asignaturaId]) {
@@ -77,9 +80,7 @@ export default function ActividadesCursoPage() {
 
             return (
               <div key={asig.id}>
-                <h2 className="text-lg font-semibold text-white mb-2">
-                  {asig.nombre}
-                </h2>
+                <h2 className="text-lg font-semibold text-white mb-2">{asig.nombre}</h2>
                 {actividadesAsignatura.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Sin actividades registradas.</p>
                 ) : (
@@ -106,11 +107,11 @@ export default function ActividadesCursoPage() {
         </div>
 
         <DialogCrearActividad
-  open={open}
-  onOpenChange={setOpen}
-  cursoId={cursoId}
-  setRefreshKey={setRefreshKey}
-/>
+          open={open}
+          onOpenChange={setOpen}
+          cursoId={cursoId}
+          setRefreshKey={() => cargarActividades(cursoId)}
+        />
       </SidebarInset>
     </SidebarProvider>
   );
