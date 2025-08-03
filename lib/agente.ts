@@ -10,19 +10,23 @@ export async function analizarTexto(prompt: string): Promise<string[]> {
     messages: [
       {
         role: "system",
-        content: "Devuelve solo un array JSON de códigos CE relevantes.",
+        content: `Tu única tarea es devolver un array JSON de códigos CE relevantes (ej: ["CE1.1", "CE2.1"]). 
+No añadas texto explicativo, ni etiquetas como "json", ni comentarios. 
+Si el texto es el mismo, el resultado debe ser idéntico. 
+No uses variantes en el orden ni en el formato.`,
       },
       {
         role: "user",
         content: prompt,
       },
     ],
-    temperature: 0.2,
+    temperature: 0.0, // máxima consistencia
+    top_p: 1,
   });
 
   const contenido = completion.choices[0].message.content ?? "[]";
 
-  // 🔧 Limpiamos el bloque ```json ... ``` si lo hubiera
+  // 🔧 Limpiamos por si añade ```json o similar
   const limpio = contenido.replace(/```json|```/g, "").trim();
 
   try {
