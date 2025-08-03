@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
+import { VistaRAyCE } from "@/components/VistaRAyCE";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -115,6 +116,9 @@ export default function ActividadesCursoPage() {
                     ))}
                   </ul>
                 )}
+                 <div className="mt-4">
+      <VistaRAyCE asignaturaId={asig.id} />
+    </div>
               </div>
             );
           })}

@@ -63,5 +63,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
     guardarActividad: (actividad: { id: string; nombre: string; fecha: string; cursoId: string; asignaturaId: string }) =>
     ipcRenderer.invoke("guardar-actividad", actividad),
+
+    obtenerRAPorAsignatura: (asignaturaId: string) =>
+    ipcRenderer.invoke("obtener-ra-por-asignatura", asignaturaId),
+
+  obtenerCEPorRA: (raId: string) =>
+    ipcRenderer.invoke("obtener-ce-por-ra", raId),
+
+  analizarDescripcion: (actividadId: string) =>
+    ipcRenderer.invoke("analizar-descripcion", actividadId),
   
 });

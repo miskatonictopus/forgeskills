@@ -10,7 +10,19 @@ export async function POST(req: Request) {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
-      { role: "system", content: "Devuelve solo un array JSON de códigos CE relevantes." },
+      {
+        role: "system",
+        content: `
+      Eres un asistente experto en evaluación educativa.
+      
+      Tu tarea es analizar una actividad descrita por el usuario y, basándote en una lista de Criterios de Evaluación (CE), devolver exclusivamente los códigos CE que se correspondan con la actividad descrita.
+      
+      - Devuelve **solo un array JSON plano**, como: ["CE1.2", "CE2.4", "CE3.1"]
+      - No expliques nada.
+      - No inventes códigos que no están en el listado del usuario.
+      - Si no hay ningún CE adecuado, devuelve: []
+      `.trim()
+      },
       { role: "user", content: prompt },
     ],
     temperature: 0.3,

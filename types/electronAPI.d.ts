@@ -44,7 +44,14 @@ export interface ElectronAPI {
 
   guardarActividad: (actividad: Actividad) => Promise<{ success: boolean }>
   actividadesDeCurso: (cursoId: string) => Promise<Actividad[]>;
-  
+
+  obtenerRAPorAsignatura: (asignaturaId: string) => Promise<
+    { id: string; codigo: string; descripcion: string }[]
+  >;
+  obtenerCEPorRA: (raId: string) => Promise<
+    { id: string; codigo: string; descripcion: string }[]
+  >;
+  analizarDescripcion: (actividadId: string) => Promise<string[]>;
 }
 
 declare global {

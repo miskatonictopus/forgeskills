@@ -1,7 +1,12 @@
+import * as dotenv from "dotenv";
+dotenv.config();
+console.log("🔑 API KEY:", process.env.OPENAI_API_KEY);
 import { app, BrowserWindow, ipcMain } from "electron"
 import * as path from "path"
 import { db, initDB } from "./database"
 import type { Asignatura } from "../models/asignatura"
+import { analizarDescripcionActividad } from "../src/lib/analizarDescripcionActividad";
+
 
 initDB()
 
@@ -428,5 +433,35 @@ ipcMain.handle("guardar-actividad", (event, actividad) => {
 })
 
 
+// Obtener todos los RA de una asignatura
+ipcMain.handle("obtener-ra-por-asignatura", (event, asignaturaId: string) => {
+  const stmt = db.prepare(`
+    SELECT id, codigo, descripcion
+    FROM ra
+    WHERE asignatura_id = ?
+    ORDER BY codigo
+  `);
+  return stmt.all(asignaturaId);
+});
 
+// Obtener todos los CE de un RA
+ipcMain.handle("obtener-ce-por-ra", (event, raId: string) => {
+  const stmt = db.prepare(`
+    SELECT id, codigo, descripcion
+    FROM ce
+    WHERE ra_id = ?
+    ORDER BY codigo
+  `);
+  return stmt.all(raId);
+});
+
+ipcMain.handle("analizar-descripcion", async (event, actividadId) => {
+  try {
+    const resultado = await analizarDescripcionActividad(actividadId);
+    return resultado;
+  } catch (err) {
+    console.error("Error al analizar la descripción:", err);
+    return [];
+  }
+});
 

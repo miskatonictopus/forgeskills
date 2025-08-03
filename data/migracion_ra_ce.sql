@@ -1,0 +1,218 @@
+-- SCRIPT DE MIGRACIÓN RA Y CE
+
+
+-- Tabla de Resultados de Aprendizaje (RA)
+CREATE TABLE IF NOT EXISTS ra (
+    id TEXT PRIMARY KEY,
+    codigo TEXT NOT NULL,
+    descripcion TEXT NOT NULL,
+    asignatura_id TEXT NOT NULL,
+    FOREIGN KEY (asignatura_id) REFERENCES asignaturas(id) ON DELETE CASCADE
+);
+
+-- Tabla de Criterios de Evaluación (CE)
+CREATE TABLE IF NOT EXISTS ce (
+    id TEXT PRIMARY KEY,
+    codigo TEXT NOT NULL,
+    descripcion TEXT NOT NULL,
+    ra_id TEXT NOT NULL,
+    FOREIGN KEY (ra_id) REFERENCES ra(id) ON DELETE CASCADE
+);
+
+
+-- INSERT RA
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('b73deaef-deea-4bdd-8f8f-be828468c5f7', 'RA1', 'Selecciona las arquitecturas y tecnologías de programación sobre clientes web, identificando y analizando las capacidades y características de cada una.', '0612');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('3ffba13e-9350-4025-986c-f2cad3847da2', 'RA2', 'Selecciona un lenguaje de programación de cliente web en función de sus posibilidades.', '0612');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('d8d74dc5-233b-4cf9-ab3b-9692e03ee109', 'RA3', 'Programa con objetos predefinidos del lenguaje.', '0612');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('1a100095-b0a8-4c62-b9df-61a02d82d7eb', 'RA4', 'Programa código para clientes web analizando y utilizando estructuras definidas por el usuario.', '0612');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('d124d51d-e364-42b4-b329-6a1552835fd5', 'RA5', 'Desarrolla aplicaciones web interactivas integrando gestión de eventos.', '0612');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('0ec9c60f-26d0-4468-809f-d891a5cce2e7', 'RA6', 'Desarrolla aplicaciones web analizando y aplicando el modelo de objetos del documento (DOM).', '0612');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('09fc0977-2f73-43db-bbd5-900636095b05', 'RA7', 'Desarrolla aplicaciones web dinámicas, aplicando comunicación asíncrona entre cliente y servidor.', '0612');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('37a88528-f791-43b9-8cda-cfe12687483d', 'RA1', 'Planifica la creación de una interfaz web valorando y aplicando especificaciones de diseño.', '0615');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('1ef28b77-c392-4529-9dd9-03f2741ed8c7', 'RA2', 'Crea interfaces web homogéneas definiendo y aplicando estilos.', '0615');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('034e9839-cecc-4d02-946d-28bf766ae2fb', 'RA3', 'Prepara archivos multimedia para la web, analizando sus características y utilizando herramientas específicas.', '0615');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('94d4315b-35a1-4ae5-a612-161343f3d015', 'RA4', 'Integra contenido multimedia en documentos web valorando su aportación y seleccionando adecuadamente los elementos interactivos.', '0615');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('91116e01-862c-44df-b363-43f8f348c8bb', 'RA5', 'Desarrolla interfaces web accesibles analizando las pautas establecidas y aplicando técnicas de verificación.', '0615');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('7e12032a-e57d-4c8e-82e8-8fa57f1a4a50', 'RA6', 'Desarrolla interfaces web amigables analizando y aplicando pautas de usabilidad establecidas.', '0615');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('86dced5c-1719-4260-a5ed-6fbb9db1c2ba', 'RA1', 'Selecciona las arquitecturas y tecnologías de programación web en entorno servidor, analizando sus capacidades y características propias.', '0613');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('5cb4dc94-59bc-4a9f-ac76-a1c49cc74952', 'RA2', 'Escribe sentencias ejecutables por un servidor web reconociendo y aplicando procedimientos de integración del código en lenguajes de marcas.', '0613');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('b22e3ae3-fca6-4558-8d16-eb1b57f3b12e', 'RA3', 'Utiliza estructuras de programación para el desarrollo de lógica de servidor.', '0613');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('70bcdfb2-a1d2-4ad8-be04-b97ed25262ba', 'RA4', 'Desarrolla aplicaciones web embebidas en lenguajes de marcas analizando e incorporando funcionalidades según especificaciones.', '0613');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('c159c0f4-b11b-45bf-9197-b15cf06eca16', 'RA5', 'Desarrolla aplicaciones web identificando y aplicando mecanismos para separar el código de presentación de la lógica de negocio.', '0613');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('d8e39211-7ae2-4b8b-a918-e93f78b9c43a', 'RA6', 'Desarrolla aplicaciones web de acceso a almacenes de datos, aplicando medidas para mantener la seguridad y la integridad de la información.', '0613');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('dadcd023-09b0-446b-995e-fb80146dcc5f', 'RA7', 'Desarrolla servicios web reutilizables y accesibles mediante protocolos web, verificando su funcionamiento.', '0613');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('0adc57f1-d10c-477b-a9c2-83b4346819c2', 'RA8', 'Genera páginas web dinámicas analizando y utilizando tecnologías y frameworks del servidor web que añaden código al lenguaje de marcas.', '0613');
+INSERT INTO ra (id, codigo, descripcion, asignatura_id) VALUES ('c3269710-87da-40ad-acec-193b6c658efa', 'RA9', 'Desarrolla aplicaciones web híbridas seleccionando y utilizando tecnologías, frameworks de servidor y repositorios heterogéneos de información.', '0613');
+
+-- INSERT CE
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('add06b08-9890-48e2-bd35-1b266137d299', 'CE1.1', 'Caracteriza y diferencia los modelos de ejecución de código en el servidor y en el cliente web.', 'b73deaef-deea-4bdd-8f8f-be828468c5f7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('cb920900-3737-4b68-a37d-829446ad5ea9', 'CE1.2', 'Identifica las capacidades y los mecanismos de ejecución de código de los navegadores web.', 'b73deaef-deea-4bdd-8f8f-be828468c5f7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('315bb344-d892-4ccc-a563-85318f984f64', 'CE1.3', 'Identifica y caracteriza los principales lenguajes relacionados con la programación de clientes web.', 'b73deaef-deea-4bdd-8f8f-be828468c5f7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('6f63e3cb-2c95-4125-ad9e-e45fbec829a9', 'CE1.4', 'Reconoce las particularidades de la programación de scripts y sus ventajas y desventajas frente a la programación tradicional.', 'b73deaef-deea-4bdd-8f8f-be828468c5f7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('2cad944a-2e39-4f43-b853-01636af5af46', 'CE1.5', 'Verifica los mecanismos de integración de los lenguajes de marcas con los de programación de clientes web.', 'b73deaef-deea-4bdd-8f8f-be828468c5f7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('62254565-9405-4205-b211-da13912a8de4', 'CE1.6', 'Reconoce y evalúa herramientas de programación y prueba para clientes web.', 'b73deaef-deea-4bdd-8f8f-be828468c5f7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('af135d69-9439-406b-8e93-ecef474d0db8', 'CE1.7', 'Escribe sentencias simples, aplicando la sintaxis del lenguaje y verificando su ejecución en navegadores web.', 'b73deaef-deea-4bdd-8f8f-be828468c5f7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('6fbe8063-5a2d-40bb-8b3e-ed905fee8189', 'CE2.1', 'Utiliza distintos tipos de variables y operadores del lenguaje.', '3ffba13e-9350-4025-986c-f2cad3847da2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('f0e5499f-d154-46ce-bdbc-3e6b17030249', 'CE2.2', 'Identifica los ámbitos de uso de las variables.', '3ffba13e-9350-4025-986c-f2cad3847da2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('927a9c72-e92e-469c-8f42-d82a0ed5a9ac', 'CE2.3', 'Reconoce y comprueba peculiaridades del lenguaje respecto a conversiones entre distintos tipos de datos.', '3ffba13e-9350-4025-986c-f2cad3847da2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('979379b2-4d0a-4f16-8c37-4306a6532f52', 'CE2.4', 'Utiliza estructuras de decisión para crear bloques de sentencias.', '3ffba13e-9350-4025-986c-f2cad3847da2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('05b23a5c-142b-4926-9ee5-a9b8db802b06', 'CE2.5', 'Utiliza bucles y verifica su funcionamiento.', '3ffba13e-9350-4025-986c-f2cad3847da2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('85dcb618-7744-4c06-81d0-577d310d3c21', 'CE2.6', 'Añade comentarios al código.', '3ffba13e-9350-4025-986c-f2cad3847da2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('0c5db8ee-2ec3-4dff-bc21-edd05d4072b1', 'CE2.7', 'Usa herramientas y entornos para facilitar la programación, prueba y documentación del código.', '3ffba13e-9350-4025-986c-f2cad3847da2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('5cc1d0c8-6a63-441f-b962-5b0a69f7e4c2', 'CE2.8', 'Escribe código aplicando funcionalidades de objetos predefinidos del lenguaje.', '3ffba13e-9350-4025-986c-f2cad3847da2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('c59ca629-7137-4383-99d6-688c9baedbd9', 'CE3.1', 'Identifica los objetos predefinidos del lenguaje.', 'd8d74dc5-233b-4cf9-ab3b-9692e03ee109');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('53bc7001-2777-4a06-9858-25ae76bf6d8b', 'CE3.2', 'Analiza los objetos relacionados con las ventanas del navegador y los documentos que contienen.', 'd8d74dc5-233b-4cf9-ab3b-9692e03ee109');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('bac82995-dc21-4964-8e35-c92bcfef31ea', 'CE3.3', 'Escribe sentencias para cambiar la apariencia del navegador y el documento usando objetos predefinidos.', 'd8d74dc5-233b-4cf9-ab3b-9692e03ee109');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('9c32e2c7-d451-48a0-bcdc-603df9a41c6c', 'CE3.4', 'Genera texto y etiquetas como resultado de ejecución de código en el navegador.', 'd8d74dc5-233b-4cf9-ab3b-9692e03ee109');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('c5b8f4f9-3ce4-4e9c-a359-6805956d7e8f', 'CE3.5', 'Escribe sentencias que interactúan con el usuario.', 'd8d74dc5-233b-4cf9-ab3b-9692e03ee109');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('5dd5a449-44ee-49c7-98eb-1a4f94134d6f', 'CE3.6', 'Usa características del lenguaje en documentos con varias ventanas.', 'd8d74dc5-233b-4cf9-ab3b-9692e03ee109');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('05ec2fe3-4792-4ab1-a094-698221479992', 'CE3.7', 'Usa mecanismos del navegador para almacenar y recuperar información.', 'd8d74dc5-233b-4cf9-ab3b-9692e03ee109');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('e9acea06-f6c8-4502-9fde-0a1a01cb375b', 'CE3.8', 'Depura y documenta el código.', 'd8d74dc5-233b-4cf9-ab3b-9692e03ee109');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('af085977-c3fb-4bac-9aaf-5c20b59000b9', 'CE4.1', 'Clasifica y utiliza funciones predefinidas del lenguaje.', '1a100095-b0a8-4c62-b9df-61a02d82d7eb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('936f02c0-e125-4284-b6d3-8d077420bcd1', 'CE4.2', 'Crea y usa funciones definidas por el usuario.', '1a100095-b0a8-4c62-b9df-61a02d82d7eb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('07c6ba25-93f4-474b-8528-ef9d50bb0414', 'CE4.3', 'Reconoce características del lenguaje relacionadas con arrays.', '1a100095-b0a8-4c62-b9df-61a02d82d7eb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('be78611c-236c-4d40-a58b-bfb4fd3f6639', 'CE4.4', 'Crea y usa arrays.', '1a100095-b0a8-4c62-b9df-61a02d82d7eb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('e9ce75a2-234a-466a-b542-6f510864879b', 'CE4.5', 'Usa operaciones agregadas para manipular datos en colecciones.', '1a100095-b0a8-4c62-b9df-61a02d82d7eb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('7de160a7-a1f2-453c-b32d-2546c4283268', 'CE4.6', 'Reconoce características de orientación a objetos del lenguaje.', '1a100095-b0a8-4c62-b9df-61a02d82d7eb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('9a0edd30-ffb6-499e-8c79-d77491eac6c1', 'CE4.7', 'Crea estructuras de objetos, métodos y propiedades.', '1a100095-b0a8-4c62-b9df-61a02d82d7eb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('3ca0aa64-2407-4144-92c6-9a00357651c8', 'CE4.8', 'Usa objetos definidos por el usuario.', '1a100095-b0a8-4c62-b9df-61a02d82d7eb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('2567ab68-c5b9-4e89-b134-eb1f80339b91', 'CE4.9', 'Aplica patrones de diseño.', '1a100095-b0a8-4c62-b9df-61a02d82d7eb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('39de7625-271f-413e-8978-1c7fc4a0a1de', 'CE4.10', 'Depura y documenta el código.', '1a100095-b0a8-4c62-b9df-61a02d82d7eb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('97e5617b-a589-43b1-9188-4f9a7a615192', 'CE5.1', 'Reconoce las capacidades del lenguaje de marcas para capturar eventos.', 'd124d51d-e364-42b4-b329-6a1552835fd5');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('6150cd92-d6c3-4d4c-b0da-045d1150bd78', 'CE5.2', 'Identifica características del lenguaje de programación para la gestión de eventos.', 'd124d51d-e364-42b4-b329-6a1552835fd5');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('a4d4812d-c014-4a75-af9c-c5ad9ef273e5', 'CE5.3', 'Diferencia tipos de eventos gestionables.', 'd124d51d-e364-42b4-b329-6a1552835fd5');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('999dc4fd-4bea-4f62-b359-7ccb653e1763', 'CE5.4', 'Crea código que captura y utiliza eventos.', 'd124d51d-e364-42b4-b329-6a1552835fd5');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('39a90e2a-4caa-4bbd-90dc-82567693c5ae', 'CE5.5', 'Reconoce capacidades para gestión de formularios.', 'd124d51d-e364-42b4-b329-6a1552835fd5');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('64e3cd0b-722e-420a-8075-da6679a9dc8e', 'CE5.6', 'Valida formularios usando eventos.', 'd124d51d-e364-42b4-b329-6a1552835fd5');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('cba5f7e1-58b0-4950-bc01-16bc35838d06', 'CE5.7', 'Usa expresiones regulares para validar.', 'd124d51d-e364-42b4-b329-6a1552835fd5');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('1c11eb9b-b4ea-4106-b278-fd29366d0255', 'CE5.8', 'Prueba y documenta el código.', 'd124d51d-e364-42b4-b329-6a1552835fd5');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('4cfe3c1f-1605-4ad6-b4cb-8f3b19d7d8fb', 'CE6.1', 'Reconoce el modelo de objetos del documento (DOM) de una página web.', '0ec9c60f-26d0-4468-809f-d891a5cce2e7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('5932cc37-205a-4b9c-b0d9-883ed639ca2c', 'CE6.2', 'Identifica objetos, propiedades y métodos.', '0ec9c60f-26d0-4468-809f-d891a5cce2e7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('529c1649-5fe4-4388-8a66-cc6d0955e445', 'CE6.3', 'Crea código que accede a la estructura del documento.', '0ec9c60f-26d0-4468-809f-d891a5cce2e7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('c24125f9-38d8-452a-b474-864a7fcd576f', 'CE6.4', 'Crea o modifica elementos de la estructura.', '0ec9c60f-26d0-4468-809f-d891a5cce2e7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('bc2526a1-b09d-40d2-b4b0-0f48767733a4', 'CE6.5', 'Asocia acciones a eventos del modelo.', '0ec9c60f-26d0-4468-809f-d891a5cce2e7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('74d051b6-e960-49f6-a134-b52000b3aa68', 'CE6.6', 'Identifica diferencias del modelo entre navegadores.', '0ec9c60f-26d0-4468-809f-d891a5cce2e7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('ac8e1485-58bf-4570-89b4-3e43ce66a4d2', 'CE6.7', 'Programa para navegadores con distintas implementaciones del modelo.', '0ec9c60f-26d0-4468-809f-d891a5cce2e7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('0f344d6d-875d-41d0-b308-a3b56f4967b3', 'CE6.8', 'Separa contenido, estilo y comportamiento en las aplicaciones web.', '0ec9c60f-26d0-4468-809f-d891a5cce2e7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('57b3b70a-1fc9-432a-874a-11f35818d1b9', 'CE7.1', 'Evalúa ventajas e inconvenientes de la comunicación asíncrona.', '09fc0977-2f73-43db-bbd5-900636095b05');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('5324d7f9-9e7d-4686-bb4a-0a1344a687f7', 'CE7.2', 'Analiza mecanismos disponibles para establecer comunicación asíncrona.', '09fc0977-2f73-43db-bbd5-900636095b05');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('ebd64604-f923-4503-b5ec-c329a0b15a62', 'CE7.3', 'Usa los objetos relacionados.', '09fc0977-2f73-43db-bbd5-900636095b05');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('b6923507-3649-4b72-adf9-c0dd3fb64a93', 'CE7.4', 'Identifica propiedades y métodos.', '09fc0977-2f73-43db-bbd5-900636095b05');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('e448b532-104f-401f-923a-4123a0be33ce', 'CE7.5', 'Usa comunicación asíncrona para actualizar dinámicamente el documento.', '09fc0977-2f73-43db-bbd5-900636095b05');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('c3d2c8ea-3a24-41f9-b9f7-020c43d52110', 'CE7.6', 'Utiliza distintos formatos de envío/recepción de información.', '09fc0977-2f73-43db-bbd5-900636095b05');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('8909ba81-c9fd-424c-a734-9e8ab7b1486a', 'CE7.7', 'Programa apps web asíncronas compatibles con diferentes navegadores.', '09fc0977-2f73-43db-bbd5-900636095b05');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('c1e70a04-559d-4ba0-91bc-d6184afc11df', 'CE7.8', 'Clasifica y usa librerías/frameworks de actualización dinámica.', '09fc0977-2f73-43db-bbd5-900636095b05');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('c468315d-7a6c-4211-acf1-b13532e33eda', 'CE7.9', 'Crea, prueba y documenta apps web usando estas herramientas.', '09fc0977-2f73-43db-bbd5-900636095b05');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('acd629e2-cde0-4649-9256-48c8fad021fa', 'CE1.1', 'Reconoce la importancia de la comunicación visual y sus principios básicos', '37a88528-f791-43b9-8cda-cfe12687483d');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('3150d96f-25fa-4f73-a447-fbae7cced976', 'CE1.2', 'Analiza y selecciona colores y tipografías adecuados para su visualización en pantalla', '37a88528-f791-43b9-8cda-cfe12687483d');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('d3e2fc6e-4192-41bf-a3bf-52c809a76fc2', 'CE1.3', 'Analiza alternativas para la presentación de información en documentos web', '37a88528-f791-43b9-8cda-cfe12687483d');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('77f7281a-516c-4696-8c82-4a96a478493f', 'CE1.4', 'Valora la importancia de definir y aplicar una guía de estilo en el desarrollo de una aplicación web', '37a88528-f791-43b9-8cda-cfe12687483d');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('4f70529f-edca-4269-95a9-4f61268d84f1', 'CE1.5', 'Utiliza y valora diferentes tecnologías para el diseño de documentos web', '37a88528-f791-43b9-8cda-cfe12687483d');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('12113fdb-d95d-418c-ade1-4adfb4c6591c', 'CE1.6', 'Crea y utiliza plantillas de diseño', '37a88528-f791-43b9-8cda-cfe12687483d');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('43083fa7-89f2-484b-9226-0f6c9913dabd', 'CE1.7', 'Crea interfaces web homogéneas definiendo y aplicando estilos', '37a88528-f791-43b9-8cda-cfe12687483d');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('f6af078f-0a96-4f9a-a4ae-06ca892a2aca', 'CE2.1', 'Reconoce las posibilidades de modificar etiquetas HTML', '1ef28b77-c392-4529-9dd9-03f2741ed8c7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('1ea8f8e3-f341-437d-823b-d8728496a0cc', 'CE2.2', 'Define estilos de forma directa', '1ef28b77-c392-4529-9dd9-03f2741ed8c7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('4a3987e8-6086-414b-b806-d943f555ccbc', 'CE2.3', 'Define y asocia estilos globales a hojas externas', '1ef28b77-c392-4529-9dd9-03f2741ed8c7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('7f598bad-c1fc-4597-abdf-ef9ac9de66bf', 'CE2.4', 'Define hojas de estilo alternativas', '1ef28b77-c392-4529-9dd9-03f2741ed8c7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('f2173541-8e35-4e0a-a19e-4e32e4b5bf23', 'CE2.5', 'Redefine estilos', '1ef28b77-c392-4529-9dd9-03f2741ed8c7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('0182a7c6-9160-4146-aed9-2620ecfdd381', 'CE2.6', 'Identifica las distintas propiedades de cada elemento', '1ef28b77-c392-4529-9dd9-03f2741ed8c7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('df937598-7cb0-406d-b969-55f25aa50cc8', 'CE2.7', 'Crea clases de estilos', '1ef28b77-c392-4529-9dd9-03f2741ed8c7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('1c278a28-df88-4f95-89e7-3028dd871242', 'CE2.8', 'Utiliza herramientas de validación de hojas de estilo', '1ef28b77-c392-4529-9dd9-03f2741ed8c7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('95e019c6-d923-4f11-bddd-36b1e7cb97ee', 'CE2.9', 'Analiza y utiliza tecnologías y frameworks para crear interfaces web con diseño responsive', '1ef28b77-c392-4529-9dd9-03f2741ed8c7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('fa314a57-807c-4191-b97e-e495acc12745', 'CE2.10', 'Analiza y utiliza preprocesadores de estilos para traducir estilos comunes a un código estándar reconocido por los navegadores', '1ef28b77-c392-4529-9dd9-03f2741ed8c7');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('c55fde8f-e6e5-49a6-a30d-860d6717dfe4', 'CE3.1', 'Reconoce implicaciones de licencias y derechos de autor en el uso de material multimedia', '034e9839-cecc-4d02-946d-28bf766ae2fb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('638509a9-e782-40f1-b40f-d47113708669', 'CE3.2', 'Identifica los formatos de imagen, audio y vídeo adecuados', '034e9839-cecc-4d02-946d-28bf766ae2fb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('7a86b780-a0c0-4d00-96ad-29ba1820bb22', 'CE3.3', 'Analiza herramientas disponibles para generar contenido multimedia', '034e9839-cecc-4d02-946d-28bf766ae2fb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('9e0b13f0-9fd9-41a9-bd57-e45743d33a80', 'CE3.4', 'Emplea herramientas para el tratamiento digital de la imagen', '034e9839-cecc-4d02-946d-28bf766ae2fb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('02879c30-0694-4b56-a5ca-498a1838b292', 'CE3.5', 'Utiliza herramientas para manipular audio y vídeo', '034e9839-cecc-4d02-946d-28bf766ae2fb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('d3de3fcb-dd83-4aab-8925-f45a04a51f19', 'CE3.6', 'Realiza animaciones a partir de imágenes fijas', '034e9839-cecc-4d02-946d-28bf766ae2fb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('c0daa535-d3cf-4384-8255-2030aede6cdc', 'CE3.7', 'Importa y exporta imágenes, audio y vídeo en varios formatos según su finalidad', '034e9839-cecc-4d02-946d-28bf766ae2fb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('7617f09f-94cc-467e-8a54-7450f1710e65', 'CE3.8', 'Aplica la guía de estilo', '034e9839-cecc-4d02-946d-28bf766ae2fb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('3c888917-91f8-4fa3-a109-fa3dceefe491', 'CE4.1', 'Reconoce y analiza tecnologías relacionadas con la inclusión de contenido multimedia e interactivo', '94d4315b-35a1-4ae5-a612-161343f3d015');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('8c8d385a-1a61-47ec-bd6c-ab952557cf33', 'CE4.2', 'Identifica configuraciones específicas necesarias en los navegadores para soportar contenido multimedia e interactivo', '94d4315b-35a1-4ae5-a612-161343f3d015');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('32f6f151-767e-43b3-9b4c-fb8cb68f34d5', 'CE4.3', 'Utiliza herramientas gráficas para el desarrollo de contenido multimedia interactivo', '94d4315b-35a1-4ae5-a612-161343f3d015');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('79685428-9824-4c8e-b124-978843bcc3d7', 'CE4.4', 'Analiza el código generado por las herramientas de contenido interactivo', '94d4315b-35a1-4ae5-a612-161343f3d015');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('fc042f9e-e334-47ee-8b87-adfab0055670', 'CE4.5', 'Añade elementos multimedia a documentos web', '94d4315b-35a1-4ae5-a612-161343f3d015');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('cb49e11e-b2b6-4f9a-8a7b-31c71187b458', 'CE4.6', 'Añade interactividad a elementos de un documento web', '94d4315b-35a1-4ae5-a612-161343f3d015');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('341922a0-092e-4830-86d1-56556b7efe00', 'CE4.7', 'Verifica el funcionamiento de elementos multimedia e interactivos en diferentes navegadores y dispositivos', '94d4315b-35a1-4ae5-a612-161343f3d015');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('9647d948-524a-4c6f-a993-977a5e2063af', 'CE5.1', 'Reconoce la necesidad de diseñar webs accesibles', '91116e01-862c-44df-b363-43f8f348c8bb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('47aca99c-c858-4788-8179-231aa2ec2301', 'CE5.2', 'Analiza la accesibilidad de distintos documentos web', '91116e01-862c-44df-b363-43f8f348c8bb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('2bf1113b-689f-4a8a-b776-99694a0e5d06', 'CE5.3', 'Analiza los principios y pautas de accesibilidad al contenido y sus niveles de conformidad', '91116e01-862c-44df-b363-43f8f348c8bb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('73ff191c-7a20-4889-a488-1e83ef5a655b', 'CE5.4', 'Analiza posibles errores según los puntos de verificación de prioridad', '91116e01-862c-44df-b363-43f8f348c8bb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('790390c4-e46f-401c-97ea-8af13a0836c4', 'CE5.5', 'Alcanza el nivel de conformidad deseado', '91116e01-862c-44df-b363-43f8f348c8bb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('38ce44ab-2a38-4d13-a203-8a904047c308', 'CE5.6', 'Verifica niveles alcanzados mediante tests externos', '91116e01-862c-44df-b363-43f8f348c8bb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('172b7ce1-e4af-4119-85d1-357b6e6b92f8', 'CE5.7', 'Verifica la visualización de la interfaz en distintos navegadores y tecnologías', '91116e01-862c-44df-b363-43f8f348c8bb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('7f00519c-6381-4339-a902-78b4c4b5c52a', 'CE5.8', 'Analiza y utiliza herramientas y estrategias que mejoran la visibilidad y accesibilidad de sitios y páginas web en los resultados de buscadores', '91116e01-862c-44df-b363-43f8f348c8bb');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('70573eb2-6703-470d-a337-33d9f849e1c0', 'CE6.1', 'Analiza la usabilidad de diferentes documentos web', '7e12032a-e57d-4c8e-82e8-8fa57f1a4a50');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('c8ae79b1-3456-4e32-a703-5b7675674bf0', 'CE6.2', 'Valora la importancia del uso de estándares en la creación de documentos web', '7e12032a-e57d-4c8e-82e8-8fa57f1a4a50');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('88e92a79-4120-4190-b813-e3686e3ef0ed', 'CE6.3', 'Modifica la interfaz web para adaptarla a sus objetivos y a su público', '7e12032a-e57d-4c8e-82e8-8fa57f1a4a50');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('8a346af8-a7e9-418b-9ec9-07e6f2b4b407', 'CE6.4', 'Verifica la facilidad de navegación de un documento web mediante distintos periféricos', '7e12032a-e57d-4c8e-82e8-8fa57f1a4a50');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('fcb0c6b1-a69b-45d8-acf2-eadfddd0e1d8', 'CE6.5', 'Analiza técnicas para verificar la usabilidad de un documento web', '7e12032a-e57d-4c8e-82e8-8fa57f1a4a50');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('cbe5ecb3-abda-4fe4-8e7c-62af2fc23610', 'CE6.6', 'Verifica la usabilidad de la interfaz web creada en distintos navegadores y tecnologías', '7e12032a-e57d-4c8e-82e8-8fa57f1a4a50');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('2a98526e-1a3c-4295-8600-fd5f7304fb5c', 'CE1.1', 'Caracteriza y diferencia los modelos de ejecución de código en el servidor y en el cliente web.', '86dced5c-1719-4260-a5ed-6fbb9db1c2ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('c55bd831-e681-48ab-9003-a02338399dbc', 'CE1.2', 'Reconoce las ventajas que proporciona la generación dinámica de páginas.', '86dced5c-1719-4260-a5ed-6fbb9db1c2ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('e5d0adc6-9047-4303-863b-73a269e6c076', 'CE1.3', 'Identifica los mecanismos de ejecución de código en los servidores web.', '86dced5c-1719-4260-a5ed-6fbb9db1c2ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('4b7ae589-e75f-43d8-86b5-6d64f72e6bb7', 'CE1.4', 'Reconoce las funcionalidades que aportan los servidores de aplicaciones y su integración con los servidores web.', '86dced5c-1719-4260-a5ed-6fbb9db1c2ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('6630bf64-a084-4d72-8440-c5a5e9605955', 'CE1.5', 'Identifica y caracteriza los principales lenguajes y tecnologías relacionados con la programación web en entorno servidor.', '86dced5c-1719-4260-a5ed-6fbb9db1c2ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('7fe8079a-5b88-4f4a-85ce-cc5bae883c83', 'CE1.6', 'Verifica los mecanismos de integración de los lenguajes de marcas con los lenguajes de programación en entorno servidor.', '86dced5c-1719-4260-a5ed-6fbb9db1c2ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('5d217692-e16c-4842-ad21-24fc32436758', 'CE1.7', 'Reconoce y evalúa las herramientas y frameworks de programación en entorno servidor.', '86dced5c-1719-4260-a5ed-6fbb9db1c2ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('9421fea8-24cc-4494-81c3-bee108f4cce0', 'CE2.1', 'Reconoce los mecanismos de generación de páginas web a partir de lenguajes de marcas con código embebido.', '5cb4dc94-59bc-4a9f-ac76-a1c49cc74952');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('eaf5108d-5d4b-4c60-bb96-4433a6ab8d68', 'CE2.2', 'Identifica las principales tecnologías asociadas.', '5cb4dc94-59bc-4a9f-ac76-a1c49cc74952');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('b2f061bb-b075-4d19-82f5-433142877aff', 'CE2.3', 'Utiliza etiquetas para la inclusión de código en el lenguaje de marcas.', '5cb4dc94-59bc-4a9f-ac76-a1c49cc74952');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('39919294-39c0-47f0-a9d6-e59508d70a7f', 'CE2.4', 'Reconoce la sintaxis del lenguaje de programación que se debe utilizar.', '5cb4dc94-59bc-4a9f-ac76-a1c49cc74952');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('23735d69-e57c-4902-89e9-a664216c8dc8', 'CE2.5', 'Escribe sentencias simples y comprueba sus efectos en el documento resultante.', '5cb4dc94-59bc-4a9f-ac76-a1c49cc74952');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('b47345a9-fdaf-4643-9873-d478b4d9b087', 'CE2.6', 'Utiliza directivas para modificar el comportamiento predeterminado.', '5cb4dc94-59bc-4a9f-ac76-a1c49cc74952');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('b1e5923b-ee82-4758-a83e-0fdc52d9fb7d', 'CE2.7', 'Utiliza los distintos tipos de variables y operadores disponibles en el lenguaje.', '5cb4dc94-59bc-4a9f-ac76-a1c49cc74952');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('393fedcd-54df-4329-817e-137d2a762bde', 'CE2.8', 'Identifica los ámbitos de utilización de las variables.', '5cb4dc94-59bc-4a9f-ac76-a1c49cc74952');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('19e20594-4e8f-4c22-9a4e-5facc283c229', 'CE2.9', 'Escribe bloques de sentencias embebidas en lenguajes de marcas, seleccionando y utilizando estructuras de programación.', '5cb4dc94-59bc-4a9f-ac76-a1c49cc74952');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('5601677b-e8eb-45eb-962c-0517f8aa4517', 'CE3.1', 'Utiliza mecanismos de decisión en la creación de bloques de sentencias.', 'b22e3ae3-fca6-4558-8d16-eb1b57f3b12e');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('58d76331-6a30-4f83-8b4f-84c5d3ac537c', 'CE3.2', 'Utiliza bucles y verifica su funcionamiento.', 'b22e3ae3-fca6-4558-8d16-eb1b57f3b12e');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('3ddfc374-d451-4e3b-af6c-97f4e88b02ec', 'CE3.3', 'Utiliza matrices (arrays) para almacenar y recuperar conjuntos de datos.', 'b22e3ae3-fca6-4558-8d16-eb1b57f3b12e');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('74f80ece-fe2e-4c5d-aef8-f69e9fb852b2', 'CE3.4', 'Crea y utiliza funciones.', 'b22e3ae3-fca6-4558-8d16-eb1b57f3b12e');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('219556cb-2f21-435d-8300-7067d1763550', 'CE3.5', 'Utiliza formularios web para interactuar con el usuario del navegador web.', 'b22e3ae3-fca6-4558-8d16-eb1b57f3b12e');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('08b47315-ad1c-4f73-b242-9bdd88f67129', 'CE3.6', 'Emplea métodos para recuperar la información introducida en el formulario.', 'b22e3ae3-fca6-4558-8d16-eb1b57f3b12e');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('07df5d4c-a220-4c36-bedc-0f61929d32cb', 'CE3.7', 'Añade comentarios al código.', 'b22e3ae3-fca6-4558-8d16-eb1b57f3b12e');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('a0b2056a-1235-4858-a17b-9ad826eccdb5', 'CE4.1', 'Identifica los mecanismos disponibles para el mantenimiento de la información relativa a un cliente web concreto y señala sus ventajas.', '70bcdfb2-a1d2-4ad8-be04-b97ed25262ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('b8b67b31-b38a-471f-a9f5-3c92d567ce61', 'CE4.2', 'Utiliza mecanismos para mantener el estado de las aplicaciones web.', '70bcdfb2-a1d2-4ad8-be04-b97ed25262ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('0ba4611d-ec06-411a-a4e2-e33144db633c', 'CE4.3', 'Utiliza mecanismos para almacenar información en el cliente web y recuperar su contenido.', '70bcdfb2-a1d2-4ad8-be04-b97ed25262ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('15be2772-e970-4fa3-ba89-4c89ce320aac', 'CE4.4', 'Identifica y caracteriza los mecanismos disponibles para la autenticación de usuarios.', '70bcdfb2-a1d2-4ad8-be04-b97ed25262ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('b746151d-5826-4723-9499-41742ef1f05c', 'CE4.5', 'Escribe aplicaciones que integren mecanismos de autenticación de usuarios.', '70bcdfb2-a1d2-4ad8-be04-b97ed25262ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('883021b0-90a4-4a94-be2e-c2a072aaa0dc', 'CE4.6', 'Utiliza herramientas y entornos para facilitar la programación, prueba y depuración del código.', '70bcdfb2-a1d2-4ad8-be04-b97ed25262ba');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('a544af83-2aed-4f4d-bacc-882e0e19bb97', 'CE5.1', 'Identifica las ventajas de separar la lógica de negocio de los aspectos de presentación de la aplicación.', 'c159c0f4-b11b-45bf-9197-b15cf06eca16');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('d8c57341-a44b-4cdf-bcb3-4164e76990af', 'CE5.2', 'Analiza y utiliza mecanismos y frameworks que permiten realizar esta separación y sus principales características.', 'c159c0f4-b11b-45bf-9197-b15cf06eca16');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('046c112a-b9a9-4959-ad68-7211ef0b2ad5', 'CE5.3', 'Utiliza objetos y controles en el servidor para generar el aspecto visual de la aplicación web en el cliente.', 'c159c0f4-b11b-45bf-9197-b15cf06eca16');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('f44713f9-9788-4668-9d23-443ee99651d0', 'CE5.4', 'Utiliza formularios generados de forma dinámica para responder a los eventos de la aplicación web.', 'c159c0f4-b11b-45bf-9197-b15cf06eca16');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('4d9c9268-d5e7-4a43-8ea8-e13d6a573932', 'CE5.5', 'Identifica y aplica los parámetros relativos a la configuración de la aplicación web.', 'c159c0f4-b11b-45bf-9197-b15cf06eca16');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('247b55c6-bd1a-414f-94d7-c36cb17f6dd9', 'CE5.6', 'Escribe aplicaciones web con mantenimiento de estado y separación de la lógica de negocio.', 'c159c0f4-b11b-45bf-9197-b15cf06eca16');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('2598348b-cc9e-4291-ab5c-7d0d09c6ef73', 'CE5.7', 'Aplica los principios y patrones de diseño de la programación orientada a objetos.', 'c159c0f4-b11b-45bf-9197-b15cf06eca16');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('e2343f5f-5f1c-4a77-a6d8-e01663b3860f', 'CE5.8', 'Prueba y documenta el código.', 'c159c0f4-b11b-45bf-9197-b15cf06eca16');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('6e5fc790-7300-4966-91ae-d61b47010495', 'CE6.1', 'Analiza las tecnologías que permiten el acceso mediante programación a la información disponible en almacenes de datos.', 'd8e39211-7ae2-4b8b-a918-e93f78b9c43a');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('2b638c8e-cc56-4b60-985b-8b8e00de3268', 'CE6.2', 'Crea aplicaciones que establezcan conexiones con bases de datos.', 'd8e39211-7ae2-4b8b-a918-e93f78b9c43a');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('633afa6f-96bd-46b2-84b3-0b349dbc5eeb', 'CE6.3', 'Recupera información almacenada en bases de datos.', 'd8e39211-7ae2-4b8b-a918-e93f78b9c43a');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('3bb7b9ba-2a13-46e6-a7ef-d06eb43c7d96', 'CE6.4', 'Publica en aplicaciones web la información recuperada.', 'd8e39211-7ae2-4b8b-a918-e93f78b9c43a');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('b4df74bf-75b4-4fad-a517-c196ac346fcb', 'CE6.5', 'Utiliza conjuntos de datos para almacenar la información.', 'd8e39211-7ae2-4b8b-a918-e93f78b9c43a');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('a98c7b36-4d61-466a-8d6e-bf2e75b4e9d5', 'CE6.6', 'Crea aplicaciones web que permitan la actualización y eliminación de información disponible en una base de datos.', 'd8e39211-7ae2-4b8b-a918-e93f78b9c43a');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('8063a70a-1710-44dc-b423-cdb7362b9968', 'CE6.7', 'Prueba y documenta las aplicaciones web.', 'd8e39211-7ae2-4b8b-a918-e93f78b9c43a');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('cf6afb17-a552-42f2-a1a2-625bdb775859', 'CE7.1', 'Reconoce las características propias y el ámbito de aplicación de los servicios web.', 'dadcd023-09b0-446b-995e-fb80146dcc5f');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('e2ba9fc8-c7a0-48b0-84de-6de4c3cf0e83', 'CE7.2', 'Reconoce las ventajas de utilizar servicios web para proporcionar acceso a funcionalidades incorporadas en la lógica de negocio de una aplicación.', 'dadcd023-09b0-446b-995e-fb80146dcc5f');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('4bd864e5-9729-4777-8109-eed68b1a1adf', 'CE7.3', 'Identifica las tecnologías y los protocolos implicados en el consumo de servicios web.', 'dadcd023-09b0-446b-995e-fb80146dcc5f');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('d73592f4-2cd9-4ec8-b57c-ef5494b07926', 'CE7.4', 'Utiliza los estándares y arquitecturas más difundidos e implicados en el desarrollo de servicios web.', 'dadcd023-09b0-446b-995e-fb80146dcc5f');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('f62f159a-0715-4be0-8c16-56d99c244518', 'CE7.5', 'Programa un servicio web.', 'dadcd023-09b0-446b-995e-fb80146dcc5f');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('86f7e2d5-5735-4061-b38b-56413985bfb0', 'CE7.6', 'Verifica el funcionamiento del servicio web.', 'dadcd023-09b0-446b-995e-fb80146dcc5f');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('f599ee8d-22fe-4652-8cde-d220b7a8719b', 'CE7.7', 'Consume el servicio web.', 'dadcd023-09b0-446b-995e-fb80146dcc5f');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('29b18883-1ca6-4640-bcd2-b5d55f9a4699', 'CE7.8', 'Documenta un servicio web.', 'dadcd023-09b0-446b-995e-fb80146dcc5f');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('61ed9cef-17f2-4b69-8365-689e1a958c2b', 'CE8.1', 'Identifica las diferencias entre la ejecución de código en el servidor y en el cliente web.', '0adc57f1-d10c-477b-a9c2-83b4346819c2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('11979720-5252-4cf6-864c-61a47536a621', 'CE8.2', 'Reconoce las ventajas de unir ambas tecnologías en el proceso de desarrollo de programas.', '0adc57f1-d10c-477b-a9c2-83b4346819c2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('82ee4917-18bd-4d80-84eb-a008b305c2e2', 'CE8.3', 'Identifica las tecnologías y los frameworks relacionados con la generación por parte del servidor de páginas web con scripts embebidos.', '0adc57f1-d10c-477b-a9c2-83b4346819c2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('88a6f923-d5ed-443f-a73d-48b7fe59d1c2', 'CE8.4', 'Utiliza estas tecnologías y frameworks para generar páginas web que incluyan interacción con el usuario.', '0adc57f1-d10c-477b-a9c2-83b4346819c2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('198270eb-da96-4fde-9441-b56d802a70c8', 'CE8.5', 'Utiliza estas tecnologías y frameworks para generar páginas web que incluyan verificación de formularios.', '0adc57f1-d10c-477b-a9c2-83b4346819c2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('05797801-d2f2-49d1-962b-42fb3e1d14a0', 'CE8.6', 'Utiliza estas tecnologías y frameworks para generar páginas web que incluyan modificación dinámica de su contenido y su estructura.', '0adc57f1-d10c-477b-a9c2-83b4346819c2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('09a883d1-12ce-49c0-bc3a-a22f7dce34ed', 'CE8.7', 'Aplica estas tecnologías y frameworks en la programación de aplicaciones web.', '0adc57f1-d10c-477b-a9c2-83b4346819c2');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('290412fc-b111-4b12-bbd0-a3c38a70d595', 'CE9.1', 'Reconoce las ventajas que proporciona la reutilización de código y el aprovechamiento de información ya existente.', 'c3269710-87da-40ad-acec-193b6c658efa');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('20c050aa-b032-439e-a1a0-a000ddf71ac2', 'CE9.2', 'Identifica tecnologías y frameworks aplicables en la creación de aplicaciones web híbridas.', 'c3269710-87da-40ad-acec-193b6c658efa');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('846ecc86-9432-4069-ad1d-ab9ea5dfdf5b', 'CE9.3', 'Crea una aplicación web que recupere y procese depósitos de información ya existentes.', 'c3269710-87da-40ad-acec-193b6c658efa');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('0b3f9530-4132-4f36-869a-04dd5a57d2af', 'CE9.4', 'Crea depósitos específicos a partir de información existente en almacenes de información.', 'c3269710-87da-40ad-acec-193b6c658efa');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('2e9afc7d-2d32-4005-b47d-e966d9bf8492', 'CE9.5', 'Utiliza librerías de código y frameworks para incorporar funcionalidades específicas a una aplicación web.', 'c3269710-87da-40ad-acec-193b6c658efa');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('b547a6ff-132a-4748-a77f-f5057c3e553f', 'CE9.6', 'Programa servicios y aplicaciones web utilizando como base información y código generados por terceros.', 'c3269710-87da-40ad-acec-193b6c658efa');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('bec5199d-d106-4968-aad8-4022636b5bfc', 'CE9.7', 'Analiza y utiliza librerías de código relacionadas con Big Data e inteligencia de negocio, para incorporar análisis e inteligencia de datos provenientes de repositorios.', 'c3269710-87da-40ad-acec-193b6c658efa');
+INSERT INTO ce (id, codigo, descripcion, ra_id) VALUES ('72456967-2137-4f41-bb63-6f667822c929', 'CE9.8', 'Prueba, depura y documenta las aplicaciones generadas.', 'c3269710-87da-40ad-acec-193b6c658efa');

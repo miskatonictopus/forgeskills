@@ -25,16 +25,16 @@ export function DialogVerActividad({ open, onOpenChange, actividad }: Props) {
 
     try {
       setLoading(true);
-      const res = await fetch("/api/analizar-ce", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texto: actividad.descripcion }),
-      });
+      const ceDetectados: string[] = await window.electronAPI.analizarDescripcion(actividad.id);
 
-      const data = await res.json();
-      setCesDetectados(data.ce || []);
+      if (!ceDetectados || ceDetectados.length === 0) {
+        toast.warning("No se han detectado CE relevantes.");
+      } else {
+        setCesDetectados(ceDetectados);
+        toast.success("CE detectados con éxito.");
+      }
     } catch (err) {
-      toast.error("Error al analizar la actividad.");
+      toast.error("Error al analizar la descripción.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -43,7 +43,7 @@ export function DialogVerActividad({ open, onOpenChange, actividad }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{actividad.nombre}</DialogTitle>
         </DialogHeader>
@@ -69,11 +69,13 @@ export function DialogVerActividad({ open, onOpenChange, actividad }: Props) {
           {cesDetectados.length > 0 && (
             <div className="mt-4 bg-muted p-3 rounded border">
               <strong>CE detectados:</strong>
-              <ul className="list-disc ml-4 mt-2">
-                {cesDetectados.map((ce, index) => (
-                  <li key={index}>{ce}</li>
-                ))}
-              </ul>
+              <div className="mt-2 max-h-40 overflow-y-auto pr-2">
+                <ul className="list-disc ml-4 text-sm space-y-1">
+                  {cesDetectados.map((ce, index) => (
+                    <li key={index}>{ce}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
         </div>
