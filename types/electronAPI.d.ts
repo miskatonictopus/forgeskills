@@ -51,7 +51,7 @@ export interface ElectronAPI {
   obtenerCEPorRA: (raId: string) => Promise<
     { id: string; codigo: string; descripcion: string }[]
   >;
-  analizarDescripcion: (actividadId: string) => Promise<string[]>;
+  analizarDescripcion: (actividadId: string) => Promise<CEDetectado[]>;
 }
 
 declare global {

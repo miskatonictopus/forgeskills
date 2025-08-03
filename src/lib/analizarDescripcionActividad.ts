@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { analizarTexto } from "../../lib/agente";
+import { compararCEconActividad } from "../../lib/comparadorCE";
 
 const db = new Database("data/db.sqlite");
 
@@ -8,9 +8,24 @@ type ActividadDB = {
   asignatura_id: string;
 };
 
+type CE = {
+  codigo: string;
+  descripcion: string;
+};
+
+type AsignaturaRow = {
+  RA: any;
+};
+
+type ResultadoCE = {
+  codigo: string;
+  descripcion: string;
+  puntuacion: number;
+};
+
 export async function analizarDescripcionActividad(
   actividadId: string
-): Promise<string[]> {
+): Promise<ResultadoCE[]> {
   // 1. Obtener la actividad
   const actividad = db
     .prepare("SELECT descripcion, asignatura_id FROM actividades WHERE id = ?")
@@ -18,82 +33,58 @@ export async function analizarDescripcionActividad(
 
   if (!actividad) throw new Error("❌ Actividad no encontrada");
 
-  // 2. Obtener la asignatura asociada
-  const fila = db
-    .prepare("SELECT * FROM asignaturas WHERE id = ?")
-    .get(actividad.asignatura_id);
+  // 2. Obtener los RA (con sus CE) de la asignatura
+  const row = db
+    .prepare("SELECT RA FROM asignaturas WHERE id = ?")
+    .get(actividad.asignatura_id) as AsignaturaRow;
 
-  if (!fila) throw new Error("❌ No se encontró la asignatura");
+  if (!row?.RA) throw new Error("❌ RA no encontrados en asignatura");
 
-  // 3. Buscar el campo RA
-  const claveRA = Object.keys(fila).find((k) => k.toLowerCase() === "ra");
-  if (!claveRA) throw new Error("❌ Campo RA no encontrado");
+  let raParsed: any[] = [];
 
-  const raRaw = fila[claveRA as keyof typeof fila];
-  let raString: string;
-
-  if (Buffer.isBuffer(raRaw)) {
-    raString = (raRaw as Buffer).toString("utf-8");
-  } else if (typeof raRaw === "object") {
-    raString = JSON.stringify(raRaw);
-  } else {
-    raString = String(raRaw);
-  }
-
-  // 4. Parsear RA
-  let raParsed;
   try {
-    raParsed = JSON.parse(raString.trim());
+    if (Buffer.isBuffer(row.RA)) {
+      raParsed = JSON.parse(row.RA.toString("utf-8"));
+    } else if (typeof row.RA === "string") {
+      raParsed = JSON.parse(row.RA);
+    } else {
+      raParsed = row.RA;
+    }
   } catch (err) {
-    console.error("❌ RA mal formateado:", raString);
-    throw new Error("❌ RA no es un JSON válido");
+    throw new Error("❌ Error al parsear los RA: " + err);
   }
 
-  // 5. Extraer CE
-  type CEItem = { codigo: string; descripcion: string };
-  type RAItem = { codigo: string; descripcion: string; CE?: CEItem[] };
-
-  const listaCE: string[] = [];
-
-  for (const ra of raParsed as RAItem[]) {
-    const ceList = ra.CE ?? [];
-    for (const ce of ceList) {
-      listaCE.push(`${ce.codigo} — ${ce.descripcion}`);
+  // 3. Extraer todos los CE
+  const todosCE: CE[] = [];
+  for (const ra of raParsed) {
+    if (Array.isArray(ra.CE)) {
+      for (const ce of ra.CE) {
+        todosCE.push({
+          codigo: ce.codigo,
+          descripcion: ce.descripcion,
+        });
+      }
     }
   }
 
-  // 6. Prompt mejorado
-  const prompt = `
-Eres un experto evaluador en Formación Profesional.
+  // 4. Comparar cada CE con la descripción
+  const resultado: ResultadoCE[] = [];
 
-Se te proporciona una actividad didáctica y una lista de Criterios de Evaluación (CE) asociados a una asignatura. 
+  for (const ce of todosCE) {
+    const match = await compararCEconActividad(
+      actividad.descripcion,
+      ce.codigo,
+      ce.descripcion
+    );
 
-Tu tarea es analizar el contenido de la actividad y determinar con precisión cuáles de esos CE están siendo evaluados de forma explícita o implícita. 
+    if (match) {
+      resultado.push({
+        codigo: ce.codigo,
+        descripcion: ce.descripcion,
+        puntuacion: match.puntuacion,
+      });
+    }
+  }
 
-✔️ Solo incluye los CE que estén justificados por el contenido de la actividad.  
-❌ No incluyas CE que no estén claramente representados.  
-💡 Si no hay CE relevantes, responde con una lista vacía.
-
----
-
-ACTIVIDAD:
-"""
-${actividad.descripcion}
-"""
-
-CRITERIOS DE EVALUACIÓN:
-${listaCE.join("\n")}
-
-RESPUESTA ESPERADA (solo JSON):
-["CE1.2", "CE2.1", "CE3.4"]
-  `.trim();
-
-  // 7. Enviar al agente
-  const resultadoIA = await analizarTexto(prompt);
-
-  const codigosDetectados = resultadoIA.filter((codigo) =>
-  listaCE.some((linea) => linea.startsWith(codigo))
-);
-
-  return codigosDetectados;
+  return resultado;
 }

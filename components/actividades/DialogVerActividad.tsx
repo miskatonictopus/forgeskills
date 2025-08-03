@@ -1,9 +1,12 @@
+"use client";
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CalendarDays, Bot } from "lucide-react";
 import { Actividad } from "@/store/actividadesPorCurso";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type Props = {
   open: boolean;
@@ -11,22 +14,34 @@ type Props = {
   actividad: Actividad | null;
 };
 
+type CEDetectado = {
+  codigo: string;
+  descripcion: string;
+  puntuacion: number;
+};
+
 export function DialogVerActividad({ open, onOpenChange, actividad }: Props) {
-  const [cesDetectados, setCesDetectados] = useState<string[]>([]);
+  const [cesDetectados, setCesDetectados] = useState<{
+    codigo: string;
+    descripcion: string;
+    puntuacion: number;
+  }[]>([]);
   const [loading, setLoading] = useState(false);
 
   if (!actividad) return null;
 
   const handleAnalizar = async () => {
-    if (!actividad.descripcion) {
+    if (!actividad?.descripcion) {
       toast.error("La actividad no tiene descripción.");
       return;
     }
-
+  
     try {
       setLoading(true);
-      const ceDetectados: string[] = await window.electronAPI.analizarDescripcion(actividad.id);
-
+      setCesDetectados([]); // 🧹 Limpiar resultados anteriores antes del análisis
+  
+      const ceDetectados = await window.electronAPI.analizarDescripcion(actividad.id) as CEDetectado[];
+  
       if (!ceDetectados || ceDetectados.length === 0) {
         toast.warning("No se han detectado CE relevantes.");
       } else {
@@ -69,12 +84,29 @@ export function DialogVerActividad({ open, onOpenChange, actividad }: Props) {
           {cesDetectados.length > 0 && (
             <div className="mt-4 bg-muted p-3 rounded border">
               <strong>CE detectados:</strong>
-              <div className="mt-2 max-h-40 overflow-y-auto pr-2">
-                <ul className="list-disc ml-4 text-sm space-y-1">
-                  {cesDetectados.map((ce, index) => (
-                    <li key={index}>{ce}</li>
-                  ))}
-                </ul>
+              <div className="mt-2 space-y-4 pr-2 max-h-[40vh] overflow-y-auto">
+                {cesDetectados.map((ce) => (
+                  <div key={ce.codigo} className="text-sm space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{ce.codigo}</span>
+                      <span
+                        className={cn(
+                          "text-xs font-semibold",
+                          ce.puntuacion >= 0.9
+                            ? "text-green-600"
+                            : ce.puntuacion >= 0.8
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                        )}
+                      >
+                        {(ce.puntuacion * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground whitespace-pre-wrap">
+                      {ce.descripcion}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
