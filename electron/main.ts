@@ -6,6 +6,9 @@ import * as path from "path"
 import { db, initDB } from "./database"
 import type { Asignatura } from "../models/asignatura"
 import { analizarDescripcionActividad } from "../src/lib/analizarDescripcionActividad";
+import { extraerTextoDePDF } from "../src/lib/extraerTextoDePDF";
+import { analizarTextoPlano } from "../src/lib/analizarTextoPlano";
+
 
 
 initDB()
@@ -465,3 +468,18 @@ ipcMain.handle("analizar-descripcion", async (event, actividadId) => {
   }
 });
 
+// Extraemos textos desde un PDF
+ipcMain.handle("extraer-texto-pdf", async (event, rutaPDF: string) => {
+  try {
+    const textoPlano = await extraerTextoDePDF(rutaPDF);
+    return textoPlano;
+  } catch (error) {
+    console.error("❌ Error en handler extraer-texto-pdf:", error);
+    return null;
+  }
+});
+// Extraemos textos planos extraidos desde un PDF
+ipcMain.handle("analizar-descripcion-desde-texto", async (event, texto: string, asignaturaId: string) => {
+  const resultado = await analizarTextoPlano(texto, asignaturaId); // función idéntica a `analizarDescripcionActividad` pero con texto plano
+  return resultado;
+});

@@ -52,6 +52,10 @@ export interface ElectronAPI {
     { id: string; codigo: string; descripcion: string }[]
   >;
   analizarDescripcion: (actividadId: string) => Promise<CEDetectado[]>;
+// extraemos texto desde un PDF
+  extraerTextoPDF: (rutaPDF: string) => Promise<string | null>;
+
+  analizarDescripcionDesdeTexto: (texto: string, asignaturaId: string) => Promise<any>;
 }
 
 declare global {

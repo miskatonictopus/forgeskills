@@ -72,5 +72,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   analizarDescripcion: (actividadId: string) =>
     ipcRenderer.invoke("analizar-descripcion", actividadId),
+
+  extraerTextoPDF: (ruta: string) => ipcRenderer.invoke("extraer-texto-pdf", ruta),
+ 
+  analizarDescripcionDesdeTexto: (texto: string, asignaturaId: string) =>
+  ipcRenderer.invoke("analizar-descripcion-desde-texto", texto, asignaturaId),
+
   
 });
