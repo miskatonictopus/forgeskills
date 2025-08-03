@@ -6,8 +6,9 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-// Umbral ajustado para pruebas
+// ----------UMBRAL-----MUY IMPORTANTE----------
 const UMBRAL_SIMILITUD = 0.42;
+// ----------UMBRAL-----MUY IMPORTANTE----------
 
 export async function compararCEconActividad(
   descripcionActividad: string,

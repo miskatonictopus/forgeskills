@@ -90,17 +90,17 @@ export function DialogVerActividad({ open, onOpenChange, actividad }: Props) {
                     <div className="flex items-center justify-between">
                       <span className="font-medium">{ce.codigo}</span>
                       <span
-                        className={cn(
-                          "text-xs font-semibold",
-                          ce.puntuacion >= 0.9
-                            ? "text-green-600"
-                            : ce.puntuacion >= 0.8
-                            ? "text-yellow-600"
-                            : "text-red-600"
-                        )}
-                      >
-                        {(ce.puntuacion * 100).toFixed(1)}%
-                      </span>
+  className={cn(
+    "ml-2",
+    ce.puntuacion > 0.45
+      ? "text-green-600"
+      : ce.puntuacion >= 0.42
+      ? "text-yellow-600"
+      : "text-red-600"
+  )}
+>
+  ({(ce.puntuacion * 100).toFixed(1)}%)
+</span>
                     </div>
                     <div className="text-xs text-muted-foreground whitespace-pre-wrap">
                       {ce.descripcion}
