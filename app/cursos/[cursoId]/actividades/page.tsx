@@ -14,14 +14,13 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Plus, CalendarDays } from "lucide-react";
+import { PlusCircle, CalendarDays } from "lucide-react";
 import { DialogCrearActividad } from "@/components/actividades/DialogCrearActividad";
 import { DialogVerActividad } from "@/components/actividades/DialogVerActividad";
 import { useSnapshot } from "valtio";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import { actividadesPorCurso, cargarActividades } from "@/store/actividadesPorCurso";
 
-// ✅ Tipo fuera del componente
 type Actividad = {
   id: string;
   nombre: string;
@@ -37,6 +36,7 @@ export default function ActividadesCursoPage() {
   const snapActividades = useSnapshot(actividadesPorCurso);
 
   const [open, setOpen] = useState(false);
+  const [asignaturaSeleccionada, setAsignaturaSeleccionada] = useState<string | null>(null);
   const [verDialogOpen, setVerDialogOpen] = useState(false);
   const [actividadSeleccionada, setActividadSeleccionada] = useState<Actividad | null>(null);
 
@@ -78,20 +78,30 @@ export default function ActividadesCursoPage() {
             </Breadcrumb>
             <h1 className="text-2xl font-bold mt-2">Actividades del curso {cursoId}</h1>
           </div>
-
-          <Button onClick={() => setOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Actividad
-          </Button>
         </div>
 
-        <div className="px-4 pb-8 space-y-6">
+        <div className="px-4 pb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
           {asignaturas.map((asig) => {
             const actividadesAsignatura = actividadesAgrupadas[asig.id] || [];
 
             return (
-              <div key={asig.id}>
-                <h2 className="text-lg font-semibold text-white mb-2">{asig.nombre}</h2>
+              <div
+                key={asig.id}
+                className="border border-zinc-800 bg-background rounded-lg p-4 shadow-sm"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-lg font-semibold text-white">{asig.nombre}</h2>
+                  <Button
+  onClick={() => {
+    setAsignaturaSeleccionada(asig.id);
+    setOpen(true);
+  }}
+>
+  <PlusCircle className="w-4 h-4 mr-2" />
+  Crear actividad
+</Button>
+                </div>
+
                 {actividadesAsignatura.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Sin actividades registradas.</p>
                 ) : (
@@ -116,9 +126,6 @@ export default function ActividadesCursoPage() {
                     ))}
                   </ul>
                 )}
-                 <div className="mt-4">
-      <VistaRAyCE asignaturaId={asig.id} />
-    </div>
               </div>
             );
           })}
@@ -126,8 +133,12 @@ export default function ActividadesCursoPage() {
 
         <DialogCrearActividad
           open={open}
-          onOpenChange={setOpen}
+          onOpenChange={(estado) => {
+            setOpen(estado);
+            if (!estado) setAsignaturaSeleccionada(null);
+          }}
           cursoId={cursoId}
+          asignaturaId={asignaturaSeleccionada ?? undefined}
           setRefreshKey={() => cargarActividades(cursoId)}
         />
 
