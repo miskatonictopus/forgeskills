@@ -10,7 +10,14 @@ import { v4 as uuidv4 } from "uuid";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import { useSnapshot } from "valtio";
 import { cargarActividades, añadirActividad } from "@/store/actividadesPorCurso";
-import { Bot, FileText } from "lucide-react";
+import { Bot, FileUp } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { Separator } from "@/components/ui/separator";
+
+
 
 type Props = {
   open: boolean;
@@ -30,7 +37,7 @@ export function DialogCrearActividad({
 }: Props) {
   const snap = useSnapshot(asignaturasPorCurso);
   const asignaturas = snap[cursoId] || [];
-
+  const [fechaObj, setFechaObj] = useState<Date | undefined>(undefined);
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
   const [asignaturaId, setAsignaturaId] = useState(asignaturaIdExterna || "");
@@ -114,7 +121,7 @@ export function DialogCrearActividad({
 </DialogTitle>
 
         </DialogHeader>
-
+        <Separator className="my-3" />
         <div className="space-y-4">
           <div>
             <Label className="mb-2">Nombre de la actividad</Label>
@@ -125,38 +132,37 @@ export function DialogCrearActividad({
             />
           </div>
 
-          <div>
-            <Label className="mb-2">Fecha</Label>
-            <Input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-            />
-          </div>
+          <div className="flex flex-col ">
+  <Label className="mb-2">Fecha</Label>
+  <Popover>
+    <PopoverTrigger asChild>
+      <Button
+        variant={"outline"}
+        className="w-full justify-start text-left font-normal"
+      >
+        <CalendarIcon className="mr-2 h-4 w-4" />
+        {fechaObj ? format(fechaObj, "dd/MM/yyyy") : <span>Elige una fecha</span>}
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="w-auto p-0" align="start">
+      <Calendar
+        mode="single"
+        selected={fechaObj}
+        onSelect={(date) => {
+          setFechaObj(date);
+          setFecha(date?.toISOString().split("T")[0] || ""); // opcional: mantiene el formato "yyyy-mm-dd"
+        }}
+        initialFocus
+      />
+    </PopoverContent>
+  </Popover>
+</div>
 
-          {!asignaturaIdExterna && (
-            <div>
-              <Label>Asignatura</Label>
-              <select
-                value={asignaturaId}
-                onChange={(e) => {
-                  setAsignaturaId(e.target.value);
-                  setCesDetectados([]);
-                }}
-                className="w-full border rounded px-2 py-1 text-sm bg-background"
-              >
-                <option value="">Selecciona una asignatura</option>
-                {asignaturas.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+
+          
 
           <div>
-            <Label>Descripción de la actividad</Label>
+            <Label className="mb-2">Descripción de la actividad</Label>
             <textarea
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
@@ -166,27 +172,51 @@ export function DialogCrearActividad({
           </div>
 
           <div>
-            <Label>O bien sube un archivo PDF</Label>
-            <Input
-              type="file"
-              accept=".pdf"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
+          <Label className="mb-2 flex justify-between items-center w-full">
+  O bien sube un archivo
+  <span className="text-xs text-neutral-500">
+    archivos permitidos:<br/>PDF / Pages / Word / txt
+  </span>
+</Label>
+<div className="flex items-center gap-2 mt-2">
+  <input
+    id="archivo"
+    type="file"
+    accept=".pdf,.doc,.docx,.pages,.txt"
+    className="hidden"
+    onChange={async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-                const arrayBuffer = await file.arrayBuffer();
-                const ruta = await window.electronAPI.guardarPDF(arrayBuffer, file.name);
+      const arrayBuffer = await file.arrayBuffer();
+      const ruta = await window.electronAPI.guardarPDF(arrayBuffer, file.name);
 
-                if (!ruta) {
-                  toast.error("No se pudo guardar el archivo.");
-                  return;
-                }
+      if (!ruta) {
+        toast.error("No se pudo guardar el archivo.");
+        return;
+      }
 
-                setArchivo(file);
-                handleExtraerTexto(ruta);
-              }}
-              disabled={loading}
-            />
+      console.log("✅ PDF guardado en:", ruta);
+      setArchivo(file);
+      handleExtraerTexto(ruta);
+    }}
+    disabled={loading}
+  />
+
+<label
+  htmlFor="archivo"
+  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-muted rounded cursor-pointer hover:bg-muted/80"
+>
+  <FileUp className="w-4 h-4" />
+  Subir archivo
+</label>
+
+  {archivo && (
+    <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+      {archivo.name}
+    </span>
+  )}
+</div>
           </div>
 
           {cesDetectados.length > 0 && (
