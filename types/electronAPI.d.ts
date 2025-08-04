@@ -54,7 +54,7 @@ export interface ElectronAPI {
   analizarDescripcion: (actividadId: string) => Promise<CEDetectado[]>;
 // extraemos texto desde un PDF
   extraerTextoPDF: (rutaPDF: string) => Promise<string | null>;
-
+  guardarPDF: (buffer: ArrayBuffer, filename: string) => Promise<string>;
   analizarDescripcionDesdeTexto: (texto: string, asignaturaId: string) => Promise<any>;
 }
 

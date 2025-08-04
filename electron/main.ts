@@ -6,10 +6,24 @@ import * as path from "path"
 import { db, initDB } from "./database"
 import type { Asignatura } from "../models/asignatura"
 import { analizarDescripcionActividad } from "../src/lib/analizarDescripcionActividad";
-import { extraerTextoDePDF } from "../src/lib/extraerTextoDePDF";
 import { analizarTextoPlano } from "../src/lib/analizarTextoPlano";
+import { extraerTextoConMutool } from "../src/lib/extraerTextoMutool";
+import { execSync } from "child_process";
+import fs from "fs";
 
 
+
+function extraerTextoPDF(path: string): string {
+  try {
+    const output = execSync(`mutool draw -F text -o - "${path}"`, {
+      encoding: "utf-8",
+    });
+    return output.trim();
+  } catch (error) {
+    console.error("❌ Error al extraer texto con mutool:", error);
+    return "";
+  }
+}
 
 initDB()
 
@@ -468,18 +482,29 @@ ipcMain.handle("analizar-descripcion", async (event, actividadId) => {
   }
 });
 
-// Extraemos textos desde un PDF
-ipcMain.handle("extraer-texto-pdf", async (event, rutaPDF: string) => {
-  try {
-    const textoPlano = await extraerTextoDePDF(rutaPDF);
-    return textoPlano;
-  } catch (error) {
-    console.error("❌ Error en handler extraer-texto-pdf:", error);
-    return null;
-  }
-});
 // Extraemos textos planos extraidos desde un PDF
 ipcMain.handle("analizar-descripcion-desde-texto", async (event, texto: string, asignaturaId: string) => {
   const resultado = await analizarTextoPlano(texto, asignaturaId); // función idéntica a `analizarDescripcionActividad` pero con texto plano
   return resultado;
+});
+
+ipcMain.handle("extraer-texto-pdf", async (event, filePath: string) => {
+  return extraerTextoPDF(filePath);
+});
+
+const rutaPDFs = path.join(__dirname, "..", "data", "archivos_pdf");
+
+if (!fs.existsSync(rutaPDFs)) {
+  fs.mkdirSync(rutaPDFs, { recursive: true });
+}
+
+ipcMain.handle("guardar-pdf", async (event, buffer: ArrayBuffer, nombre: string) => {
+  try {
+    const rutaFinal = path.join(__dirname, "../data/archivos_pdf", nombre);
+    fs.writeFileSync(rutaFinal, Buffer.from(buffer));
+    return rutaFinal;
+  } catch (error) {
+    console.error("❌ Error al guardar el PDF:", error);
+    return null;
+  }
 });

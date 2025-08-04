@@ -29,6 +29,8 @@ export function DialogCrearActividad({ open, onOpenChange, cursoId, setRefreshKe
   const [archivo, setArchivo] = useState<File | null>(null);
   const [cesDetectados, setCesDetectados] = useState<any[]>([]);
   const asignaturas = snap[cursoId] || [];
+  const [loading, setLoading] = useState(false);
+
 
   const handleGuardar = async () => {
     if (!nombre || !fecha || !asignaturaId) {
@@ -71,8 +73,9 @@ export function DialogCrearActividad({ open, onOpenChange, cursoId, setRefreshKe
     }
   
     const texto = await window.electronAPI.extraerTextoPDF(filePath);
+    console.log("📄 Texto extraído:", texto);
 
-    const palabras = texto?.trim().split(/\s+/).length || 0;
+    const palabras = (texto ?? "").split(/\s+/).filter(Boolean).length;
   
     console.log("Texto extraído:", texto);
   
@@ -151,18 +154,26 @@ export function DialogCrearActividad({ open, onOpenChange, cursoId, setRefreshKe
           <div>
             <Label>O bien sube un archivo PDF</Label>
             <Input
-              type="file"
-              accept=".pdf"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setArchivo(file);
-                  // @ts-ignore
-                  const filePath = file.path;
-                  handleExtraerTexto(filePath);
-                }
-              }}
-            />
+  type="file"
+  accept=".pdf"
+  onChange={async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const ruta = await window.electronAPI.guardarPDF(arrayBuffer, file.name);
+
+    if (!ruta) {
+      toast.error("No se pudo guardar el archivo.");
+      return;
+    }
+
+    console.log("✅ PDF guardado en:", ruta);
+    setArchivo(file);
+    handleExtraerTexto(ruta);
+  }}
+  disabled={loading}
+/>
           </div>
 
           {cesDetectados.length > 0 && (
