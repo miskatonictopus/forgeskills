@@ -2,16 +2,15 @@
 
 import { cursoStore } from "@/store/cursoStore";
 import { useSnapshot } from "valtio";
-import { DialogEliminarFlow } from "@/components/DialogEliminarFlow";
 import { useRef } from "react";
-import { CursoCard } from "@/components/CursoCard"
-
+import React from "react";
 import { useEffect, useState } from "react";
-import { SquarePen, Trash2, Users } from "lucide-react";
-import { toast } from "sonner";
+import { DialogEliminarFlow } from "@/components/DialogEliminarFlow";
+import { CursoCard } from "@/components/CursoCard";
 import TablaAlumnos from "@/components/TablaAlumnos";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AsignaturaCard } from "@/components/AsignaturaCard";
+import { Separator } from "@/components/ui/separator";
 import {
   SidebarProvider,
   SidebarInset,
@@ -24,16 +23,8 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Separator } from "@/components/ui/separator";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
-import { Card, CardContent } from "@/components/ui/card";
 import { HorarioDialog } from "@/components/HorarioDialog";
-import React from "react";
-import Link from "next/link";
+import { toast } from "sonner";
 
 // Tipos de datos
 
@@ -177,11 +168,17 @@ export default function Page() {
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <div className="flex flex-wrap gap-6 items-start justify-between">
-            <div className="flex flex-col gap-2">
-              <h2 className="text-2xl font-notojp font-light tracking-tight flex items-center gap-2 mb-2">
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-0 w-full">
+              <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2 mb-2">
                 Mis Cursos
               </h2>
-              <div className="flex flex-wrap gap-3">
+              <div
+  className="grid gap-5 w-full auto-cols-[360px] grid-flow-col overflow-x-auto"
+  style={{
+    gridAutoColumns: "360px",
+    gridAutoFlow: "column",
+  }}
+>
   {snap.cursos.map((curso) => (
     <CursoCard key={curso.id} curso={curso} />
   ))}

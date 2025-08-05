@@ -14,6 +14,10 @@ const config: Config = {
         notojp: ["var(--font-notojp)"], 
       },
 
+      screens: {
+        xxxl: "1570px", // nuevo breakpoint personalizado
+      },
+
       keyframes: {
         'fade-in': {
           '0%': { opacity: 0, transform: 'translateY(-10px)' },

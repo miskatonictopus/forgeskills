@@ -44,7 +44,8 @@ export function CursoCard({ curso }: Props) {
 
   return (
     <>
-      <Card className="relative flex flex-col justify-between w-[19rem] h-[auto] bg-zinc-900 border border-zinc-700 text-white">
+      <Card className="w-full bg-zinc-900 border border-zinc-700 text-white flex flex-col justify-between relative">
+
         {/* ICONOS ACCIONES */}
         <div className="absolute top-2 right-2 flex gap-2 z-10">
           <Tooltip>
@@ -89,7 +90,7 @@ export function CursoCard({ curso }: Props) {
         {/* CONTENIDO */}
         <CardContent className="leading-tight space-y-1 mt-0">
           <div className="h-[80px]">
-            <p className="text-3xl font-bold truncate uppercase">
+            <p className="text-4xl font-bold truncate uppercase">
               {curso.acronimo}
               {curso.nivel}
             </p>
@@ -128,7 +129,7 @@ export function CursoCard({ curso }: Props) {
           )}
           {/* BOTÓN ASIGNATURAS */}
         </CardContent>
-        <div className="p-1 mt-auto ml-4">
+        <div className="p-1 ml-4">
             <Button
               variant={tieneAsignaturas ? "outline" : "secondary"}
               size="sm"
