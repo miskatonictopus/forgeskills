@@ -6,7 +6,10 @@ import { cursoStore } from "@/store/cursoStore";
 import { CursoCard } from "@/components/CursoCard";
 import { AsignaturaCard } from "@/components/AsignaturaCard";
 import { HorarioDialog } from "@/components/HorarioDialog";
+import TablaAlumnos from "@/components/TablaAlumnos";
 import { toast } from "sonner";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   SidebarProvider,
   SidebarInset,
@@ -43,7 +46,7 @@ type Horario = {
 
 export default function Page() {
   const snap = useSnapshot(cursoStore);
-
+  const [filtro, setFiltro] = useState("");
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [openHorario, setOpenHorario] = useState<string | null>(null);
   const [horariosPorAsignatura, setHorariosPorAsignatura] = useState<
@@ -93,26 +96,25 @@ export default function Page() {
       return total + (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
     }, 0);
 
-    const [fechaActual, setFechaActual] = useState("");
+  const [fechaActual, setFechaActual] = useState("");
 
-useEffect(() => {
-  const interval = setInterval(() => {
-    const ahora = new Date();
-    const fechaFormateada = ahora.toLocaleString("es-ES", {
-      weekday: "short",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-    setFechaActual(fechaFormateada);
-  }, 1000);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const ahora = new Date();
+      const fechaFormateada = ahora.toLocaleString("es-ES", {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      setFechaActual(fechaFormateada);
+    }, 1000);
 
-  return () => clearInterval(interval);
-}, []);
-
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <SidebarProvider>
@@ -123,20 +125,20 @@ useEffect(() => {
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4 mx-2" />
           <div className="flex items-center justify-between w-full px-4 py-2">
-  {/* Breadcrumb a la izquierda */}
-  <Breadcrumb>
-    <BreadcrumbList>
-      <BreadcrumbItem>
-        <BreadcrumbLink href="#">Panel de Control</BreadcrumbLink>
-      </BreadcrumbItem>
-    </BreadcrumbList>
-  </Breadcrumb>
+            {/* Breadcrumb a la izquierda */}
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="#">Panel de Control</BreadcrumbLink>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
 
-  {/* Hora actual a la derecha */}
-  <span className="text-sm text-muted-foreground font-mono tabular-nums">
-    {fechaActual}
-  </span>
-</div>
+            {/* Hora actual a la derecha */}
+            <span className="text-sm text-muted-foreground font-mono tabular-nums">
+              {fechaActual}
+            </span>
+          </div>
         </header>
 
         {/* LAYOUT 2x2 */}
@@ -164,21 +166,21 @@ useEffect(() => {
 
           {/* MIS ASIGNATURAS */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-  <h2 className="text-xl font-semibold flex items-center gap-2">
-    <BookA className="w-5 h-5" />
-    Mis Asignaturas
-  </h2>
-  <div className="text-sm text-muted-foreground">
-    Total horas / semana:
-    <span className="text-emerald-200 ml-2 font-semibold">
-      {totalHoras.toFixed(1)} h
-    </span>
-  </div>
-</div>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <BookA className="w-5 h-5" />
+                Mis Asignaturas
+              </h2>
+              <div className="text-sm text-muted-foreground">
+                Total horas / semana:
+                <span className="text-emerald-200 ml-2 font-semibold">
+                  {totalHoras.toFixed(1)} h
+                </span>
+              </div>
+            </div>
 
             <div className="flex-1 overflow-y-auto pr-1">
-            <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
                 {asignaturas.map((asig) => (
                   <React.Fragment key={asig.id}>
                     <AsignaturaCard
@@ -201,12 +203,28 @@ useEffect(() => {
 
           {/* MIS ALUMNOS */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
-            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
-              <User className="w-5 h-5" />
-              Mis Alumnos
-            </h2>
-            <div className="flex-1 rounded bg-background/60" />
-          </section>
+  <div className="flex items-center justify-between mb-2">
+    <h2 className="text-xl font-semibold flex items-center gap-2">
+      <User className="w-5 h-5" />
+      Mis Alumnos
+    </h2>
+    <div className="relative w-64">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+      <Input
+        type="text"
+        placeholder="Buscar por nombre o apellidos..."
+        value={filtro}
+        onChange={(e) => setFiltro(e.target.value)}
+        className="pl-10 bg-zinc-800 text-white placeholder-zinc-400"
+      />
+    </div>
+  </div>
+
+  <div className="flex-1 overflow-y-auto pr-1">
+  <TablaAlumnos filtro={filtro} />
+
+  </div>
+</section>
 
           {/* MIS ACTIVIDADES */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">

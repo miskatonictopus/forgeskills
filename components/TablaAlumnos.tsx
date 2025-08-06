@@ -11,9 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, BarChart3 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 
 type Alumno = {
   id: number;
@@ -23,9 +22,12 @@ type Alumno = {
   mail: string;
 };
 
-export default function TablaAlumnos() {
+type Props = {
+  filtro: string;
+};
+
+export default function TablaAlumnos({ filtro }: Props) {
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
-  const [filtro, setFiltro] = useState("");
   const [seleccionados, setSeleccionados] = useState<number[]>([]);
 
   useEffect(() => {
@@ -58,23 +60,6 @@ export default function TablaAlumnos() {
 
   return (
     <div className="mt-0">
-      {/* 🔤 Título + Buscador */}
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-2xl font-notojp font-light tracking-tight">
-          Mis Alumnos
-        </h2>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-          <Input
-            type="text"
-            placeholder="Buscar por nombre o apellidos..."
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
-            className="pl-10 bg-zinc-800 text-white placeholder-zinc-400"
-          />
-        </div>
-      </div>
-
       {/* 📋 Tabla */}
       <div className="border border-zinc-800 rounded-xl overflow-auto bg-zinc-900 overflow-x-auto">
         <Table>
@@ -104,7 +89,6 @@ export default function TablaAlumnos() {
               <TableRow key={alumno.id}>
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    {/* 📊 Botón de estadísticas */}
                     <button
                       onClick={() =>
                         console.log("Ver estadísticas de", alumno.nombre)
@@ -113,15 +97,11 @@ export default function TablaAlumnos() {
                     >
                       <BarChart3 className="h-4 w-4" />
                     </button>
-
-                    {/* 🖼️ Avatar */}
                     <img
                       src={`/avatars/avatar${(alumno.id % 5) + 1}.png`}
                       alt={`Avatar de ${alumno.nombre}`}
                       className="w-8 h-8 rounded-full object-cover shadow"
                     />
-
-                    {/* ✅ Checkbox */}
                     <Checkbox
                       checked={seleccionados.includes(alumno.id)}
                       onCheckedChange={() => toggleSeleccion(alumno.id)}
