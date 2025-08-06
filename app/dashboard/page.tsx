@@ -10,6 +10,9 @@ import TablaAlumnos from "@/components/TablaAlumnos";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { NuevoCurso } from "@/components/NuevoCurso";
 import {
   SidebarProvider,
   SidebarInset,
@@ -145,10 +148,26 @@ export default function Page() {
         <main className="grid grid-cols-1 md:grid-cols-2 grid-rows-2 gap-4 pl-4 pr-4 pt-1 pb-4 h-[calc(100vh-4rem)] overflow-y-auto">
           {/* MIS CURSOS */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
-            <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
-              <GraduationCap className="w-5 h-5" />
-              Mis Cursos
-            </h2>
+          <div className="flex items-center justify-between mb-2">
+  <h2 className="text-xl font-semibold flex items-center gap-2">
+    <GraduationCap className="w-5 h-5" />
+    Mis Cursos
+  </h2>
+
+  <Dialog>
+    <DialogTrigger asChild>
+      <Button variant="secondary" className="text-xs">
+        + Nuevo Curso
+      </Button>
+    </DialogTrigger>
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>Nuevo Curso</DialogTitle>
+      </DialogHeader>
+      <NuevoCurso />
+    </DialogContent>
+  </Dialog>
+</div>
             <div className="flex-1 overflow-y-auto pr-1">
               <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
                 {snap.cursos.length === 0 ? (
