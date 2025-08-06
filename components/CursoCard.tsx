@@ -44,7 +44,7 @@ export function CursoCard({ curso }: Props) {
 
   return (
     <>
-      <Card className="w-[auto] bg-zinc-900 border border-zinc-700 text-white flex flex-col justify-between relative">
+      <Card className="min-w-[300px] bg-zinc-900 border border-zinc-700 text-white flex flex-col justify-between relative">
 
         {/* ICONOS ACCIONES */}
         <div className="absolute top-2 right-2 flex gap-2 z-10">

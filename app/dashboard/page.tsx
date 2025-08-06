@@ -1,8 +1,12 @@
 "use client";
+
+import React, { useEffect, useState } from "react";
 import { useSnapshot } from "valtio";
 import { cursoStore } from "@/store/cursoStore";
 import { CursoCard } from "@/components/CursoCard";
-
+import { AsignaturaCard } from "@/components/AsignaturaCard";
+import { HorarioDialog } from "@/components/HorarioDialog";
+import { toast } from "sonner";
 import {
   SidebarProvider,
   SidebarInset,
@@ -18,8 +22,98 @@ import {
 } from "@/components/ui/breadcrumb";
 import { GraduationCap, BookA, User, Pencil } from "lucide-react";
 
+// Tipos
+type CE = { codigo: string; descripcion: string };
+type RA = { codigo: string; descripcion: string; CE: CE[] };
+type Descripcion = { duracion: string; centro: string; empresa: string };
+
+type Asignatura = {
+  id: string;
+  nombre: string;
+  creditos: string;
+  descripcion: Descripcion;
+  RA: RA[];
+};
+
+type Horario = {
+  dia: string;
+  horaInicio: string;
+  horaFin: string;
+};
+
 export default function Page() {
   const snap = useSnapshot(cursoStore);
+
+  const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
+  const [openHorario, setOpenHorario] = useState<string | null>(null);
+  const [horariosPorAsignatura, setHorariosPorAsignatura] = useState<
+    Record<string, Horario[]>
+  >({});
+
+  // Cargar asignaturas al montar
+  useEffect(() => {
+    const fetchAsignaturas = async () => {
+      try {
+        const asignaturasBD =
+          (await window.electronAPI?.leerAsignaturas()) as Asignatura[];
+        setAsignaturas(asignaturasBD || []);
+      } catch (error) {
+        console.error("❌ Error al leer asignaturas:", error);
+        toast.error("No se pudieron cargar las asignaturas");
+      }
+    };
+    fetchAsignaturas();
+  }, []);
+
+  // Cargar horarios después de que se hayan cargado las asignaturas
+  useEffect(() => {
+    const cargarHorarios = async () => {
+      const mapa: Record<string, Horario[]> = {};
+      for (const asignatura of asignaturas) {
+        const horarios = (await window.electronAPI.leerHorarios(
+          asignatura.id
+        )) as Horario[];
+        mapa[asignatura.id] = horarios;
+      }
+      setHorariosPorAsignatura(mapa);
+    };
+    cargarHorarios();
+  }, [asignaturas]);
+
+  const cargarAsignaturas = async (id: string) => {
+    const nuevas = (await window.electronAPI.leerAsignaturas()) as Asignatura[];
+    setAsignaturas(nuevas);
+  };
+
+  const totalHoras = Object.values(horariosPorAsignatura)
+    .flat()
+    .reduce((total, h) => {
+      const [h1, m1] = h.horaInicio.split(":").map(Number);
+      const [h2, m2] = h.horaFin.split(":").map(Number);
+      return total + (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
+    }, 0);
+
+    const [fechaActual, setFechaActual] = useState("");
+
+useEffect(() => {
+  const interval = setInterval(() => {
+    const ahora = new Date();
+    const fechaFormateada = ahora.toLocaleString("es-ES", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    setFechaActual(fechaFormateada);
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, []);
+
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -28,50 +122,86 @@ export default function Page() {
         <header className="flex h-16 items-center gap-2 px-4">
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4 mx-2" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="#">Panel de Control</BreadcrumbLink>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+          <div className="flex items-center justify-between w-full px-4 py-2">
+  {/* Breadcrumb a la izquierda */}
+  <Breadcrumb>
+    <BreadcrumbList>
+      <BreadcrumbItem>
+        <BreadcrumbLink href="#">Panel de Control</BreadcrumbLink>
+      </BreadcrumbItem>
+    </BreadcrumbList>
+  </Breadcrumb>
+
+  {/* Hora actual a la derecha */}
+  <span className="text-sm text-muted-foreground font-mono tabular-nums">
+    {fechaActual}
+  </span>
+</div>
         </header>
 
         {/* LAYOUT 2x2 */}
         <main className="grid grid-cols-1 md:grid-cols-2 grid-rows-2 gap-4 pl-4 pr-4 pt-1 pb-4 h-[calc(100vh-4rem)] overflow-y-auto">
           {/* MIS CURSOS */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
-  <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
-    <GraduationCap className="w-5 h-5" />
-    Mis Cursos
-  </h2>
-
-  {/* Contenedor scrollable */}
-  <div className="flex-1 overflow-y-auto pr-1">
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-      {snap.cursos.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No hay cursos disponibles.</p>
-      ) : (
-        snap.cursos.map((curso) => (
-          <CursoCard key={curso.id} curso={curso} />
-        ))
-      )}
-    </div>
-  </div>
-</section>
+            <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
+              <GraduationCap className="w-5 h-5" />
+              Mis Cursos
+            </h2>
+            <div className="flex-1 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
+                {snap.cursos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No hay cursos disponibles.
+                  </p>
+                ) : (
+                  snap.cursos.map((curso) => (
+                    <CursoCard key={curso.id} curso={curso} />
+                  ))
+                )}
+              </div>
+            </div>
+          </section>
 
           {/* MIS ASIGNATURAS */}
-          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <BookA className="w-5 h-5" />
-              Mis Asignaturas
-            </h2>
-            <div className="flex-1 rounded bg-background/60" />
+          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between mb-2">
+  <h2 className="text-xl font-semibold flex items-center gap-2">
+    <BookA className="w-5 h-5" />
+    Mis Asignaturas
+  </h2>
+  <div className="text-sm text-muted-foreground">
+    Total horas / semana:
+    <span className="text-emerald-200 ml-2 font-semibold">
+      {totalHoras.toFixed(1)} h
+    </span>
+  </div>
+</div>
+
+            <div className="flex-1 overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
+                {asignaturas.map((asig) => (
+                  <React.Fragment key={asig.id}>
+                    <AsignaturaCard
+                      asignatura={asig}
+                      horarios={horariosPorAsignatura[asig.id] || []}
+                      onOpenHorario={setOpenHorario}
+                      onReload={() => cargarAsignaturas(asig.id)}
+                    />
+                    <HorarioDialog
+                      open={openHorario === asig.id}
+                      onClose={() => setOpenHorario(null)}
+                      asignatura={asig}
+                      onSave={() => cargarAsignaturas(asig.id)}
+                    />
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
           </section>
 
           {/* MIS ALUMNOS */}
-          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
+          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
               <User className="w-5 h-5" />
               Mis Alumnos
             </h2>
@@ -79,8 +209,8 @@ export default function Page() {
           </section>
 
           {/* MIS ACTIVIDADES */}
-          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
+          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
               <Pencil className="w-5 h-5" />
               Mis Actividades
             </h2>

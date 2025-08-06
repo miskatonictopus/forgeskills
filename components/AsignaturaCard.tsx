@@ -72,85 +72,80 @@ export function AsignaturaCard({
   }, 0)
 
   return (
-    <Card
-      className="w-[17rem] h-[15rem] bg-zinc-900 border border-zinc-700 text-white relative overflow-visible"
-      // style={{ borderLeft: `8px solid ${colorActual}` }}
-    >
-      {/* Botón Horario */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button onClick={() => onOpenHorario(asignatura.id)} className="absolute top-2 left-2">
-            <Clock className="h-4 w-4 text-zinc-400 hover:text-emerald-200 transition-colors" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top">Horario</TooltipContent>
-      </Tooltip>
+<Card className="min-w-[300px] bg-zinc-900 border border-zinc-700 text-white flex flex-col relative">
+  {/* Botón Horario */}
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button onClick={() => onOpenHorario(asignatura.id)} className="absolute top-2 left-2">
+        <Clock className="h-4 w-4 text-zinc-400 hover:text-emerald-200 transition-colors" />
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side="top">Horario</TooltipContent>
+  </Tooltip>
 
-      {/* Iconos derecha */}
-      <div className="absolute top-2 right-2 flex gap-2 z-10">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              className="text-zinc-400 hover:text-emerald-400"
-              onClick={() => setEditandoColor(!editandoColor)}
-            >
-              <SquarePen className="w-4 h-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top">Color</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button className="text-zinc-400 hover:text-emerald-400">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top">Borrar</TooltipContent>
-        </Tooltip>
-      </div>
+  {/* Iconos derecha */}
+  <div className="absolute top-2 right-2 flex gap-2 z-10">
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          className="text-zinc-400 hover:text-emerald-400"
+          onClick={() => setEditandoColor(!editandoColor)}
+        >
+          <SquarePen className="w-4 h-4" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">Color</TooltipContent>
+    </Tooltip>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button className="text-zinc-400 hover:text-emerald-400">
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">Borrar</TooltipContent>
+    </Tooltip>
+  </div>
 
-      <CardContent className="leading-tight space-y-1">
-        <p className="text-3xl font-bold truncate uppercase">{asignatura.id}</p>
-        <p className="text-xs font-light text-zinc-400 uppercase">{asignatura.nombre}</p>
+  <CardContent className="leading-tight space-y-2 pt-6">
+    <p className="text-4xl font-bold truncate uppercase">{asignatura.id}</p>
+    <p className="text-xs font-light text-zinc-400 uppercase">{asignatura.nombre}</p>
 
-        <div className="flex gap-2 text-xs font-light">
-          <p className="text-zinc-400">
-            Créditos: <span className="text-white">{asignatura.creditos}</span>
-          </p>
-          <p className="text-zinc-400">
-            Horas: <span className="text-white">{asignatura.descripcion?.duracion}</span>
-          </p>
+    <div className="flex gap-2 text-xs font-light">
+      <p className="text-zinc-400">
+        Créditos: <span className="text-white">{asignatura.creditos}</span>
+      </p>
+      <p className="text-zinc-400">
+        Horas: <span className="text-white">{asignatura.descripcion?.duracion}</span>
+      </p>
+    </div>
+
+    <p className="text-xs font-bold text-white">
+      RA: <span className="font-light">{asignatura.RA?.length || 0}</span>
+    </p>
+
+    {editandoColor && (
+      <ColorSelector colorActual={colorActual} onSelect={handleColorChange} />
+    )}
+
+    {/* Horarios */}
+    <div className="border-t border-zinc-700 pt-2 mt-2 space-y-1 text-xs text-emerald-200 leading-tight">
+      {horarios.length > 0 ? (
+        <>
+          {horarios.map((h) => (
+            <div key={`${h.dia}-${h.horaInicio}`}>
+              {h.dia} {h.horaInicio}–{h.horaFin}
+            </div>
+          ))}
+          <div className="text-xl font-bold">{totalHoras.toFixed(1)} h</div>
+        </>
+      ) : (
+        <div className="text-red-200 text-xs">
+          <MensajeSinHorarios />
         </div>
+      )}
+    </div>
+  </CardContent>
+</Card>
 
-        <p className="text-xs font-bold text-white">
-          RA: <span className="font-light">{asignatura.RA?.length || 0}</span>
-        </p>
-
-        {editandoColor && (
-          <ColorSelector colorActual={colorActual} onSelect={handleColorChange} />
-        )}
-
-        {/* Horarios */}
-        {horarios.length > 0 ? (
-          <div className="h-px bg-zinc-700 my-2">
-            <div className="mt-1 space-y-1 text-xs text-emerald-200 leading-tight pt-2">
-              {horarios.map((h) => (
-                <div key={`${h.dia}-${h.horaInicio}`}>
-                  {h.dia} {h.horaInicio}–{h.horaFin}
-                </div>
-              ))}
-              <div className="text-xl font-bold">{totalHoras.toFixed(1)} h</div>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="h-px bg-zinc-700 my-2 mb-2" />
-            <div className="text-xs text-red-200">
-              <MensajeSinHorarios />
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
   )
 }
