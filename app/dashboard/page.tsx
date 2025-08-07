@@ -10,9 +10,16 @@ import TablaAlumnos from "@/components/TablaAlumnos";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { NuevoCurso } from "@/components/NuevoCurso";
+import NuevaAsignatura from "@/components/NuevaAsignatura";
 import {
   SidebarProvider,
   SidebarInset,
@@ -101,6 +108,23 @@ export default function Page() {
 
   const [fechaActual, setFechaActual] = useState("");
 
+  const handleAsignaturaGuardada = async () => {
+    try {
+      const nuevas = await window.electronAPI.leerAsignaturas() as Asignatura[];
+      setAsignaturas(nuevas);
+  
+      const mapa: Record<string, Horario[]> = {};
+      for (const asignatura of nuevas) {
+        const horarios = await window.electronAPI.leerHorarios(asignatura.id);
+        mapa[asignatura.id] = horarios;
+      }
+      setHorariosPorAsignatura(mapa);
+    } catch (error) {
+      console.error("❌ Error al refrescar asignaturas:", error);
+      toast.error("No se pudieron refrescar las asignaturas");
+    }
+  };
+
   useEffect(() => {
     const interval = setInterval(() => {
       const ahora = new Date();
@@ -146,28 +170,29 @@ export default function Page() {
 
         {/* LAYOUT 2x2 */}
         <main className="grid grid-cols-1 md:grid-cols-2 grid-rows-2 gap-4 pl-4 pr-4 pt-1 pb-4 h-[calc(100vh-4rem)] overflow-y-auto">
-          {/* MIS CURSOS */}
+          {/* --------------------------------------------
+          ---------------MIS CURSOS-------------------
+          -------------------------------------------- */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-  <h2 className="text-xl font-semibold flex items-center gap-2">
-    <GraduationCap className="w-5 h-5" />
-    Mis Cursos
-  </h2>
-
-  <Dialog>
-    <DialogTrigger asChild>
-      <Button variant="secondary" className="text-xs">
-        + Nuevo Curso
-      </Button>
-    </DialogTrigger>
-    <DialogContent className="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle>Nuevo Curso</DialogTitle>
-      </DialogHeader>
-      <NuevoCurso />
-    </DialogContent>
-  </Dialog>
-</div>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <GraduationCap className="w-5 h-5" />
+                Mis Cursos
+              </h2>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="secondary" className="text-xs">
+                    + Nuevo Curso
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Nuevo Curso</DialogTitle>
+                  </DialogHeader>
+                  <NuevoCurso />
+                </DialogContent>
+              </Dialog>
+            </div>
             <div className="flex-1 overflow-y-auto pr-1">
               <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
                 {snap.cursos.length === 0 ? (
@@ -183,67 +208,90 @@ export default function Page() {
             </div>
           </section>
 
-          {/* MIS ASIGNATURAS */}
+          {/* --------------------------------------------
+          ---------------MIS CURSOS-------------------
+          -------------------------------------------- */}
+
+           {/* --------------------------------------------
+          ---------------MIS ASIGNATURAS-------------------
+          -------------------------------------------- */}
+
+<section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+  <div className="flex items-center justify-between mb-2">
+    <h2 className="text-xl font-semibold flex items-center gap-2">
+      <BookA className="w-5 h-5" />
+      Mis Asignaturas
+    </h2>
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="secondary" className="text-xs">
+          + Nueva Asignatura
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Nueva Asignatura</DialogTitle>
+        </DialogHeader>
+        <NuevaAsignatura onSave={handleAsignaturaGuardada} />
+      </DialogContent>
+    </Dialog>
+  </div>
+
+  <div className="flex-1 overflow-y-auto pr-1">
+    <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
+      {asignaturas.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No hay asignaturas disponibles.
+        </p>
+      ) : (
+        asignaturas.map((asig) => (
+          <React.Fragment key={asig.id}>
+            <AsignaturaCard
+              asignatura={asig}
+              horarios={horariosPorAsignatura[asig.id] || []}
+              onOpenHorario={setOpenHorario}
+              onReload={() => cargarAsignaturas(asig.id)}
+            />
+            <HorarioDialog
+              open={openHorario === asig.id}
+              onClose={() => setOpenHorario(null)}
+              asignatura={asig}
+              onSave={() => cargarAsignaturas(asig.id)}
+            />
+          </React.Fragment>
+        ))
+      )}
+    </div>
+  </div>
+</section>
+
+           {/* --------------------------------------------
+          ---------------MIS ASIGNATURAS-------------------
+          -------------------------------------------- */}
+
+          {/* MIS ALUMNOS */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-semibold flex items-center gap-2">
-                <BookA className="w-5 h-5" />
-                Mis Asignaturas
+                <User className="w-5 h-5" />
+                Mis Alumnos
               </h2>
-              <div className="text-sm text-muted-foreground">
-                Total horas / semana:
-                <span className="text-emerald-200 ml-2 font-semibold">
-                  {totalHoras.toFixed(1)} h
-                </span>
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                <Input
+                  type="text"
+                  placeholder="Buscar por nombre o apellidos..."
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  className="pl-10 bg-zinc-800 text-white placeholder-zinc-400"
+                />
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-1">
-              <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
-                {asignaturas.map((asig) => (
-                  <React.Fragment key={asig.id}>
-                    <AsignaturaCard
-                      asignatura={asig}
-                      horarios={horariosPorAsignatura[asig.id] || []}
-                      onOpenHorario={setOpenHorario}
-                      onReload={() => cargarAsignaturas(asig.id)}
-                    />
-                    <HorarioDialog
-                      open={openHorario === asig.id}
-                      onClose={() => setOpenHorario(null)}
-                      asignatura={asig}
-                      onSave={() => cargarAsignaturas(asig.id)}
-                    />
-                  </React.Fragment>
-                ))}
-              </div>
+              <TablaAlumnos filtro={filtro} />
             </div>
           </section>
-
-          {/* MIS ALUMNOS */}
-          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
-  <div className="flex items-center justify-between mb-2">
-    <h2 className="text-xl font-semibold flex items-center gap-2">
-      <User className="w-5 h-5" />
-      Mis Alumnos
-    </h2>
-    <div className="relative w-64">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-      <Input
-        type="text"
-        placeholder="Buscar por nombre o apellidos..."
-        value={filtro}
-        onChange={(e) => setFiltro(e.target.value)}
-        className="pl-10 bg-zinc-800 text-white placeholder-zinc-400"
-      />
-    </div>
-  </div>
-
-  <div className="flex-1 overflow-y-auto pr-1">
-  <TablaAlumnos filtro={filtro} />
-
-  </div>
-</section>
 
           {/* MIS ACTIVIDADES */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">

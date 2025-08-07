@@ -18,7 +18,12 @@ type AsignaturaRemota = {
   RA: RA[]
 }
 
-export default function NuevaAsignatura() {
+type Props = {
+  onSave?: () => void;
+};
+
+export default function NuevaAsignatura({ onSave }: Props) {
+
   const [asignaturasRemotas, setAsignaturasRemotas] = useState<AsignaturaRemota[]>([])
   const [asignaturaSeleccionada, setAsignaturaSeleccionada] = useState<AsignaturaRemota | null>(null)
 
@@ -34,18 +39,21 @@ export default function NuevaAsignatura() {
 
   const handleGuardar = async () => {
     if (!asignaturaSeleccionada) {
-      toast.error("Selecciona una asignatura")
-      return
+      toast.error("Selecciona una asignatura");
+      return;
     }
-
+  
     try {
-      await window.electronAPI.guardarAsignatura(asignaturaSeleccionada)
-      toast.success("Asignatura guardada en la base de datos")
+      await window.electronAPI.guardarAsignatura(asignaturaSeleccionada);
+      toast.success("Asignatura guardada en la base de datos");
+  
+      onSave?.(); // ✅ aquí se dispara la recarga en page.tsx
     } catch (error) {
-      toast.error("Error al guardar la asignatura")
-      console.error(error)
+      toast.error("Error al guardar la asignatura");
+      console.error(error);
     }
-  }
+  };
+  
 
   return (
     <div className="space-y-4">
