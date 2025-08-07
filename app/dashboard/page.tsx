@@ -296,49 +296,55 @@ export default function Page() {
           -------------------------------------------- */}
 
 <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+  {/* Encabezado: título y botón */}
   <div className="flex items-center justify-between mb-2">
     <h2 className="text-xl font-semibold flex items-center gap-2">
       <User className="w-5 h-5" />
       Mis Alumnos
     </h2>
 
-    <div className="flex items-center gap-2">
-      {!sinAlumnos && (
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-          <Input
-            type="text"
-            placeholder="Buscar por nombre o apellidos..."
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
-            className="pl-10 bg-zinc-800 text-white placeholder-zinc-400"
-          />
-        </div>
-      )}
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="secondary" className="text-xs">
-            + Añadir alumno/s
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Nuevo Alumno</DialogTitle>
-          </DialogHeader>
-          <NuevoAlumno onSave={() => setRefreshKey((prev) => prev + 1)} />
-        </DialogContent>
-      </Dialog>
-    </div>
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="secondary" className="text-xs">
+          + Añadir alumno/s
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Nuevo Alumno</DialogTitle>
+        </DialogHeader>
+        <NuevoAlumno onSave={() => setRefreshKey((prev) => prev + 1)} />
+      </DialogContent>
+    </Dialog>
   </div>
 
+  {/* 🔽 Buscador debajo, alineado a la derecha */}
+  {!sinAlumnos && (
+    <div className="flex justify-end mb-4">
+      <div className="relative w-full md:w-80">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+        <Input
+          type="text"
+          placeholder="Buscar por nombre o apellidos..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          className="pl-10 bg-zinc-800 text-white placeholder-zinc-400 w-full"
+        />
+      </div>
+    </div>
+  )}
+
+  {/* Tabla de alumnos */}
   <div className="flex-1 overflow-y-auto pr-1">
-  <TablaAlumnos
-  filtro={filtro}
-  onEmptyChange={setSinAlumnos}
-  refreshKey={refreshKey}
-/>
+    <TablaAlumnos
+      filtro={filtro}
+      onEmptyChange={setSinAlumnos}
+      refreshKey={refreshKey}
+    />
   </div>
 </section>
+
+
 
 
           {/* --------------------------------------------

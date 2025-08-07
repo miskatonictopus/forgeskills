@@ -12,14 +12,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, User } from "lucide-react";
 
 type Props = {
   filtro: string;
   onEmptyChange?: (isEmpty: boolean) => void;
   refreshKey?: number;
 };
-
 
 type Alumno = {
   id: number;
@@ -29,7 +28,11 @@ type Alumno = {
   mail: string;
 };
 
-export default function TablaAlumnos({ filtro, onEmptyChange, refreshKey }: Props) {
+export default function TablaAlumnos({
+  filtro,
+  onEmptyChange,
+  refreshKey,
+}: Props) {
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [seleccionados, setSeleccionados] = useState<number[]>([]);
 
@@ -40,8 +43,7 @@ export default function TablaAlumnos({ filtro, onEmptyChange, refreshKey }: Prop
       onEmptyChange?.(datos.length === 0);
     };
     cargarAlumnos();
-  }, [refreshKey]); // <--- AQUI
-  
+  }, [refreshKey]);
 
   const alumnosFiltrados = alumnos.filter((alumno) =>
     `${alumno.nombre} ${alumno.apellidos}`
@@ -83,23 +85,9 @@ export default function TablaAlumnos({ filtro, onEmptyChange, refreshKey }: Prop
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-40">
-                <div className="flex items-center gap-4">
-                  <BarChart3 className="invisible h-4 w-4" />
-                  <Checkbox
-                    checked={
-                      seleccionados.length === alumnosFiltrados.length &&
-                      alumnosFiltrados.length > 0
-                    }
-                    onCheckedChange={toggleTodos}
-                    aria-label="Seleccionar todos"
-                  />
-                </div>
-              </TableHead>
-              <TableHead>Apellidos</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Curso</TableHead>
-              <TableHead>Correo</TableHead>
+            <TableHead></TableHead>
+              <TableHead className="text-xs">Alumno</TableHead>
+              <TableHead className="text-xs">Curso</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -113,42 +101,33 @@ export default function TablaAlumnos({ filtro, onEmptyChange, refreshKey }: Prop
                       }
                       className="text-muted-foreground hover:text-white transition"
                     >
-                      <BarChart3 className="h-4 w-4" />
+                      <User className="h-4 w-4" />
                     </button>
-                    <img
+                    {/* <img
                       src={`/avatars/avatar${(alumno.id % 5) + 1}.png`}
                       alt={`Avatar de ${alumno.nombre}`}
                       className="w-8 h-8 rounded-full object-cover shadow"
-                    />
-                    <Checkbox
-                      checked={seleccionados.includes(alumno.id)}
-                      onCheckedChange={() => toggleSeleccion(alumno.id)}
-                      aria-label={`Seleccionar ${alumno.nombre}`}
-                    />
+                    /> */}
                   </div>
                 </TableCell>
-                <TableCell className="uppercase text-blue-400 hover:underline cursor-pointer">
+                <TableCell className="text-xs text-white leading-tight">
                   <Link
                     href={`/alumnos/${crearSlugAlumno(
                       alumno.nombre,
                       alumno.apellidos
                     )}`}
+                    className="block hover:underline"
                   >
-                    {alumno.apellidos}
+                    <span className=" text-white text-xs">
+                      {`${alumno.apellidos}, ${alumno.nombre}`}
+                    </span>
+                    <br />
+                    <span className="text-muted-foreground text-xs">
+                      {alumno.mail}
+                    </span>
                   </Link>
                 </TableCell>
-                <TableCell className="uppercase text-blue-400 hover:underline cursor-pointer">
-                  <Link
-                    href={`/alumnos/${crearSlugAlumno(
-                      alumno.nombre,
-                      alumno.apellidos
-                    )}`}
-                  >
-                    {alumno.nombre}
-                  </Link>
-                </TableCell>
-                <TableCell className="uppercase">{alumno.curso}</TableCell>
-                <TableCell>{alumno.mail}</TableCell>
+                <TableCell className="uppercase text-xs">{alumno.curso}</TableCell>
               </TableRow>
             ))}
           </TableBody>
