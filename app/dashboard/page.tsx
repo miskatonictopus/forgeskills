@@ -182,10 +182,14 @@ export default function Page() {
           -------------------------------------------- */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                <GraduationCap className="w-5 h-5" />
-                Mis Cursos
-              </h2>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+  <GraduationCap className="w-5 h-5" />
+  Mis Cursos
+  <span className="bg-white text-black text-lg font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-sm">
+  {snap.cursos.length}
+</span>
+</h2>
+              
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="secondary" className="text-xs">
@@ -200,7 +204,7 @@ export default function Page() {
                 </DialogContent>
               </Dialog>
             </div>
-
+            <Separator className="mt-2 mb-4 bg-zinc-800" />
             <div className="flex-1 overflow-y-auto pr-1">
               {snap.cursos.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full w-full space-y-4">
@@ -236,6 +240,9 @@ export default function Page() {
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <BookA className="w-5 h-5" />
                 Mis Asignaturas
+                <span className="bg-white text-black text-lg font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-sm">
+    {asignaturas.length}
+  </span>
               </h2>
               <Dialog>
                 <DialogTrigger asChild>
@@ -251,7 +258,7 @@ export default function Page() {
                 </DialogContent>
               </Dialog>
             </div>
-
+            <Separator className="mt-2 mb-4 bg-zinc-800" />
             <div className="flex-1 overflow-y-auto pr-1">
               {asignaturas.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full w-full space-y-4">
@@ -317,7 +324,7 @@ export default function Page() {
       </DialogContent>
     </Dialog>
   </div>
-
+  <Separator className="mt-2 mb-4 bg-zinc-800" />
   {/* 🔽 Buscador debajo, alineado a la derecha */}
   {!sinAlumnos && (
     <div className="flex justify-end mb-4">
@@ -357,6 +364,7 @@ export default function Page() {
               <Pencil className="w-5 h-5" />
               Mis Actividades
             </h2>
+            <Separator className="mt-2 mb-4 bg-zinc-800" />
             <div className="flex-1 rounded bg-background/60" />
           </section>
         </main>

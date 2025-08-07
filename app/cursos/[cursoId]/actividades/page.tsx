@@ -20,7 +20,7 @@ import { DialogVerActividad } from "@/components/actividades/DialogVerActividad"
 import { useSnapshot } from "valtio";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import { actividadesPorCurso, cargarActividades } from "@/store/actividadesPorCurso";
-
+import { Separator } from "@/components/ui/separator";
 type Actividad = {
   id: string;
   nombre: string;
