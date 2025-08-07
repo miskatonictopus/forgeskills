@@ -9,8 +9,12 @@ import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { AlumnoEntrada } from "@/models/alumno"
 
+type Props = {
+  onSave?: () => void;
+};
 
-export default function NuevoAlumno() {
+
+export default function NuevoAlumno({ onSave }: Props) {
   const [nombre, setNombre] = useState("")
   const [apellidos, setApellidos] = useState("")
   const [cursos, setCursos] = useState<any[]>([]) 
@@ -43,11 +47,15 @@ export default function NuevoAlumno() {
   
       await window.electronAPI.guardarAlumno(alumno)
       toast.success("Alumno guardado")
+  
+
+      onSave?.();
     } catch (error) {
       toast.error("Error al guardar el alumno")
       console.error(error)
     }
   }
+  
   
 
   return (

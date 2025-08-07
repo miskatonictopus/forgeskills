@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,7 @@ type Props = {
 
 export function CursoCard({ curso }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
-
+  const router = useRouter();
   const asignaturas = asignaturasPorCurso[curso.id] || [];
   const tieneAsignaturas = asignaturas.length > 0;
 
@@ -109,11 +110,11 @@ export function CursoCard({ curso }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2 my-4">
-            <div className="h-px flex-1 bg-zinc-700" />
+            {/* <div className="h-px flex-1 bg-zinc-700" />
             <span className="text-xs uppercase text-muted-foreground mt-1">
               Asignaturas
             </span>
-            <div className="h-px flex-1 bg-zinc-700" />
+            <div className="h-px flex-1 bg-zinc-700" /> */}
           </div>
           {asignaturas.length > 0 && (
             <div className="mt-2">
@@ -146,14 +147,19 @@ export function CursoCard({ curso }: Props) {
             </Button>
           </div>
           <div className="p-1 mt-2 ml-4">
-  <Link
-    href={`/cursos/${curso.id}/actividades`}
-    className="text-xs font-light uppercase text-muted-foreground hover:text-white transition-colors inline-flex items-center gap-1"
+          <div className="p-1 mt-2 ml-4">
+  <Button
+    variant="ghost"
+    size="sm"
+    className="text-xs font-light uppercase text-muted-foreground hover:text-white inline-flex items-center gap-1 transition-colors"
+    onClick={() => router.push(`/cursos/${curso.id}/actividades`)}
   >
     <ClipboardList className="w-4 h-4" />
     Ver actividades
     <span className="text-xs text-zinc-400 ml-1">(0)</span>
-  </Link>
+  </Button>
+</div>
+
 </div>
 
       </Card>

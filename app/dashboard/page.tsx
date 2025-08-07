@@ -7,6 +7,7 @@ import { CursoCard } from "@/components/CursoCard";
 import { AsignaturaCard } from "@/components/AsignaturaCard";
 import { HorarioDialog } from "@/components/HorarioDialog";
 import TablaAlumnos from "@/components/TablaAlumnos";
+import NuevoAlumno from "@/components/NuevoAlumno";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -57,11 +58,15 @@ type Horario = {
 export default function Page() {
   const snap = useSnapshot(cursoStore);
   const [filtro, setFiltro] = useState("");
+  const [sinAlumnos, setSinAlumnos] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>([]);
   const [openHorario, setOpenHorario] = useState<string | null>(null);
   const [horariosPorAsignatura, setHorariosPorAsignatura] = useState<
     Record<string, Horario[]>
   >({});
+
+  
 
   // Cargar asignaturas al montar
   useEffect(() => {
@@ -125,6 +130,7 @@ export default function Page() {
       toast.error("No se pudieron refrescar las asignaturas");
     }
   };
+  
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -198,15 +204,15 @@ export default function Page() {
             <div className="flex-1 overflow-y-auto pr-1">
               {snap.cursos.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full w-full space-y-4">
-                <img
-                  src="/images/DKke.gif"
-                  alt="Sin cursos"
-                  className="w-24 h-24"
-                />
-                <p className="text-sm text-muted-foreground text-center">
-                  No hay cursos disponibles.
-                </p>
-              </div>
+                  <img
+                    src="/images/DKke.gif"
+                    alt="Sin cursos"
+                    className="w-24 h-24"
+                  />
+                  <p className="text-sm text-muted-foreground text-center">
+                    No hay cursos disponibles.
+                  </p>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
                   {snap.cursos.map((curso) => (
@@ -225,86 +231,119 @@ export default function Page() {
           ---------------MIS ASIGNATURAS-------------------
           -------------------------------------------- */}
 
-<section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
-  <div className="flex items-center justify-between mb-2">
-    <h2 className="text-xl font-semibold flex items-center gap-2">
-      <BookA className="w-5 h-5" />
-      Mis Asignaturas
-    </h2>
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="secondary" className="text-xs">
-          + Nueva Asignatura
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Nueva Asignatura</DialogTitle>
-        </DialogHeader>
-        <NuevaAsignatura onSave={handleAsignaturaGuardada} />
-      </DialogContent>
-    </Dialog>
-  </div>
+          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <BookA className="w-5 h-5" />
+                Mis Asignaturas
+              </h2>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="secondary" className="text-xs">
+                    + Nueva Asignatura
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Nueva Asignatura</DialogTitle>
+                  </DialogHeader>
+                  <NuevaAsignatura onSave={handleAsignaturaGuardada} />
+                </DialogContent>
+              </Dialog>
+            </div>
 
-  <div className="flex-1 overflow-y-auto pr-1">
-    {asignaturas.length === 0 ? (
-      <div className="flex flex-col items-center justify-center h-full w-full space-y-4">
-        <img src="/images/DKke.gif" alt="Sin asignaturas" className="w-24 h-24" />
-        <p className="text-sm text-muted-foreground text-center">
-          No hay asignaturas disponibles.
-        </p>
-      </div>
-    ) : (
-      <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
-        {asignaturas.map((asig) => (
-          <React.Fragment key={asig.id}>
-            <AsignaturaCard
-              asignatura={asig}
-              horarios={horariosPorAsignatura[asig.id] || []}
-              onOpenHorario={setOpenHorario}
-              onReload={() => cargarAsignaturas(asig.id)}
-            />
-            <HorarioDialog
-              open={openHorario === asig.id}
-              onClose={() => setOpenHorario(null)}
-              asignatura={asig}
-              onSave={() => cargarAsignaturas(asig.id)}
-            />
-          </React.Fragment>
-        ))}
-      </div>
-    )}
-  </div>
-</section>
-
+            <div className="flex-1 overflow-y-auto pr-1">
+              {asignaturas.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full w-full space-y-4">
+                  <img
+                    src="/images/DKke.gif"
+                    alt="Sin asignaturas"
+                    className="w-24 h-24"
+                  />
+                  <p className="text-sm text-muted-foreground text-center">
+                    No hay asignaturas disponibles.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
+                  {asignaturas.map((asig) => (
+                    <React.Fragment key={asig.id}>
+                      <AsignaturaCard
+                        asignatura={asig}
+                        horarios={horariosPorAsignatura[asig.id] || []}
+                        onOpenHorario={setOpenHorario}
+                        onReload={() => cargarAsignaturas(asig.id)}
+                      />
+                      <HorarioDialog
+                        open={openHorario === asig.id}
+                        onClose={() => setOpenHorario(null)}
+                        asignatura={asig}
+                        onSave={() => cargarAsignaturas(asig.id)}
+                      />
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
 
           {/* --------------------------------------------
           ---------------MIS ASIGNATURAS-------------------
           -------------------------------------------- */}
 
-          {/* MIS ALUMNOS */}
-          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Mis Alumnos
-              </h2>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                <Input
-                  type="text"
-                  placeholder="Buscar por nombre o apellidos..."
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  className="pl-10 bg-zinc-800 text-white placeholder-zinc-400"
-                />
-              </div>
-            </div>
+          {/* --------------------------------------------
+          ---------------MIS ALUMNOS-------------------
+          -------------------------------------------- */}
 
-            <div className="flex-1 overflow-y-auto pr-1">
-              <TablaAlumnos filtro={filtro} />
-            </div>
-          </section>
+<section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+  <div className="flex items-center justify-between mb-2">
+    <h2 className="text-xl font-semibold flex items-center gap-2">
+      <User className="w-5 h-5" />
+      Mis Alumnos
+    </h2>
+
+    <div className="flex items-center gap-2">
+      {!sinAlumnos && (
+        <div className="relative w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+          <Input
+            type="text"
+            placeholder="Buscar por nombre o apellidos..."
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
+            className="pl-10 bg-zinc-800 text-white placeholder-zinc-400"
+          />
+        </div>
+      )}
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="secondary" className="text-xs">
+            + Añadir alumno/s
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nuevo Alumno</DialogTitle>
+          </DialogHeader>
+          <NuevoAlumno onSave={() => setRefreshKey((prev) => prev + 1)} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  </div>
+
+  <div className="flex-1 overflow-y-auto pr-1">
+  <TablaAlumnos
+  filtro={filtro}
+  onEmptyChange={setSinAlumnos}
+  refreshKey={refreshKey}
+/>
+  </div>
+</section>
+
+
+          {/* --------------------------------------------
+          ---------------MIS ALUMNOS-------------------
+          -------------------------------------------- */}
 
           {/* MIS ACTIVIDADES */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">

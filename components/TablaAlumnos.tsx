@@ -14,6 +14,13 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { BarChart3 } from "lucide-react";
 
+type Props = {
+  filtro: string;
+  onEmptyChange?: (isEmpty: boolean) => void;
+  refreshKey?: number;
+};
+
+
 type Alumno = {
   id: number;
   nombre: string;
@@ -22,11 +29,7 @@ type Alumno = {
   mail: string;
 };
 
-type Props = {
-  filtro: string;
-};
-
-export default function TablaAlumnos({ filtro }: Props) {
+export default function TablaAlumnos({ filtro, onEmptyChange, refreshKey }: Props) {
   const [alumnos, setAlumnos] = useState<Alumno[]>([]);
   const [seleccionados, setSeleccionados] = useState<number[]>([]);
 
@@ -34,9 +37,11 @@ export default function TablaAlumnos({ filtro }: Props) {
     const cargarAlumnos = async () => {
       const datos = await window.electronAPI.leerAlumnos();
       setAlumnos(datos);
+      onEmptyChange?.(datos.length === 0);
     };
     cargarAlumnos();
-  }, []);
+  }, [refreshKey]); // <--- AQUI
+  
 
   const alumnosFiltrados = alumnos.filter((alumno) =>
     `${alumno.nombre} ${alumno.apellidos}`
@@ -58,9 +63,22 @@ export default function TablaAlumnos({ filtro }: Props) {
     }
   };
 
+  // ✅ Mostrar mensaje si no hay alumnos
+  if (alumnos.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground p-6">
+        <img
+          src="/images/DKke.gif"
+          alt="Sin alumnos"
+          className="w-24 h-24 mb-4"
+        />
+        <p className="text-sm">No hay alumnos disponibles.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-0">
-      {/* 📋 Tabla */}
       <div className="border border-zinc-800 rounded-xl overflow-auto bg-zinc-900 overflow-x-auto">
         <Table>
           <TableHeader>
