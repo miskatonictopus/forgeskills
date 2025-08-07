@@ -110,9 +110,10 @@ export default function Page() {
 
   const handleAsignaturaGuardada = async () => {
     try {
-      const nuevas = await window.electronAPI.leerAsignaturas() as Asignatura[];
+      const nuevas =
+        (await window.electronAPI.leerAsignaturas()) as Asignatura[];
       setAsignaturas(nuevas);
-  
+
       const mapa: Record<string, Horario[]> = {};
       for (const asignatura of nuevas) {
         const horarios = await window.electronAPI.leerHorarios(asignatura.id);
@@ -193,18 +194,26 @@ export default function Page() {
                 </DialogContent>
               </Dialog>
             </div>
+
             <div className="flex-1 overflow-y-auto pr-1">
-              <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
-                {snap.cursos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No hay cursos disponibles.
-                  </p>
-                ) : (
-                  snap.cursos.map((curso) => (
-                    <CursoCard key={curso.id} curso={curso} />
-                  ))
-                )}
+              {snap.cursos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full w-full space-y-4">
+                <img
+                  src="/images/DKke.gif"
+                  alt="Sin cursos"
+                  className="w-24 h-24"
+                />
+                <p className="text-sm text-muted-foreground text-center">
+                  No hay cursos disponibles.
+                </p>
               </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
+                  {snap.cursos.map((curso) => (
+                    <CursoCard key={curso.id} curso={curso} />
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 
@@ -212,7 +221,7 @@ export default function Page() {
           ---------------MIS CURSOS-------------------
           -------------------------------------------- */}
 
-           {/* --------------------------------------------
+          {/* --------------------------------------------
           ---------------MIS ASIGNATURAS-------------------
           -------------------------------------------- */}
 
@@ -238,13 +247,16 @@ export default function Page() {
   </div>
 
   <div className="flex-1 overflow-y-auto pr-1">
-    <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
-      {asignaturas.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+    {asignaturas.length === 0 ? (
+      <div className="flex flex-col items-center justify-center h-full w-full space-y-4">
+        <img src="/images/DKke.gif" alt="Sin asignaturas" className="w-24 h-24" />
+        <p className="text-sm text-muted-foreground text-center">
           No hay asignaturas disponibles.
         </p>
-      ) : (
-        asignaturas.map((asig) => (
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-2 gap-3">
+        {asignaturas.map((asig) => (
           <React.Fragment key={asig.id}>
             <AsignaturaCard
               asignatura={asig}
@@ -259,13 +271,14 @@ export default function Page() {
               onSave={() => cargarAsignaturas(asig.id)}
             />
           </React.Fragment>
-        ))
-      )}
-    </div>
+        ))}
+      </div>
+    )}
   </div>
 </section>
 
-           {/* --------------------------------------------
+
+          {/* --------------------------------------------
           ---------------MIS ASIGNATURAS-------------------
           -------------------------------------------- */}
 
