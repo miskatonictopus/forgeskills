@@ -1,8 +1,14 @@
+// components/MensajeSinHorarios.tsx
 import { useEffect, useState } from "react";
-import { Clock } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function MensajeSinHorarios() {
+type Props = {
+  onClick?: () => void;
+  className?: string;
+};
+
+export function MensajeSinHorarios({ onClick, className }: Props) {
   const [animar, setAnimar] = useState(false);
 
   useEffect(() => {
@@ -10,19 +16,19 @@ export function MensajeSinHorarios() {
       setAnimar(true);
       setTimeout(() => setAnimar(false), 1000);
     }, 5000);
-
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <p
-className={cn(
-        "flex items-center gap-2 text-xs text-red-200 uppercase mt-2 transition-all",
-        animar && "animate-bounce ease-in-out text-red-200"
+    <button
+      onClick={onClick}
+      aria-label="Añadir horario"
+      className={cn(
+        "flex items-center gap-2 text-xs mt-2 px-3 py-2 rounded-md bg-white text-black hover:bg-gray-100 transition-all"
       )}
     >
-      <Clock className="w-3.5 h-3.5" />
-      Sin horarios asignados
-    </p>
+      <PlusCircle className="w-4 h-4" />
+      Añadir horario
+    </button>
   );
 }
