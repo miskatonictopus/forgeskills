@@ -1,22 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
-import { Users, SquarePen, Trash2, ClipboardList } from "lucide-react";
-import { DialogAsignarAsignaturas } from "@/components/DialogAsignarAsignaturas";
-import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
-// import { setCursoAEliminar } from "@/store/cursoAEliminar"
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Users, SquarePen, ClipboardList, SquarePenIcon, PlusCircle } from "lucide-react";
+import { DialogAsignaturas } from "@/components/DialogAsignaturas";
+import { asignaturasPorCurso, setAsignaturasCurso } from "@/store/asignaturasPorCurso";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
-import { setAsignaturasCurso } from "@/store/asignaturasPorCurso";
 
 type Curso = {
   id: string;
@@ -27,26 +21,24 @@ type Curso = {
   nivel: string;
 };
 
-type Props = {
-  curso: Curso;
-};
+type Props = { curso: Curso };
 
 export function CursoCard({ curso }: Props) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [openAdd, setOpenAdd] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
   const router = useRouter();
   const asignaturas = asignaturasPorCurso[curso.id] || [];
   const tieneAsignaturas = asignaturas.length > 0;
 
   useEffect(() => {
-    window.electronAPI.asignaturasDeCurso(curso.id).then((asignaturas) => {
-      setAsignaturasCurso(curso.id, asignaturas);
+    window.electronAPI.asignaturasDeCurso(curso.id).then((asigs) => {
+      setAsignaturasCurso(curso.id, asigs);
     });
   }, [curso.id]);
 
   return (
     <>
-      <Card className="min-w-[300px] bg-zinc-900 border border-zinc-700 text-white flex flex-col justify-between relative">
-
+      <Card className="min-w-[300px] bg-zinc-900 border border-zinc-700 text-white flex flex-col relative">
         {/* ICONOS ACCIONES */}
         <div className="absolute top-2 right-2 flex gap-2 z-10">
           <Tooltip>
@@ -69,28 +61,11 @@ export function CursoCard({ curso }: Props) {
             </TooltipTrigger>
             <TooltipContent side="top">Editar</TooltipContent>
           </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {/* <button
-                onClick={() =>
-                  setCursoAEliminar({
-                    id: curso.id,
-                    nombre: curso.acronimo,
-                  })
-                }
-                className="text-zinc-400 hover:text-emerald-400"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button> */}
-            </TooltipTrigger>
-            <TooltipContent side="top">Borrar</TooltipContent>
-          </Tooltip>
         </div>
 
         {/* CONTENIDO */}
-        <CardContent className="leading-tight space-y-1 mt-0">
-          <div className="h-[80px]">
+        <CardContent className="leading-tight space-y-1">
+          <div>
             <p className="text-4xl font-bold truncate uppercase">
               {curso.acronimo}
               {curso.nivel}
@@ -100,75 +75,72 @@ export function CursoCard({ curso }: Props) {
             </p>
             <div className="flex items-center gap-4">
               <p className="text-xs font-light text-zinc-400">
-                Grado:{" "}
-                <span className="text-white uppercase">{curso.grado}</span>
+                Grado: <span className="text-white uppercase">{curso.grado}</span>
               </p>
               <p className="text-xs font-light text-zinc-400">
-                Clase:{" "}
-                <span className="text-white uppercase">{curso.clase}</span>
+                Clase: <span className="text-white uppercase">{curso.clase}</span>
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 my-4">
-            {/* <div className="h-px flex-1 bg-zinc-700" />
-            <span className="text-xs uppercase text-muted-foreground mt-1">
-              Asignaturas
-            </span>
-            <div className="h-px flex-1 bg-zinc-700" /> */}
-          </div>
-          {asignaturas.length > 0 && (
-            <div className="mt-2">
-              <ul className="list-disc list-outside pl-4 text-xs text-white space-y-0.5">
-                {asignaturas.map((a) => (
-                  <li key={a.id}>
-                  <span className="font-mono text-muted-foreground mr-1">{a.id}</span>
-                  {a.nombre}
-                </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {/* BOTÓN ASIGNATURAS */}
-        </CardContent>
-        <div className="p-1 ml-4">
+
+          <Separator className="my-4" />
+
+          {!tieneAsignaturas ? (
             <Button
-              variant={tieneAsignaturas ? "outline" : "secondary"}
               size="sm"
-              className={cn(
-                "w-auto transition-all uppercase font-light text-xs",
-                !tieneAsignaturas &&
-                  "border-dashed text-destructive animate-pulse"
-              )}
-              onClick={() => setDialogOpen(true)}
+              aria-label="Asociar asignaturas"
+              className="flex items-center gap-2 text-xs mt-2 px-3 py-2 rounded-md bg-white text-black hover:bg-gray-100 transition-all"
+              onClick={() => setOpenAdd(true)}
             >
-              {tieneAsignaturas
-                ? "Modificar asignaturas"
-                : "+ Asociar asignaturas"}
+              <PlusCircle className="w-4 h-4" />
+              Añadir asignatura/s
             </Button>
-          </div>
-          <div className="p-1 mt-2 ml-4">
-          <div className="p-1 mt-2 ml-4">
-  <Button
-    variant="ghost"
-    size="sm"
-    className="text-xs font-light uppercase text-muted-foreground hover:text-white inline-flex items-center gap-1 transition-colors"
-    onClick={() => router.push(`/cursos/${curso.id}/actividades`)}
-  >
-    <ClipboardList className="w-4 h-4" />
-    Ver actividades
-    <span className="text-xs text-zinc-400 ml-1">(0)</span>
-  </Button>
-</div>
+          ) : (
+            <>
+              <div className="pt-2 space-y-1 text-xs leading-tight pb-4">
+                <ul className="list-disc list-outside pl-4 text-xs text-white space-y-0.5">
+                  {asignaturas.map((a) => (
+                    <li key={a.id}>
+                      <span className="font-mono text-muted-foreground mr-1">
+                        {a.id}
+                      </span>
+                      {a.nombre}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-</div>
+              <Button
+                size="sm"
+                aria-label="Modificar Asignatura/s"
+                className="flex items-center gap-2 text-xs mt-2 px-3 py-2 rounded-md bg-white text-black hover:bg-gray-100 transition-all"
+                onClick={() => setOpenEdit(true)}
+              >
+                <SquarePenIcon className="w-4 h-4" />
+                Modificar asignatura/s
+              </Button>
+            </>
+          )}
+          <Separator className="my-4" />
+        </CardContent>
 
+        <div className="p-3 pt-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs font-medium uppercase text-muted-foreground hover:text-white inline-flex items-center gap-1 transition-colors"
+            onClick={() => router.push(`/cursos/${curso.id}/actividades`)}
+          >
+            <ClipboardList className="w-4 h-4" />
+            Ver actividades
+            <span className="text-xs text-zinc-400 ml-1">(0)</span>
+          </Button>
+        </div>
       </Card>
 
-      <DialogAsignarAsignaturas
-        cursoId={curso.id}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-      />
+      {/* Un único dialog, dos modos */}
+      <DialogAsignaturas cursoId={curso.id} open={openAdd} onOpenChange={setOpenAdd} mode="add" />
+      <DialogAsignaturas cursoId={curso.id} open={openEdit} onOpenChange={setOpenEdit} mode="edit" />
     </>
   );
 }

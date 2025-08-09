@@ -7,19 +7,20 @@ import { ColorSelector } from "@/components/ColorSelector"
 import { MensajeSinHorarios } from "@/components/MensajeSinHorarios"
 import { SquarePen, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import { Separator } from "@/components/ui/separator";
 
 type Horario = { dia: string; horaInicio: string; horaFin: string }
 type Descripcion = {
   duracion: string
   centro: string
   empresa: string
-  creditos: string | number // 👈 añadir esto
+  creditos?: string | number // 👈 añadir esto
 }
 type RA = { codigo: string; descripcion: string; CE: any[] }
 type Asignatura = {
   id: string
   nombre: string
-  creditos: number | string
+  creditos?: number | string
   descripcion: Descripcion
   RA: RA[]
   color?: string
@@ -112,8 +113,8 @@ export function AsignaturaCard(props: AsignaturaCardProps): React.JSX.Element {
         {editandoColor && (
           <ColorSelector colorActual={colorActual} onSelect={handleColorChange} />
         )}
-
-<div className="border-t border-zinc-700 pt-2 mt-2 space-y-1 text-xs leading-tight">
+<Separator className="my-4" />
+<div className="pt-2 mt-2 space-y-1 text-xs leading-tight">
   {horarios.length > 0 ? (
     <>
       {horarios.map((h, i) => (
