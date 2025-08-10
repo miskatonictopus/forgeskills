@@ -7,11 +7,13 @@ import { Actividad } from "@/store/actividadesPorCurso";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   actividad: Actividad | null;
+  asignaturaNombre?: string;
 };
 
 type CEDetectado = {
@@ -20,12 +22,8 @@ type CEDetectado = {
   puntuacion: number;
 };
 
-export function DialogVerActividad({ open, onOpenChange, actividad }: Props) {
-  const [cesDetectados, setCesDetectados] = useState<{
-    codigo: string;
-    descripcion: string;
-    puntuacion: number;
-  }[]>([]);
+export function DialogVerActividad({ open, onOpenChange, actividad, asignaturaNombre}: Props) {
+  const [cesDetectados, setCesDetectados] = useState<CEDetectado[]>([]);
   const [loading, setLoading] = useState(false);
 
   if (!actividad) return null;
@@ -35,13 +33,10 @@ export function DialogVerActividad({ open, onOpenChange, actividad }: Props) {
       toast.error("La actividad no tiene descripción.");
       return;
     }
-  
     try {
       setLoading(true);
-      setCesDetectados([]); // 🧹 Limpiar resultados anteriores antes del análisis
-  
-      const ceDetectados = await window.electronAPI.analizarDescripcion(actividad.id) as CEDetectado[];
-  
+      setCesDetectados([]);
+      const ceDetectados = (await window.electronAPI.analizarDescripcion(actividad.id)) as CEDetectado[];
       if (!ceDetectados || ceDetectados.length === 0) {
         toast.warning("No se han detectado CE relevantes.");
       } else {
@@ -58,22 +53,28 @@ export function DialogVerActividad({ open, onOpenChange, actividad }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-[1100px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{actividad.nombre}</DialogTitle>
+          <DialogTitle className="text-3xl">{actividad.nombre}</DialogTitle>
         </DialogHeader>
-
         <div className="space-y-2 text-sm text-muted-foreground">
           <p>
             <CalendarDays className="inline w-4 h-4 mr-1" />
             {new Date(actividad.fecha).toLocaleDateString("es-ES")}
           </p>
-          <p><strong>Asignatura:</strong> {actividad.asignaturaId}</p>
+          <p>
+    <strong>Asignatura:</strong>{" "}
+    <span className="uppercase">
+      {asignaturaNombre || actividad.asignaturaId}
+    </span>
+  </p>
+  <Separator className="my-3" />
 
           {actividad.descripcion && (
             <div className="mt-4">
-              <strong>Descripción:</strong>
-              <p className="whitespace-pre-wrap mb-2">{actividad.descripcion}</p>
+              <strong className="text-white mb-4">Descripción:</strong>
+              <p className="whitespace-pre-wrap mb-2 text-md">{actividad.descripcion}</p>
+              <Separator className="my-3" />
               <Button onClick={handleAnalizar} disabled={loading}>
                 <Bot className="w-4 h-4 mr-2" />
                 {loading ? "Analizando..." : "Analizar descripción"}
@@ -90,17 +91,17 @@ export function DialogVerActividad({ open, onOpenChange, actividad }: Props) {
                     <div className="flex items-center justify-between">
                       <span className="font-medium">{ce.codigo}</span>
                       <span
-  className={cn(
-    "ml-2",
-    ce.puntuacion > 0.45
-      ? "text-green-600"
-      : ce.puntuacion >= 0.42
-      ? "text-yellow-600"
-      : "text-red-600"
-  )}
->
-  ({(ce.puntuacion * 100).toFixed(1)}%)
-</span>
+                        className={cn(
+                          "ml-2",
+                          ce.puntuacion > 0.45
+                            ? "text-green-600"
+                            : ce.puntuacion >= 0.42
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                        )}
+                      >
+                        ({(ce.puntuacion * 100).toFixed(1)}%)
+                      </span>
                     </div>
                     <div className="text-xs text-muted-foreground whitespace-pre-wrap">
                       {ce.descripcion}

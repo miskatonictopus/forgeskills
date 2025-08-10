@@ -103,31 +103,41 @@ export function CursoCard({ curso }: Props) {
             </Button>
           ) : (
             <div className="pt-2 space-y-2 text-xs leading-tight pb-2">
-              <ul className="pl-0 space-y-2">
-                {asignaturas.map((a) => (
-                  <li key={a.id} className="list-none -mx-2 p-2 rounded-md hover:bg-zinc-800/40 transition-colors">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2">
-                        <span className="font-mono text-muted-foreground mt-[2px]">0{a.id}</span>
-                        <span className="text-white">{a.nombre}</span>
-                      </div>
+  <ul className="pl-0 space-y-2">
+    {asignaturas.map((a) => (
+      <li key={a.id} className="list-none -mx-2 p-2 rounded-md hover:bg-zinc-800/40 transition-colors">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2">
+            <span className="font-mono text-muted-foreground mt-[2px]">0{a.id}</span>
+            <span className="text-white">{a.nombre}</span>
+          </div>
 
-                      {/* botón crear actividad para ESTA asignatura */}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Crear actividad para ${a.nombre}`}
-                        className="h-7 text-emerald-200 hover:text-emerald-200 hover:bg-emerald-900/20 gap-1 text-xs"
-                        onClick={() => abrirCrearActividad(a)}
-                      >
-                        <PlusCircle className="w-4 h-4" />
-                        Crear actividad
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Crear actividad para ${a.nombre}`}
+            className="h-7 text-emerald-200 hover:text-emerald-200 hover:bg-emerald-900/20 gap-1 text-xs"
+            onClick={() => abrirCrearActividad(a)}
+          >
+            <PlusCircle className="w-4 h-4" />
+            Crear actividad
+          </Button>
+        </div>
+      </li>
+    ))}
+  </ul>
+
+  {/* Botón blanco para MODIFICAR asignaturas */}
+  <Button
+    size="sm"
+    aria-label="Modificar asignaturas"
+    className="mt-2 inline-flex items-center gap-2 bg-white text-black hover:bg-gray-100 px-3 py-2 text-xs rounded-md shadow-sm"
+    onClick={() => setOpenEdit(true)}
+  >
+    <SquarePen className="w-4 h-4" />
+    Modificar asignaturas
+  </Button>
+</div>
           )}
 
           <Separator className="my-4" />
