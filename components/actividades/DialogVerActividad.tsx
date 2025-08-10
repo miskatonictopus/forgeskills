@@ -15,12 +15,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 
 type Props = {
@@ -56,7 +51,7 @@ export function DialogVerActividad({
     }
     try {
       setLoading(true);
-      setCesDetectados([]); // limpiar anteriores
+      setCesDetectados([]);
       const ceDetectados = (await window.electronAPI.analizarDescripcion(
         actividad.id
       )) as CEDetectado[];
@@ -75,10 +70,8 @@ export function DialogVerActividad({
   };
 
   const badgeFor = (r: CEDetectado) => {
-    if (r.reason === "high_sim")
-      return <Badge variant="secondary">Alta similitud</Badge>;
-    if (r.reason === "lang_rule")
-      return <Badge variant="secondary">Lenguajes</Badge>;
+    if (r.reason === "high_sim") return <Badge variant="secondary">Alta similitud</Badge>;
+    if (r.reason === "lang_rule") return <Badge variant="secondary">Lenguajes</Badge>;
     return <Badge>Con evidencias</Badge>;
   };
 
@@ -92,10 +85,7 @@ export function DialogVerActividad({
         : `Alineación de acción y objetos del criterio detectada en el enunciado (${pct}).`;
 
     if (r.evidencias?.length) {
-      const muestras = r.evidencias
-        .slice(0, 2)
-        .map((e) => `“${e}”`)
-        .join("  ·  ");
+      const muestras = r.evidencias.slice(0, 2).map((e) => `“${e}”`).join("  ·  ");
       base += ` Evidencias: ${muestras}.`;
     }
     return base;
@@ -105,122 +95,134 @@ export function DialogVerActividad({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="
-    w-[95vw]           
-    max-w-[95vw]
-    sm:max-w-[1100px]       
-    lg:max-w-[1200px]
-    max-h-[90vh]
-    overflow-y-auto
-  "
+          w-[95vw] max-w-[95vw] sm:max-w-[1100px] lg:max-w-[1200px]
+          max-h-[90vh] overflow-y-auto
+        "
       >
-        <DialogHeader>
-          <DialogTitle className="text-3xl">{actividad.nombre}</DialogTitle>
-        </DialogHeader>
+        {/* CABECERA STICKY */}
+        <div className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/65">
+          <div className="px-6 pt-3 pb-4">
+            <p className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
+              Actividad
+            </p>
 
-        <div className="space-y-4 text-sm text-muted-foreground">
-          <p>
-            <CalendarDays className="inline w-4 h-4 mr-1" />
-            {new Date(actividad.fecha).toLocaleDateString("es-ES")}
-          </p>
+            <DialogHeader className="flex flex-row items-center gap-6">
+              <DialogTitle className="text-3xl lowercase">{actividad.nombre}</DialogTitle>
 
-          <p>
-            <strong>Asignatura:</strong>{" "}
-            <span className="uppercase">
-              {asignaturaNombre || actividad.asignaturaId}
-            </span>
-          </p>
+              <div className="flex items-center gap-2 text-sm">
+                <CalendarDays className="w-4 h-4" />
+                <span>{new Date(actividad.fecha).toLocaleDateString("es-ES")}</span>
+              </div>
 
+              <div className="flex items-center gap-2 text-sm">
+                <strong>Asignatura:</strong>
+                <span className="uppercase">
+                  {asignaturaNombre || actividad.asignaturaId}
+                </span>
+              </div>
+            </DialogHeader>
+          </div>
+        </div>
+
+        {/* CONTENIDO */}
+        <div className="px-6 py-4 space-y-4 text-sm text-muted-foreground">
           {actividad.descripcion && (
-            <div className="mt-4">
+            <section>
               <p className="font-semibold text-white mb-1">Descripción:</p>
-              <p className="whitespace-pre-wrap mb-3">
-                {actividad.descripcion}
-              </p>
-
+              <p className="whitespace-pre-wrap mb-3">{actividad.descripcion}</p>
               <Button onClick={handleAnalizar} disabled={loading}>
                 <Bot className="w-4 h-4 mr-2" />
                 {loading ? "Analizando..." : "Analizar descripción"}
               </Button>
-            </div>
+            </section>
           )}
 
           {cesDetectados.length > 0 && (
-            <div className="mt-6">
+            <section className="mt-6">
               <p className="font-semibold text-white mb-2">CE detectados</p>
+
               <Table className="w-full table-auto">
-              <colgroup>
-  <col style={{ width: "8%" }} />   {/* CE */}
-  <col style={{ width: "35%" }} />  {/* Descripción */}
-  <col style={{ width: "17%" }} />  {/* Coincidencia */}
-  <col style={{ width: "12%" }} />  {/* Razón */}
-  <col style={{ width: "28%" }} />  {/* Justificación */}
-</colgroup>
+                {/* Columnas: ajusta si quieres otros porcentajes */}
+                <colgroup>
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "30%" }} />
+                  <col style={{ width: "16%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "32%" }} />
+                </colgroup>
 
-  <TableHeader>
-    <TableRow>
-      <TableHead>CE</TableHead>
-      <TableHead>Descripción</TableHead>
-      <TableHead>Coincidencia</TableHead>
-      <TableHead>Razón</TableHead>
-      <TableHead>Justificación / Evidencias</TableHead>
-    </TableRow>
-  </TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>CE</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead>Coincidencia</TableHead>
+                    <TableHead>Razón</TableHead>
+                    <TableHead>Justificación / Evidencias</TableHead>
+                  </TableRow>
+                </TableHeader>
 
-  <TableBody>
-    {cesDetectados
-      .slice()
-      .sort((a, b) => b.puntuacion - a.puntuacion)
-      .map((ce) => (
-        <TableRow key={ce.codigo}>
-          <TableCell className="font-medium">{ce.codigo}</TableCell>
+                <TableBody>
+                  {cesDetectados
+                    .slice()
+                    .sort((a, b) => b.puntuacion - a.puntuacion)
+                    .map((ce) => (
+                      <TableRow key={ce.codigo}>
+                        <TableCell className="font-medium">{ce.codigo}</TableCell>
 
-          {/* Descripción: 2 líneas máx, con wrap fiable */}
-          <TableCell className="align-top pr-4">
-            <div className="max-w-[560px] text-sm text-zinc-200 whitespace-normal break-words line-clamp-2">
-              {ce.descripcion}
-            </div>
-          </TableCell>
+                        {/* Descripción: clamp 2 líneas */}
+                        <TableCell className="align-top pr-4">
+                          <p
+                            className="text-sm text-zinc-200 line-clamp-2 break-words"
+                            style={{
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {ce.descripcion}
+                          </p>
+                        </TableCell>
 
-          <TableCell className="w-[12%] align-top overflow-visible">
-  <div className="flex items-center gap-2">
-    <span
-      className={cn(
-        ce.puntuacion > 0.6
-          ? "text-emerald-400"
-          : ce.puntuacion >= 0.5
-          ? "text-yellow-400"
-          : "text-red-400",
-        "font-semibold"
-      )}
-    >
-      {(ce.puntuacion * 100).toFixed(1)}%
-    </span>
-  </div>
+                        {/* Coincidencia: asegurar ancho y que la barra siempre se vea */}
+                        <TableCell className="align-top">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                ce.puntuacion > 0.6
+                                  ? "text-emerald-400"
+                                  : ce.puntuacion >= 0.5
+                                  ? "text-yellow-400"
+                                  : "text-red-400",
+                                "font-semibold"
+                              )}
+                            >
+                              {(ce.puntuacion * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="mt-1 min-w-[140px]">
+                            <Progress className="h-2" value={Math.round(ce.puntuacion * 100)} />
+                          </div>
+                        </TableCell>
 
-  {/* Ancho explícito al progress para que siempre se vea */}
-  <div className="mt-1 w-[120px]">
-    <Progress className="h-2" value={Math.round(ce.puntuacion * 100)} />
-  </div>
-</TableCell>
+                        <TableCell className="align-top">
+                          {badgeFor(ce)}
+                        </TableCell>
 
-          <TableCell className="align-top">
-            {badgeFor(ce)}
-          </TableCell>
-
-          <TableCell className="align-top">
-            <div className="text-xs whitespace-pre-wrap">
-              {makeWhy(ce)}
-            </div>
-          </TableCell>
-        </TableRow>
-      ))}
-  </TableBody>
-</Table>
-
-            </div>
+                        <TableCell className="align-top">
+                          <div className="text-xs whitespace-pre-wrap">
+                            {makeWhy(ce)}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </section>
           )}
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+

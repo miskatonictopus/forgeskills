@@ -61,7 +61,7 @@ export default function ActividadesCursoPage() {
     ? (asignaturas.find(a => a.id === actividadSeleccionada.asignaturaId)?.nombre
         ?? actividadSeleccionada.asignaturaId)
     : undefined;
-    
+
   useEffect(() => {
     if (cursoId) cargarActividades(cursoId);
   }, [cursoId]);
@@ -104,8 +104,8 @@ export default function ActividadesCursoPage() {
 
             return (
               <div key={asig.id} className="border border-zinc-800 bg-background rounded-lg p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-2xl font-semibold text-white">{asig.nombre}</h2>
+                <div className="flex items-center justify-between mb-3 h-[75px]">
+                  <h2 className="text-2xl font-semibold text-white"><span className="text-zinc-400">{asig.id}</span> {asig.nombre}</h2>
                   <Button
                     size="sm"
                     className="px-2.5 py-2 mt-1 rounded-md bg-white text-black text-xs hover:bg-gray-100"
@@ -119,6 +119,8 @@ export default function ActividadesCursoPage() {
                   </Button>
                 </div>
 
+                <Separator className="my-4" />
+
                 {actividadesAsignatura.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Sin actividades registradas.</p>
                 ) : (
@@ -126,7 +128,7 @@ export default function ActividadesCursoPage() {
                     <Table>
                       <TableHeader className="bg-zinc-900/60 text-xs">
                         <TableRow>
-                          <TableHead className="w-[55%]">Actividad</TableHead>
+                          <TableHead className="w-[45%]">Actividad</TableHead>
                           <TableHead className="w-[25%]">Fecha</TableHead>
                           <TableHead className="w-[20%] text-right">Abrir</TableHead>
                         </TableRow>

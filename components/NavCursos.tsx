@@ -75,7 +75,7 @@ export function NavCursos({ setCursoAEliminar }: Props) {
                             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-white transition-colors"
                           >
                             <BookOpen className="w-3 h-3" />
-                            <span className="truncate">{asig.nombre}</span>
+                            <span className="truncate">{asig.id} {asig.nombre}</span>
                           </Link>
                         </li>
                       ))}
