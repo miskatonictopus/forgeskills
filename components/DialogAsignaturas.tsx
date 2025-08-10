@@ -88,10 +88,10 @@ export function DialogAsignaturas({ cursoId, open, onOpenChange, mode }: Props) 
           <DialogTitle>
             {mode === "add" ? "Añadir asignaturas" : "Modificar / Eliminar asignaturas"}
             {mode === "edit" && (
-              <p className="text-xs font-light uppercase mt-2 text-red-200">
+              <p className="text-xs font-light uppercase mt-2 text-white">
                 <span className="font-bold">Atención</span>, este proceso modifica todas las dependencias,
                 alumnos y notas asociadas a estas asignaturas. <br />
-                <span className="animate-pulse">Esta acción no se puede deshacer</span>
+                Esta acción no se puede deshacer
               </p>
             )}
           </DialogTitle>

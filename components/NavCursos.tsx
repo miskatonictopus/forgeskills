@@ -1,13 +1,16 @@
-import { useSnapshot } from "valtio"
-import { cursoStore } from "@/store/cursoStore"
-import { asignaturasPorCurso } from "@/store/asignaturasPorCurso"
+import { useSnapshot } from "valtio";
+import { cursoStore } from "@/store/cursoStore";
+import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import {
   Folder,
   MoreHorizontal,
   Trash2,
   GraduationCap,
   BookOpen,
-} from "lucide-react"
+  ClipboardList, // 👈 nuevo
+} from "lucide-react";
 
 import {
   DropdownMenu,
@@ -15,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 
 import {
   SidebarGroup,
@@ -25,22 +28,22 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
-import { useEffect } from "react"
-import Link from "next/link"
+import { useEffect } from "react";
+import Link from "next/link";
 
 type Props = {
-  setCursoAEliminar: (curso: { id: string; nombre: string }) => void
-}
+  setCursoAEliminar: (curso: { id: string; nombre: string }) => void;
+};
 
 export function NavCursos({ setCursoAEliminar }: Props) {
-  const { isMobile } = useSidebar()
-  const snap = useSnapshot(cursoStore)
+  const { isMobile } = useSidebar();
+  const snap = useSnapshot(cursoStore);
 
   useEffect(() => {
-    cursoStore.cargarCursos()
-  }, [])
+    cursoStore.cargarCursos();
+  }, []);
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
@@ -53,7 +56,10 @@ export function NavCursos({ setCursoAEliminar }: Props) {
               <SidebarMenuButton asChild>
                 <Link href={`/cursos/${curso.id}`}>
                   <GraduationCap className="w-4 h-4" />
-                  <span>{curso.acronimo}{curso.nivel}</span>
+                  <span>
+                    {curso.acronimo}
+                    {curso.nivel}
+                  </span>
                 </Link>
               </SidebarMenuButton>
 
@@ -73,6 +79,24 @@ export function NavCursos({ setCursoAEliminar }: Props) {
                   ))}
                 </ul>
               )}
+
+              {/* Ver actividades (debajo de las asignaturas) */}
+              <div className="ml-6 mt-2">
+                <Button
+                  asChild
+                  size="sm"
+                  className="px-2.5 py-2 mt-1 rounded-md bg-white text-black text-xs hover:bg-gray-100"
+                >
+                  <Link
+                    href={`/cursos/${curso.id}/actividades`}
+                    className="inline-flex items-center gap-1"
+                  >
+                    <ClipboardList className="w-3.5 h-3.5" />
+                    Ver actividades
+                  </Link>
+                </Button>
+              </div>
+              <Separator className="my-3" />
             </div>
 
             {/* Dropdown de acciones */}
@@ -87,9 +111,11 @@ export function NavCursos({ setCursoAEliminar }: Props) {
                 side={isMobile ? "bottom" : "right"}
                 align={isMobile ? "end" : "start"}
               >
-                <DropdownMenuItem>
-                  <Folder className="text-muted-foreground" />
-                  <span>Ver curso</span>
+                <DropdownMenuItem asChild>
+                  <Link href={`/cursos/${curso.id}`}>
+                    <Folder className="text-muted-foreground" />
+                    <span>Ver curso</span>
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -106,5 +132,5 @@ export function NavCursos({ setCursoAEliminar }: Props) {
         ))}
       </SidebarMenu>
     </SidebarGroup>
-  )
+  );
 }

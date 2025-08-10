@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { Separator } from "@/components/ui/separator";
+import { CEDetectedList } from "@/components/CEDetectedList";
 
 
 
@@ -220,23 +221,16 @@ export function DialogCrearActividad({
           </div>
 
           {cesDetectados.length > 0 && (
-            <div className="space-y-1 text-sm text-muted-foreground">
-              <Label>CE Detectados automáticamente</Label>
-              <ul className="space-y-1 pl-5">
-                {cesDetectados.map((ce, i) => {
-                  let color = "text-red-500";
-                  if (ce.puntuacion >= 0.7) color = "text-green-600";
-                  else if (ce.puntuacion >= 0.5) color = "text-orange-500";
-
-                  return (
-                    <li key={i} className={`${color} text-sm`}>
-                      <strong>{ce.codigo}</strong> — {(ce.puntuacion * 100).toFixed(1)}%
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
+  <div className="mt-4">
+    <CEDetectedList
+      results={cesDetectados}
+      // opcional:
+      // onRemove={(codigo) =>
+      //   setCesDetectados(prev => prev.filter((x) => x.codigo !== codigo))
+      // }
+    />
+  </div>
+)}
 
           <Button className="w-full mt-4" onClick={handleGuardar}>
             <Bot className="w-4 h-4 mr-2" /> Guardar actividad

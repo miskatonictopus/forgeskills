@@ -6,19 +6,61 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-type CriterioEvaluacion = {
+// el shape que consume CEDetectedList
+type ResultadoCE = {
   codigo: string;
   descripcion: string;
+  puntuacion: number;      // 0..1
+  evidencias?: string[];
+  reason?: "evidence" | "high_sim" | "lang_rule";
+  justificacion?: string;
 };
+
+type CriterioEvaluacion = { codigo: string; descripcion: string };
 
 type Props = {
   criterios: CriterioEvaluacion[];
-  onResultado: (cesDetectados: string[]) => void;
+  // IMPORTANT: ahora devolvemos objetos completos, no string[]
+  onResultado: (cesDetectados: ResultadoCE[]) => void;
 };
 
 export function InterpretadorCE({ criterios, onResultado }: Props) {
   const [texto, setTexto] = useState("");
   const [cargando, setCargando] = useState(false);
+
+  // mapea lo que venga de la API al shape ResultadoCE[]
+  const normalizar = (raw: any): ResultadoCE[] => {
+    if (!raw) return [];
+    // si ya vienen objetos completos
+    if (Array.isArray(raw) && typeof raw[0] === "object") {
+      return raw.map((r: any) => ({
+        codigo: r.codigo,
+        descripcion:
+          r.descripcion ??
+          criterios.find((c) => c.codigo === r.codigo)?.descripcion ??
+          "",
+        puntuacion: typeof r.puntuacion === "number" ? r.puntuacion : 0.6, // valor por defecto
+        evidencias: r.evidencias ?? [],
+        reason: r.reason ?? "evidence",
+        justificacion: r.justificacion ?? "",
+      }));
+    }
+    // si vienen solo códigos (string[])
+    if (Array.isArray(raw) && typeof raw[0] === "string") {
+      return raw.map((codigo: string) => {
+        const ce = criterios.find((c) => c.codigo === codigo);
+        return {
+          codigo,
+          descripcion: ce?.descripcion ?? "",
+          puntuacion: 0.62,     // default razonable
+          evidencias: [],
+          reason: "high_sim",   // marcamos como alta similitud si no hay evidencias
+          justificacion: "",
+        };
+      });
+    }
+    return [];
+  };
 
   const interpretar = async () => {
     if (!texto.trim()) {
@@ -27,38 +69,25 @@ export function InterpretadorCE({ criterios, onResultado }: Props) {
     }
 
     setCargando(true);
-
     try {
-      const prompt = `
-Eres un experto en evaluación educativa. A continuación tienes una actividad de FP y una lista de criterios de evaluación (CE). Devuélveme solo los códigos de los CE que se relacionan con la actividad.
-
-ACTIVIDAD:
-${texto}
-
-CRITERIOS DE EVALUACIÓN:
-${criterios.map((ce) => `- ${ce.codigo}: ${ce.descripcion}`).join("\n")}
-
-RESPUESTA ESPERADA (JSON):
-["CE1.1", "CE1.3"]
-      `.trim();
-
-      const respuesta = await fetch("/api/interpretar-ce", {
+      const res = await fetch("/api/analizar-ce", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ texto, criterios }), // pasa criterios si tu API los usa
       });
+      const data = await res.json();
 
-      const data = await respuesta.json();
-      if (!Array.isArray(data.resultado)) {
-        toast.error("Error al interpretar los CE.");
+      const resultadoNormalizado = normalizar(data?.resultado);
+      if (!resultadoNormalizado.length) {
+        toast.error("No se detectaron CE o el formato de respuesta no es válido.");
         return;
       }
 
-      onResultado(data.resultado);
-      toast.success("CE sugeridos correctamente.");
-    } catch (err) {
-      console.error(err);
-      toast.error("Fallo al conectar con el motor semántico.");
+      onResultado(resultadoNormalizado);
+      toast.success(`Detectados ${resultadoNormalizado.length} CE.`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Fallo al conectar con el motor de análisis.");
     } finally {
       setCargando(false);
     }
@@ -70,11 +99,11 @@ RESPUESTA ESPERADA (JSON):
       <Textarea
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
-        placeholder="Ej: Diseñar una API RESTful que permita..."
+        placeholder="Ej: Informe técnico sobre estándares W3C, validación HTML/CSS, pruebas de usabilidad..."
         rows={5}
       />
       <Button onClick={interpretar} disabled={cargando}>
-        {cargando ? "Interpretando..." : "Detectar CE automáticamente"}
+        {cargando ? "Analizando..." : "Detectar CE automáticamente"}
       </Button>
     </div>
   );
