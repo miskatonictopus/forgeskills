@@ -1,7 +1,7 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 console.log("🔑 API KEY:", process.env.OPENAI_API_KEY);
-import { app, BrowserWindow, ipcMain } from "electron"
+import { app, BrowserWindow, ipcMain, dialog } from "electron"
 import * as path from "path"
 import { db, initDB } from "./database"
 import type { Asignatura } from "../models/asignatura"
@@ -10,6 +10,7 @@ import { analizarTextoPlano } from "../src/lib/analizarTextoPlano";
 import { extraerTextoConMutool } from "../src/lib/extraerTextoMutool";
 import { execSync } from "child_process";
 import fs from "fs";
+import { writeFile } from "node:fs/promises"; // o: import * as fs from "
 
 
 
@@ -472,14 +473,10 @@ ipcMain.handle("obtener-ce-por-ra", (event, raId: string) => {
   return stmt.all(raId);
 });
 
-ipcMain.handle("analizar-descripcion", async (event, actividadId) => {
-  try {
-    const resultado = await analizarDescripcionActividad(actividadId);
-    return resultado;
-  } catch (err) {
-    console.error("Error al analizar la descripción:", err);
-    return [];
-  }
+ipcMain.handle("analizar-descripcion", async (_e, actividadId: string) => {
+  // tu función real:
+  const resultado = await analizarDescripcionActividad(actividadId);
+  return resultado; // debe devolver el array con {codigo, descripcion, puntuacion, ...}
 });
 
 // Extraemos textos planos extraidos desde un PDF
@@ -507,4 +504,15 @@ ipcMain.handle("guardar-pdf", async (event, buffer: ArrayBuffer, nombre: string)
     console.error("❌ Error al guardar el PDF:", error);
     return null;
   }
+});
+
+ipcMain.handle("guardar-informe-pdf", async (_e, data: Uint8Array, sugerido: string) => {
+  const { filePath, canceled } = await dialog.showSaveDialog({
+    title: "Guardar informe PDF",
+    defaultPath: sugerido,
+    filters: [{ name: "PDF", extensions: ["pdf"] }],
+  });
+  if (canceled || !filePath) return { ok: false };
+  fs.writeFileSync(filePath, Buffer.from(data));
+  return { ok: true, filePath };
 });

@@ -80,4 +80,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("guardar-pdf", arrayBuffer, nombre),
   extraerTextoPDF: (ruta: string) => ipcRenderer.invoke("extraer-texto-pdf", ruta),
 
+  guardarInformePDF: (data: Uint8Array, sugerido: string) =>
+    ipcRenderer.invoke("guardar-informe-pdf", data, sugerido),
+
 });

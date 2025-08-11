@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { ExportarPDFButton } from "@/components/ExportarPDFButton";
 import {
   Table,
   TableBody,
@@ -89,6 +90,31 @@ export function DialogVerActividad({
         .sort((a, b) => b.puntuacion - a.puntuacion),
     [cesDetectados, umbral, filtroRazon]
   );
+
+  const pdfData = useMemo(() => {
+    if (!actividad) return null;
+    return {
+      titulo: actividad.nombre ?? "Actividad",
+      fechaISO: actividad.fecha ?? new Date().toISOString(),
+      asignatura: asignaturaNombre ?? actividad.asignaturaId ?? "—",
+      descripcion: actividad.descripcion ?? "",
+      umbral, // 0–100 ya en tu estado
+      ces: cesDetectados.map((ce) => ({
+        codigo: ce.codigo,
+        texto: ce.descripcion,
+        similitud: ce.puntuacion, // 0..1
+        // ra: (si algún día lo añades al CE, lo pasamos aquí)
+      })),
+    };
+  }, [actividad, asignaturaNombre, umbral, cesDetectados]);
+  
+  const suggestedFileName = useMemo(() => {
+    const base = (actividad?.nombre || "Informe_actividad")
+      .replace(/\s+/g, "_")
+      .replace(/[^\w\-]+/g, "");
+    return `Informe_${base}.pdf`;
+  }, [actividad?.nombre]);
+  
 
   const totalCE = cesDetectados.length;
 const visiblesCE = cesFiltrados.length;
@@ -400,8 +426,17 @@ const pctCE = totalCE ? Math.round((visiblesCE / totalCE) * 100) : 0;
   </Badge>
 )}
               </div>
+              
 
               <div className="flex items-center gap-2">
+
+              <ExportarPDFButton
+    data={pdfData as any}
+    headerTitle="Informe de actividad"
+    fileName={suggestedFileName}
+    disabled={!pdfData || cesDetectados.length === 0}
+  />
+  
                 <Button
                   variant="outline"
                   size="sm"

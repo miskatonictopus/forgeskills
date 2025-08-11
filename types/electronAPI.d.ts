@@ -51,7 +51,13 @@ export interface ElectronAPI {
   obtenerCEPorRA: (raId: string) => Promise<
     { id: string; codigo: string; descripcion: string }[]
   >;
-  analizarDescripcion: (actividadId: string) => Promise<CEDetectado[]>;
+  analizarDescripcion(actividadId: string): Promise<{
+    codigo: string;
+    descripcion: string;
+    puntuacion: number; // 0..1
+    reason?: "evidence" | "high_sim" | "lang_rule";
+    evidencias?: string[];
+  }[]>;
 // extraemos texto desde un PDF
   extraerTextoPDF: (rutaPDF: string) => Promise<string | null>;
   guardarPDF: (buffer: ArrayBuffer, filename: string) => Promise<string>;
@@ -59,7 +65,18 @@ export interface ElectronAPI {
 }
 
 declare global {
+  type CEDetectado = {
+    codigo: string;
+    descripcion: string;
+    puntuacion: number; // 0..1
+    reason?: "evidence" | "high_sim" | "lang_rule";
+    evidencias?: string[];
+  };
+
   interface Window {
-    electronAPI: ElectronAPI
+    electronAPI: {
+      guardarInformePDF(data: Uint8Array, sugerido: string): Promise<{ ok: boolean; filePath?: string }>;
+      analizarDescripcion(actividadId: string): Promise<CEDetectado[]>;
+    };
   }
 }
