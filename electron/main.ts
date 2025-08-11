@@ -11,7 +11,7 @@ import { extraerTextoConMutool } from "../src/lib/extraerTextoMutool";
 import { execSync } from "child_process";
 import fs from "fs";
 import { writeFile } from "node:fs/promises"; // o: import * as fs from "
-
+import * as crypto from "crypto";
 
 
 function extraerTextoPDF(path: string): string {
@@ -27,6 +27,59 @@ function extraerTextoPDF(path: string): string {
 }
 
 initDB()
+
+// --- Migración idempotente (better-sqlite3) ---
+function colExists(table: string, col: string) {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as any[];
+  return rows.some(r => r.name === col);
+}
+
+function ensureSchema() {
+  // columnas nuevas en 'actividades'
+  if (!colExists("actividades", "estado")) {
+    db.prepare(`ALTER TABLE actividades ADD COLUMN estado TEXT NOT NULL DEFAULT 'borrador'`).run();
+  }
+  if (!colExists("actividades", "umbral_aplicado")) {
+    db.prepare(`ALTER TABLE actividades ADD COLUMN umbral_aplicado INTEGER`).run();
+  }
+  if (!colExists("actividades", "analisis_fecha")) {
+    db.prepare(`ALTER TABLE actividades ADD COLUMN analisis_fecha TEXT`).run();
+  }
+  if (!colExists("actividades", "programada_para")) {
+    db.prepare(`ALTER TABLE actividades ADD COLUMN programada_para TEXT`).run();
+  }
+  if (!colExists("actividades", "programada_fin")) {
+    db.prepare(`ALTER TABLE actividades ADD COLUMN programada_fin TEXT`).run();
+  }
+
+  // tablas snapshot y auditoría
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS actividad_ce (
+      actividad_id TEXT NOT NULL,
+      ce_codigo TEXT NOT NULL,
+      puntuacion REAL NOT NULL,
+      razon TEXT,
+      evidencias TEXT,
+      incluido INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY (actividad_id, ce_codigo)
+    )
+  `).run();
+
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS actividad_estado_historial (
+      id TEXT PRIMARY KEY,
+      actividad_id TEXT NOT NULL,
+      estado TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      meta TEXT
+    )
+  `).run();
+}
+
+// Llama al iniciar la app, antes de registrar handlers IPC
+ensureSchema();
+
+
 
 // Tabla ALUMNOS
 
@@ -409,19 +462,22 @@ type ActividadCruda = {
   curso_id: string;
   asignatura_id: string;
   descripcion?: string;
+  estado?: string | null;
+  analisis_fecha?: string | null;
+  umbral_aplicado?: number | null;
 };
 
 ipcMain.handle("actividades-de-curso", (event, cursoId: string) => {
   const stmt = db.prepare(`
-    SELECT id, nombre, fecha, curso_id, asignatura_id, descripcion
+    SELECT id, nombre, fecha, curso_id, asignatura_id, descripcion,
+           estado, analisis_fecha, umbral_aplicado
     FROM actividades
     WHERE curso_id = ?
-    ORDER BY fecha ASC
+    ORDER BY date(fecha) ASC, nombre ASC
   `);
 
   const actividades = stmt.all(cursoId) as ActividadCruda[];
 
-  // Mapeamos los nombres para que coincidan con el modelo del front
   return actividades.map((a) => ({
     id: a.id,
     nombre: a.nombre,
@@ -429,8 +485,12 @@ ipcMain.handle("actividades-de-curso", (event, cursoId: string) => {
     cursoId: a.curso_id,
     asignaturaId: a.asignatura_id,
     descripcion: a.descripcion ?? "",
+    estado: a.estado ?? "borrador",
+    analisisFecha: a.analisis_fecha ?? null,
+    umbralAplicado: a.umbral_aplicado ?? null,
   }));
 });
+
 
 ipcMain.handle("guardar-actividad", (event, actividad) => {
   const stmt = db.prepare(`
@@ -515,4 +575,76 @@ ipcMain.handle("guardar-informe-pdf", async (_e, data: Uint8Array, sugerido: str
   if (canceled || !filePath) return { ok: false };
   fs.writeFileSync(filePath, Buffer.from(data));
   return { ok: true, filePath };
+});
+
+ipcMain.handle("actividad.guardar-analisis", (_e, payload) => {
+  const { actividadId, umbral, ces } = payload;
+  const now = new Date().toISOString();
+
+  const tx = db.transaction(() => {
+    db.prepare(`
+      UPDATE actividades
+      SET estado = 'analizada',
+          umbral_aplicado = ?,
+          analisis_fecha = ?
+      WHERE id = ?
+    `).run(umbral, now, actividadId);
+
+    const upsert = db.prepare(`
+      INSERT INTO actividad_ce (actividad_id, ce_codigo, puntuacion, razon, evidencias, incluido)
+      VALUES (?, ?, ?, ?, ?, 1)
+      ON CONFLICT(actividad_id, ce_codigo) DO UPDATE
+        SET puntuacion=excluded.puntuacion,
+            razon=excluded.razon,
+            evidencias=excluded.evidencias,
+            incluido=1
+    `);
+
+    for (const ce of ces) {
+      upsert.run(
+        actividadId,
+        ce.codigo,
+        ce.puntuacion,
+        ce.reason ?? null,
+        ce.evidencias ? JSON.stringify(ce.evidencias) : null
+      );
+    }
+
+    db.prepare(`
+      INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha, meta)
+      VALUES (?, ?, 'analizada', ?, ?)
+    `).run(crypto.randomUUID(), actividadId, now, JSON.stringify({ umbral }));
+  });
+
+  tx();
+  return { ok: true };
+});
+
+ipcMain.handle("actividad.leer-analisis", (_e, actividadId: string) => {
+  const meta = db.prepare(`
+    SELECT umbral_aplicado, analisis_fecha
+    FROM actividades
+    WHERE id = ?
+  `).get(actividadId) as { umbral_aplicado: number|null; analisis_fecha: string|null } | undefined;
+
+  const ces = db.prepare(`
+    SELECT ce_codigo AS codigo, puntuacion, razon, evidencias
+    FROM actividad_ce
+    WHERE actividad_id = ? AND incluido = 1
+    ORDER BY puntuacion DESC
+  `).all(actividadId) as {
+    codigo: string; puntuacion: number; razon?: string; evidencias?: string|null;
+  }[];
+
+  return {
+    umbral: meta?.umbral_aplicado ?? 0,
+    fecha: meta?.analisis_fecha ?? null,
+    ces: ces.map(c => ({
+      codigo: c.codigo,
+      descripcion: "", // rellena si tienes descripción maestra
+      puntuacion: c.puntuacion,
+      reason: (c.razon as any) ?? undefined,
+      evidencias: c.evidencias ? JSON.parse(c.evidencias) : undefined,
+    })),
+  };
 });

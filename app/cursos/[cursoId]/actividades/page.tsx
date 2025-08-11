@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarInset } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,7 +14,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, CalendarDays } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import { DialogCrearActividad } from "@/components/actividades/DialogCrearActividad";
 import { DialogVerActividad } from "@/components/actividades/DialogVerActividad";
 import { useSnapshot } from "valtio";
@@ -23,8 +24,6 @@ import {
   cargarActividades,
 } from "@/store/actividadesPorCurso";
 import { Separator } from "@/components/ui/separator";
-
-// 👇 añade los componentes de tabla de shadcn
 import {
   Table,
   TableHeader,
@@ -34,6 +33,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 
+// Extiende el tipo para incluir estado/fecha/umbral si tu store aún no lo tiene
 type Actividad = {
   id: string;
   nombre: string;
@@ -41,7 +41,51 @@ type Actividad = {
   cursoId: string;
   asignaturaId: string;
   descripcion?: string;
+  estado?: "borrador" | "analizada" | "enviada" | "pendiente" | "evaluada";
+  analisisFecha?: string | null;
+  umbralAplicado?: number | null;
 };
+
+function EstadoBadge({
+  estado,
+  fecha,
+}: {
+  estado?: string;
+  fecha?: string | null;
+}) {
+  const label =
+    estado === "analizada"
+      ? "Analizada"
+      : estado === "enviada"
+      ? "Enviada"
+      : estado === "pendiente"
+      ? "Pendiente"
+      : estado === "evaluada"
+      ? "Evaluada"
+      : "Borrador";
+
+  const cls =
+    estado === "analizada"
+      ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+      : estado === "enviada"
+      ? "bg-sky-500/15 text-sky-400 border-sky-500/30"
+      : estado === "pendiente"
+      ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+      : estado === "evaluada"
+      ? "bg-violet-500/15 text-violet-400 border-violet-500/30"
+      : "bg-zinc-500/15 text-zinc-300 border-zinc-500/30";
+
+  return (
+    <div className="flex items-center gap-2">
+      <Badge variant="outline" className={cn("border", cls)}>{label}</Badge>
+      {estado === "analizada" && fecha && (
+        <span className="text-[11px] text-muted-foreground">
+          {new Date(fecha).toLocaleDateString("es-ES")}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function ActividadesCursoPage() {
   const { cursoId } = useParams<{ cursoId: string }>();
@@ -50,6 +94,7 @@ export default function ActividadesCursoPage() {
 
   const [open, setOpen] = useState(false);
   const [asignaturaSeleccionada, setAsignaturaSeleccionada] = useState<string | null>(null);
+
   const [verDialogOpen, setVerDialogOpen] = useState(false);
   const [actividadSeleccionada, setActividadSeleccionada] = useState<Actividad | null>(null);
 
@@ -57,23 +102,20 @@ export default function ActividadesCursoPage() {
   const actividades = snapActividades[cursoId] || [];
 
   const nombreAsigSel =
-  actividadSeleccionada
-    ? (asignaturas.find(a => a.id === actividadSeleccionada.asignaturaId)?.nombre
-        ?? actividadSeleccionada.asignaturaId)
-    : undefined;
+    actividadSeleccionada
+      ? (asignaturas.find((a) => a.id === actividadSeleccionada.asignaturaId)?.nombre ??
+         actividadSeleccionada.asignaturaId)
+      : undefined;
 
   useEffect(() => {
     if (cursoId) cargarActividades(cursoId);
   }, [cursoId]);
 
-  // Agrupar por asignatura
+  // Agrupar por asignatura para render
   const actividadesAgrupadas: Record<string, Actividad[]> = {};
-  actividades.forEach((actividad) => {
-    (actividadesAgrupadas[actividad.asignaturaId] ||= []).push(actividad);
+  actividades.forEach((act) => {
+    (actividadesAgrupadas[act.asignaturaId] ||= []).push(act);
   });
-
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
 
   return (
     <SidebarProvider>
@@ -103,9 +145,14 @@ export default function ActividadesCursoPage() {
             const actividadesAsignatura = actividadesAgrupadas[asig.id] || [];
 
             return (
-              <div key={asig.id} className="border border-zinc-800 bg-background rounded-lg p-4 shadow-sm">
+              <div
+                key={asig.id}
+                className="border border-zinc-800 bg-background rounded-lg p-4 shadow-sm"
+              >
                 <div className="flex items-center justify-between mb-3 h-[75px]">
-                  <h2 className="text-2xl font-semibold text-white"><span className="text-zinc-400">{asig.id}</span> {asig.nombre}</h2>
+                  <h2 className="text-2xl font-semibold text-white">
+                    <span className="text-zinc-400">{asig.id}</span> {asig.nombre}
+                  </h2>
                   <Button
                     size="sm"
                     className="px-2.5 py-2 mt-1 rounded-md bg-white text-black text-xs hover:bg-gray-100"
@@ -125,35 +172,44 @@ export default function ActividadesCursoPage() {
                   <p className="text-sm text-muted-foreground">Sin actividades registradas.</p>
                 ) : (
                   <div className="rounded-md border border-zinc-800 overflow-hidden">
-                    <Table>
-                      <TableHeader className="bg-zinc-900/60 text-xs">
+                    <Table className="table-fixed">
+  <colgroup>
+    <col className="w-[60%]" />   
+    <col className="w-[20%]" />   
+    <col className="w-[20%]" />   
+  </colgroup>
+                      <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[45%]">Actividad</TableHead>
-                          <TableHead className="w-[25%]">Fecha</TableHead>
-                          <TableHead className="w-[20%] text-right">Abrir</TableHead>
+                          <TableHead>Actividad</TableHead>
+                          <TableHead className="w-[160px]">Estado</TableHead>
+                          <TableHead className="w-[120px]">Fecha</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {actividadesAsignatura.map((actividad) => (
+                        {actividadesAsignatura.map((a) => (
                           <TableRow
-                            key={actividad.id}
-                            className="cursor-pointer hover:bg-zinc-900"
+                            key={a.id}
+                            className="cursor-pointer"
                             onClick={() => {
-                              setActividadSeleccionada(actividad);
+                              setActividadSeleccionada(a);
                               setVerDialogOpen(true);
                             }}
                           >
-                            <TableCell className="font-medium truncate">
-                              <div className="max-w-[28ch] truncate">{actividad.nombre}</div>
-                              {actividad.descripcion && (
-                                <div className="text-xs text-muted-foreground max-w-[50ch] truncate">
-                                  {actividad.descripcion}
-                                </div>
-                              )}
+                            <TableCell>
+  <div className="font-semibold truncate" title={a.nombre}>{a.nombre}</div>
+  {a.descripcion ? (
+    <div className="text-xs text-muted-foreground truncate" title={a.descripcion}>
+      {a.descripcion}
+    </div>
+  ) : null}
+</TableCell>
+
+                            <TableCell>
+                              <EstadoBadge estado={a.estado}/>
                             </TableCell>
-                            <TableCell className="text-xs">{fmt(actividad.fecha)}</TableCell>
-                            <TableCell className="text-right">
-                              <CalendarDays className="w-4 h-4 inline-block text-muted-foreground" />
+
+                            <TableCell className="tabular-nums">
+                              {new Date(a.fecha).toLocaleDateString("es-ES")}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -174,7 +230,6 @@ export default function ActividadesCursoPage() {
           }}
           cursoId={cursoId}
           asignaturaId={asignaturaSeleccionada ?? undefined}
-          // si tu DialogCrearActividad admite setRefreshKey como callback, llama a cargarActividades:
           setRefreshKey={() => cargarActividades(cursoId)}
         />
 

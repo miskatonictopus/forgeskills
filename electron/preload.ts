@@ -83,4 +83,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   guardarInformePDF: (data: Uint8Array, sugerido: string) =>
     ipcRenderer.invoke("guardar-informe-pdf", data, sugerido),
 
+  guardarAnalisisActividad: (actividadId: string, umbral: number, ces: any[]) =>
+    ipcRenderer.invoke("actividad.guardar-analisis", { actividadId, umbral, ces }),
+  
+    leerAnalisisActividad: (actividadId: string) =>
+    ipcRenderer.invoke("actividad.leer-analisis", actividadId),
+
 });

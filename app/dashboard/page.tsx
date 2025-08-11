@@ -11,6 +11,7 @@ import NuevoAlumno from "@/components/NuevoAlumno";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { PanelActividadesCompact } from "@/components/panel/PanelActividadesCompact";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +58,10 @@ type Horario = {
 
 export default function Page() {
   const snap = useSnapshot(cursoStore);
+  const cursosParaPanel = snap.cursos.map((c: any) => ({
+    id: c.id,
+    nombre: c.nombre ?? c.id,
+  }));
   const [filtro, setFiltro] = useState("");
   const [sinAlumnos, setSinAlumnos] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -365,7 +370,17 @@ export default function Page() {
               Mis Actividades
             </h2>
             <Separator className="mt-2 mb-4 bg-zinc-800" />
-            <div className="flex-1 rounded bg-background/60" />
+            <div className="flex-1 overflow-hidden">
+  {snap.cursos.length === 0 ? (
+    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      No hay cursos.
+    </div>
+  ) : (
+    <div className="h-full overflow-y-auto">
+      <PanelActividadesCompact cursos={cursosParaPanel} />
+    </div>
+  )}
+</div>
           </section>
         </main>
       </SidebarInset>

@@ -1,13 +1,17 @@
 import { proxy } from "valtio"
 
 export type Actividad = {
-    id: string;
-    nombre: string;
-    fecha: string;
-    cursoId: string;
-    asignaturaId: string;
-    descripcion?: string;
-  };
+  id: string;
+  nombre: string;
+  fecha: string;
+  cursoId: string;
+  asignaturaId: string;
+  descripcion?: string;
+
+  estado?: "borrador" | "analizada" | "enviada" | "pendiente" | "evaluada";
+  analisisFecha?: string | null;
+  umbralAplicado?: number | null;
+};
 
 type ActividadesPorCurso = Record<string, Actividad[]>
 
