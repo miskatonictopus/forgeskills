@@ -24,15 +24,29 @@ export interface ElectronAPI {
   guardarAlumno: (alumno: AlumnoEntrada) => Promise<void>;
 
   // Horarios
-  leerHorarios: (asignaturaId: string) => Promise<Horario[]>;
-  leerHorariosTodos: () => Promise<Horario[]>;
-  guardarHorario: (horario: {
+  leerHorarios(asignaturaId: string, cursoId?: string): Promise<Array<{
+    id: number|string;
+    cursoId: string;
     asignaturaId: string;
     dia: string;
     horaInicio: string;
     horaFin: string;
-  }) => Promise<void>;
-  borrarHorario: (datos: { asignaturaId: string; dia: string; horaInicio: string }) => Promise<void>;
+  }>>;
+
+  leerHorariosTodos: () => Promise<Horario[]>;
+  guardarHorario(data: {
+    cursoId: string;
+    asignaturaId: string;
+    dia: string;
+    horaInicio: string;
+    horaFin: string;
+  }): Promise<any>;
+  borrarHorario(data: {
+    cursoId: string;
+    asignaturaId: string;
+    dia: string;
+    horaInicio: string;
+  }): Promise<{ changes: number }>;
 
   // Actividades
   guardarActividad: (actividad: Actividad) => Promise<{ success: boolean }>;

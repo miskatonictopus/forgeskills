@@ -9,7 +9,12 @@ import { SquarePen, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Separator } from "@/components/ui/separator";
 
-type Horario = { dia: string; horaInicio: string; horaFin: string }
+type Horario = { 
+  dia: string; 
+  horaInicio: string; 
+  horaFin: string;
+  cursoId?: string; 
+}
 type Descripcion = {
   duracion: string
   centro: string
@@ -130,6 +135,13 @@ export function AsignaturaCard(props: AsignaturaCardProps): React.JSX.Element {
           >
             <SquarePen className="w-3.5 h-3.5" />
           </button>
+
+          {/* chip del curso */}
+          {h.cursoId && (
+            <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 text-[10px] uppercase tracking-wide">
+              {h.cursoId}
+            </span>
+          )}
 
           <span className="tabular-nums">
             {h.dia} {h.horaInicio}–{h.horaFin}

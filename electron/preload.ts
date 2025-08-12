@@ -2,6 +2,22 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { Asignatura } from "../models/asignatura";
 import type { Alumno, AlumnoEntrada } from "../models/alumno";
 
+type GuardarHorarioIn = {
+  cursoId: string;
+  asignaturaId: string;
+  dia: string;
+  horaInicio: string;
+  horaFin: string;
+};
+
+type BorrarHorarioIn = {
+  cursoId: string;
+  asignaturaId: string;
+  dia: string;
+  horaInicio: string;
+};
+
+
 contextBridge.exposeInMainWorld("electronAPI", {
   // Nombres (para pruebas)
   guardarNombre: (nombre: string) =>
@@ -41,22 +57,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("leer-alumnos-por-curso", cursoId),
 
   // 🕒 Horarios
-  guardarHorario: (horario: {
-    asignaturaId: string;
-    dia: string;
-    horaInicio: string;
-    horaFin: string;
-  }) => ipcRenderer.invoke("guardar-horario", horario),
+  guardarHorario: (data: GuardarHorarioIn) =>
+    ipcRenderer.invoke("guardar-horario", data),
 
-  leerHorarios: (asignaturaId: string) =>
-    ipcRenderer.invoke("leer-horarios", asignaturaId),
+  leerHorarios: (asignaturaId: string, cursoId?: string) =>
+    ipcRenderer.invoke("leer-horarios", asignaturaId, cursoId),
   leerHorariosTodos: () => ipcRenderer.invoke("leer-horarios-todos"),
 
-  borrarHorario: (datos: {
-    asignaturaId: string;
-    dia: string;
-    horaInicio: string;
-  }) => ipcRenderer.invoke("borrar-horario", datos),
+  borrarHorario: (data: BorrarHorarioIn) =>
+  ipcRenderer.invoke("borrar-horario", data),
 
   actividadesDeCurso: (cursoId: string) =>
     ipcRenderer.invoke("actividades-de-curso", cursoId),

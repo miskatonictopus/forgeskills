@@ -339,97 +339,74 @@ ipcMain.handle("leer-alumnos-por-curso", (event, cursoId: string) => {
 // ---------------------------
 
 
-ipcMain.handle("guardar-horario", (event, horario) => {
-  const stmt = db.prepare(`
-    INSERT INTO horarios (asignatura_id, dia, hora_inicio, hora_fin)
-    VALUES (?, ?, ?, ?)
-  `)
+ipcMain.handle("guardar-horario", (e, payload) => {
+  const cursoId      = String(payload.cursoId ?? "").trim();
+  const asignaturaId = String(payload.asignaturaId ?? "").trim();
+  const diaRaw       = String(payload.dia ?? "").trim().toLowerCase();
+  const dia          = diaRaw === "miercoles" ? "miércoles" : diaRaw === "sabado" ? "sábado" : diaRaw;
+  const horaInicio   = String(payload.horaInicio ?? "").trim();
+  const horaFin      = String(payload.horaFin ?? "").trim();
 
-  stmt.run(horario.asignaturaId, horario.dia, horario.horaInicio, horario.horaFin)
+  const faltan = [];
+  if (!cursoId)      faltan.push("cursoId");
+  if (!asignaturaId) faltan.push("asignaturaId");
+  if (!dia)          faltan.push("dia");
+  if (!horaInicio)   faltan.push("horaInicio");
+  if (!horaFin)      faltan.push("horaFin");
+  if (faltan.length) throw new Error(`Faltan campos (${faltan.join(", ")})`);
 
-  return { success: true }
-})
+  const insert = db.prepare(`
+    INSERT INTO horarios (curso_id, asignatura_id, dia, hora_inicio, hora_fin)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const info = insert.run(cursoId, asignaturaId, dia, horaInicio, horaFin);
 
-ipcMain.handle("leer-horarios", (event, asignaturaId: string) => {
-  const stmt = db.prepare(`
-    SELECT dia, hora_inicio, hora_fin
+  return db.prepare(`
+    SELECT id,
+           curso_id      AS cursoId,
+           asignatura_id AS asignaturaId,
+           dia,
+           hora_inicio   AS horaInicio,
+           hora_fin      AS horaFin
+    FROM horarios WHERE id = ?
+  `).get(info.lastInsertRowid as number);
+});
+
+ipcMain.handle("leer-horarios", (e, asignaturaId: string, cursoId?: string) => {
+  let query = `
+    SELECT 
+      id,
+      curso_id      AS cursoId,
+      asignatura_id AS asignaturaId,
+      dia,
+      hora_inicio   AS horaInicio,
+      hora_fin      AS horaFin
     FROM horarios
     WHERE asignatura_id = ?
-  `)
+  `;
+  const params: any[] = [asignaturaId];
 
-  const resultados = stmt.all(asignaturaId) as {
-    dia: string
-    hora_inicio: string
-    hora_fin: string
-  }[]
+  if (cursoId) {
+    query += " AND curso_id = ?";
+    params.push(cursoId);
+  }
 
-  return resultados.map((h) => ({
-    dia: h.dia,
-    horaInicio: h.hora_inicio,
-    horaFin: h.hora_fin,
-  }))
-})
+  query += `
+    ORDER BY 
+      CASE lower(dia)
+        WHEN 'lunes' THEN 1 WHEN 'martes' THEN 2 WHEN 'miércoles' THEN 3
+        WHEN 'miercoles' THEN 3 WHEN 'jueves' THEN 4 WHEN 'viernes' THEN 5
+        WHEN 'sábado' THEN 6 WHEN 'sabado' THEN 6 WHEN 'domingo' THEN 7
+      END,
+      hora_inicio
+  `;
 
-ipcMain.handle("borrar-horario", (event, datos: { asignaturaId: string; dia: string; horaInicio: string }) => {
-  const stmt = db.prepare(`
-    DELETE FROM horarios
-    WHERE asignatura_id = ? AND dia = ? AND hora_inicio = ?
-  `)
-
-  stmt.run(datos.asignaturaId, datos.dia, datos.horaInicio)
-  return { success: true }
-})
-
+  return db.prepare(query).all(...params);
+});
 // ---------------------------
 // IPC handler para HORARIOS de FULLCALENDAR
 // ---------------------------
 
-ipcMain.handle("leer-horarios-todos", () => {
-  const stmt = db.prepare(`
-    SELECT h.dia, h.hora_inicio, h.hora_fin, a.nombre, asignatura_id
-    FROM horarios h
-    JOIN asignaturas a ON h.asignatura_id = a.id
-  `);
-
-  const resultados = stmt.all() as {
-    dia: string;
-    hora_inicio: string;
-    hora_fin: string;
-    nombre: string;
-    asignatura_id: string;
-  }[];
-
-  return resultados.map((h) => ({
-    title: `📘 ${h.nombre}`,
-    start: generarFecha(h.dia, h.hora_inicio),
-    end: generarFecha(h.dia, h.hora_fin),
-    asignaturaId: h.asignatura_id,
-  }));
-
-  function generarFecha(dia: string, hora: string): string {
-    const diasSemana: Record<string, number> = {
-      lunes: 1,
-      martes: 2,
-      miercoles: 3,
-      miércoles: 3,
-      jueves: 4,
-      viernes: 5,
-      sabado: 6,
-      sábado: 6,
-      domingo: 0,
-    };
-
-    const base = new Date("2025-07-14"); // lunes como día de referencia
-    const offset = diasSemana[dia.toLowerCase()] ?? 1;
-    const fecha = new Date(base);
-    fecha.setDate(base.getDate() + (offset - 1));
-
-    const [hh, mm] = hora.split(":");
-    fecha.setHours(Number(hh), Number(mm), 0, 0);
-
-    return fecha.toISOString();
-  }
-});
 
 // ---------------------------
 // IPC handler para ASOCIAR ASIGNATURAS A LOS CURSOS
