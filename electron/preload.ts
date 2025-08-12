@@ -89,4 +89,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     leerAnalisisActividad: (actividadId: string) =>
     ipcRenderer.invoke("actividad.leer-analisis", actividadId),
 
+    borrarActividad: (actividadId: string) =>
+    ipcRenderer.invoke("borrar-actividad", actividadId),
+
 });

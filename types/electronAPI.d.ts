@@ -62,6 +62,9 @@ export interface ElectronAPI {
   leerAnalisisActividad: (
     actividadId: string
   ) => Promise<{ umbral: number; fecha: string | null; ces: CEDetectado[] }>;
+  
+  borrarActividad: (actividadId: string) => Promise<void>;
+  
 }
 
 declare global {

@@ -13,6 +13,7 @@ import fs from "fs";
 import { writeFile } from "node:fs/promises"; // o: import * as fs from "
 import * as crypto from "crypto";
 
+db.pragma("foreign_keys = ON");
 
 function extraerTextoPDF(path: string): string {
   try {
@@ -134,6 +135,18 @@ app.whenReady().then(createWindow)
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit()
 })
+
+function getEstadoActividad(id: string): string | null {
+  try {
+    const row = db
+      .prepare(`SELECT estado FROM actividades WHERE id = ?`)
+      .get(id) as { estado?: string } | undefined;
+    return row?.estado ?? null;
+  } catch {
+    // Si no existe la columna, no bloqueamos el borrado por estado
+    return null;
+  }
+}
 
 // ---------------------------
 // IPC handlers para CURSOS
@@ -647,4 +660,38 @@ ipcMain.handle("actividad.leer-analisis", (_e, actividadId: string) => {
       evidencias: c.evidencias ? JSON.parse(c.evidencias) : undefined,
     })),
   };
+});
+
+// ---------------------------
+// IPC handler: BORRAR ACTIVIDAD (con validación de estado)
+// ---------------------------
+
+// Transacción de borrado segura (borra dependencias si no usas FK con CASCADE)
+const txBorrarActividad = db.transaction((id: string) => {
+  // Si tienes claves foráneas con ON DELETE CASCADE hacia actividades.id,
+  // podrías omitir estos dos deletes manuales.
+  db.prepare(`DELETE FROM actividad_ce WHERE actividad_id = ?`).run(id);
+  db.prepare(`DELETE FROM actividad_estado_historial WHERE actividad_id = ?`).run(id);
+
+  const info = db.prepare(`DELETE FROM actividades WHERE id = ?`).run(id);
+  if (info.changes === 0) throw new Error("NOT_FOUND");
+});
+
+ipcMain.handle("borrar-actividad", (_event, id: string) => {
+  if (!id || typeof id !== "string") throw new Error("ID inválido");
+
+  // Validar estado si existe la columna (ya tienes getEstadoActividad arriba)
+  const estado = getEstadoActividad(id);
+  if (estado && !["borrador", "analizada"].includes(estado)) {
+    throw new Error("Solo se puede eliminar una actividad en estado 'borrador' o 'analizada'");
+  }
+
+  try {
+    txBorrarActividad(id);
+    return { ok: true };
+  } catch (e: any) {
+    if (e?.message === "NOT_FOUND") throw new Error("La actividad no existe");
+    console.error("Error al borrar actividad:", e);
+    throw new Error("No se pudo eliminar la actividad");
+  }
 });
