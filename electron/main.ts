@@ -12,6 +12,7 @@ import { execSync } from "child_process";
 import fs from "fs";
 import { writeFile } from "node:fs/promises"; // o: import * as fs from "
 import * as crypto from "crypto";
+import { randomUUID } from "crypto";
 
 db.pragma("foreign_keys = ON");
 
@@ -780,6 +781,34 @@ ipcMain.handle("lectivo:guardar", async (_e, payload: { start: string; end: stri
   stmt.run({ start, end });
   return { ok: true };
 });
+
+/* ---------- Festivos ---------- */
+ipcMain.handle("festivos:listar", async () => {
+  return db.prepare(`
+    SELECT id, start, end, title
+    FROM festivos
+    ORDER BY start DESC, id DESC
+  `).all();
+});
+
+ipcMain.handle("festivos:crear", async (_e, f: { start: string; end?: string | null; title: string }) => {
+  const id = randomUUID();
+  const startOk = /^\d{4}-\d{2}-\d{2}$/.test(f.start);
+  const endOk = !f.end || /^\d{4}-\d{2}-\d{2}$/.test(f.end);
+  if (!startOk || !endOk) throw new Error("Fechas inválidas (YYYY-MM-DD).");
+  if (!f.title?.trim()) throw new Error("El motivo es obligatorio.");
+
+  db.prepare(`INSERT INTO festivos (id, start, end, title) VALUES (@id, @start, @end, @title)`)
+    .run({ id, start: f.start, end: f.end ?? null, title: f.title.trim() });
+
+    return { id, start: f.start, end: f.end ?? null, title: f.title.trim() };
+  });
+
+ipcMain.handle("festivos:borrar", async (_e, id: string) => {
+  db.prepare(`DELETE FROM festivos WHERE id = ?`).run(id);
+  return { ok: true };
+});
+
 
 
 

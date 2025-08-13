@@ -111,4 +111,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
       leerRangoLectivo: () => ipcRenderer.invoke("lectivo:leer"),
   guardarRangoLectivo: (r: { start: string; end: string }) => ipcRenderer.invoke("lectivo:guardar", r),
 
+  // Festivos
+  listarFestivos: () => ipcRenderer.invoke("festivos:listar"),
+  crearFestivo: (f: { start: string; end?: string | null; title: string }) =>
+    ipcRenderer.invoke("festivos:crear", f),
+  borrarFestivo: (id: string) => ipcRenderer.invoke("festivos:borrar", id),
+
 });

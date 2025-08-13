@@ -19,6 +19,9 @@ import { DialogCrearActividad } from "@/components/actividades/DialogCrearActivi
 import { cursoStore } from "@/store/cursoStore";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 
+import type { Festivo } from "@/types/electronAPI";
+
+
 /* ---------- utils ---------- */
 const ymdLocal = (d: Date) => {
   const y = d.getFullYear();
@@ -40,11 +43,11 @@ export default function CalendarioGlobalPage() {
     !!lectivoStartDate && !!lectivoEndDate && lectivoStartDate < lectivoEndDate;
 
   /* -------- Eventos -------- */
-  const [events, setEvents] = useState<FCEvent[]>([]);
-  const [diasPermitidos] = useState<number[] | undefined>([1, 2, 3, 4, 5]); // L–V
-  const [festivos, setFestivos] = useState<{ id?: string; title: string; start: string; end?: string }[]>(
-    []
-  );
+ /* -------- Eventos -------- */
+const [events, setEvents] = useState<FCEvent[]>([]);
+const [diasPermitidos] = useState<number[] | undefined>([1, 2, 3, 4, 5]); // L–V
+// ⬇️ TIPADO CORRECTO
+const [festivos, setFestivos] = useState<Festivo[]>([]);
 
   const [openDialog, setOpenDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -81,15 +84,17 @@ export default function CalendarioGlobalPage() {
         setLectivoStartISO(r?.start);
         setLectivoEndISO(r?.end);
       } catch {}
+  
       try {
-        const f = await window.electronAPI.listarFestivos?.();
+        // ⬇️ sin optional chaining: devuelve Festivo[]
+        const f = await window.electronAPI.listarFestivos();
         if (!alive) return;
-        if (Array.isArray(f)) setFestivos(f);
+        setFestivos(f);
       } catch {}
     })();
     return () => { alive = false; };
   }, [refreshKey]);
-
+  
   /* -------- Cargar horarios + actividades (limitados al rango) -------- */
   useEffect(() => {
     let alive = true;
@@ -142,8 +147,8 @@ export default function CalendarioGlobalPage() {
             : actividades;
 
         // Festivos como background
-        const eventosFestivos: FCEvent[] = (festivos || []).map((f, idx) => ({
-          id: f.id ?? `festivo-${idx}`,
+        const eventosFestivos: FCEvent[] = (festivos || []).map((f) => ({
+          id: f.id,
           title: f.title,
           start: `${f.start}T00:00:00`,
           end: f.end ? `${f.end}T23:59:59` : undefined,
@@ -173,6 +178,7 @@ export default function CalendarioGlobalPage() {
     },
     [festivos]
   );
+  
 
   const handleCreate = useCallback(
     (date: Date) => {
@@ -284,7 +290,8 @@ export default function CalendarioGlobalPage() {
                 ? { start: lectivoStartISO, end: lectivoEndISO }
                 : undefined
             }
-            festivos={festivos.map((f) => ({ start: f.start, end: f.end }))}
+            // ⬇️ convierte null → undefined para el prop
+            festivos={festivos.map((f) => ({ start: f.start, end: f.end ?? undefined }))}
           />
 
           <DialogCrearActividad

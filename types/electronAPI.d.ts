@@ -6,7 +6,12 @@ import type { Actividad } from "@/store/actividadesPorCurso";
 
 // 🆕 Tipos calendario
 export type RangoLectivo = { start: string; end: string };              // "YYYY-MM-DD"
-export type Festivo = { id?: string; title: string; start: string; end?: string };
+export type Festivo = {
+  id: string;
+  start: string;           
+  end?: string | null;     
+  title: string;          
+};
 
 export interface ElectronAPI {
   // Cursos
@@ -94,12 +99,14 @@ export interface ElectronAPI {
   leerAnalisisActividad: (actividadId: string) => Promise<{ umbral: number; fecha: string | null; ces: CEDetectado[] }>;
 
   // 🆕 Calendario — rango lectivo y festivos (opcionales para no romper si aún no hay IPC)
-  leerRangoLectivo?: () => Promise<RangoLectivo | null>;
-  guardarRangoLectivo?: (r: RangoLectivo) => Promise<void>;
-  listarFestivos?: () => Promise<Festivo[]>;
-
+  // Lectivo
   leerRangoLectivo: () => Promise<RangoLectivo | null>;
   guardarRangoLectivo: (r: RangoLectivo) => Promise<{ ok: boolean } | void>;
+
+  // Festivos
+  listarFestivos: () => Promise<Festivo[]>;
+  crearFestivo: (f: { start: string; end?: string | null; title: string }) => Promise<Festivo>;
+  borrarFestivo: (id: string) => Promise<{ ok: boolean }>;
 }
 
 declare global {
