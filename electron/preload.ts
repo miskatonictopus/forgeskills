@@ -101,4 +101,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     borrarActividad: (actividadId: string) =>
     ipcRenderer.invoke("borrar-actividad", actividadId),
 
+    getHorariosAsignatura: (cursoId: string, asignaturaId: string) =>
+    ipcRenderer.invoke("horarios-de-asignatura", { cursoId, asignaturaId }),
+
 });

@@ -78,6 +78,10 @@ export interface ElectronAPI {
   ) => Promise<{ umbral: number; fecha: string | null; ces: CEDetectado[] }>;
   
   borrarActividad: (actividadId: string) => Promise<void>;
+
+  getHorariosAsignatura(cursoId: string, asignaturaId: string): Promise<
+  { diaSemana: number; horaInicio: string; horaFin: string }[]
+>;
   
 }
 

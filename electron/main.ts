@@ -672,3 +672,61 @@ ipcMain.handle("borrar-actividad", (_event, id: string) => {
     throw new Error("No se pudo eliminar la actividad");
   }
 });
+
+// main.ts
+ipcMain.handle("horarios-de-asignatura", (event, { cursoId, asignaturaId }) => {
+  const cols = db.prepare("PRAGMA table_info(horarios)").all().map((c: any) => c.name);
+
+  const colDia =
+    cols.includes("dia_semana") ? "dia_semana" :
+    cols.includes("diaSemana")  ? "diaSemana"  :
+    cols.includes("dia")        ? "dia"        : null;
+
+  const colInicio =
+    cols.includes("hora_inicio") ? "hora_inicio" :
+    cols.includes("horaInicio")  ? "horaInicio"  :
+    cols.includes("inicio")      ? "inicio"      : null;
+
+  const colFin =
+    cols.includes("hora_fin") ? "hora_fin" :
+    cols.includes("horaFin")  ? "horaFin"  :
+    cols.includes("fin")      ? "fin"      : null;
+
+  if (!colDia || !colInicio || !colFin) {
+    throw new Error(`Tabla 'horarios' sin columnas esperadas. Columns: ${cols.join(", ")}`);
+  }
+
+  // Normalización robusta en SQL → diaSemana: 0=Dom..6=Sáb
+  const sql = `
+    SELECT
+      CASE
+        WHEN lower(${colDia}) IN ('domingo','dom') THEN 0
+        WHEN lower(${colDia}) IN ('lunes','lun')   THEN 1
+        WHEN lower(${colDia}) IN ('martes','mar')  THEN 2
+        WHEN lower(${colDia}) IN ('miercoles','miércoles','mié','mie') THEN 3
+        WHEN lower(${colDia}) IN ('jueves','jue')  THEN 4
+        WHEN lower(${colDia}) IN ('viernes','vie') THEN 5
+        WHEN lower(${colDia}) IN ('sabado','sábado','sab','sáb') THEN 6
+
+        -- numérico 0..6 (JS)
+        WHEN CAST(${colDia} AS INTEGER) BETWEEN 0 AND 6 THEN CAST(${colDia} AS INTEGER)
+        -- numérico 1..7 (ISO: Lu..Do)
+        WHEN CAST(${colDia} AS INTEGER) BETWEEN 1 AND 7 THEN (CAST(${colDia} AS INTEGER) % 7)
+
+        ELSE NULL
+      END AS diaSemana,
+      ${colInicio} AS horaInicio,
+      ${colFin}    AS horaFin
+    FROM horarios
+    WHERE curso_id = ? AND asignatura_id = ?
+  `;
+
+  const rows = db.prepare(sql).all(cursoId, asignaturaId) as {
+    diaSemana: number | null; horaInicio: string; horaFin: string;
+  }[];
+
+  // filtrar nulos por seguridad
+  return rows.filter(r => r.diaSemana !== null);
+});
+
+
