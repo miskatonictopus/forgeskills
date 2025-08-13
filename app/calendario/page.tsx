@@ -35,51 +35,70 @@ export default function CalendarioGlobalPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [fechaPreseleccionada, setFechaPreseleccionada] = useState<Date | undefined>(undefined);
 
-  // Cargar todas las actividades
+  // Cargar actividades (solo "programada") + horarios (recurrentes)
   useEffect(() => {
     let alive = true;
+
     (async () => {
       try {
-        const acts =
-          (await window.electronAPI.listarActividadesGlobal?.()) ??
-          // Fallback: si aún no tienes el IPC, juntamos por curso
-          (await (async () => {
-            const cursos = await window.electronAPI.leerCursos();
-            const porCurso = await Promise.all(
-              cursos.map(async (c) => {
-                const arr = await window.electronAPI.actividadesDeCurso(c.id);
-                return arr.map((a) => ({ ...a, cursoNombre: c.nombre }));
-              })
-            );
-            return porCurso.flat();
-          })());
-  
+        // 1) Cursos
+        const cursos = await window.electronAPI.leerCursos();
+
+        // 2) Horarios de todas las asignaturas por curso
+        const eventosHorarios: Evento[] = [];
+        for (const c of cursos) {
+          const asigs = await window.electronAPI.asignaturasDeCurso(c.id); // [{id,nombre}]
+          for (const a of asigs) {
+            const hrs = await window.electronAPI.getHorariosAsignatura(c.id, a.id);
+            for (const h of hrs || []) {
+              eventosHorarios.push({
+                id: `horario-${c.id}-${a.id}-${h.diaSemana}-${h.horaInicio}`,
+                title: `${a.nombre} · ${c.nombre}`,
+                daysOfWeek: [h.diaSemana],     // 0..6 ya normalizado
+                startTime: h.horaInicio,       // "HH:mm"
+                endTime: h.horaFin,            // "HH:mm"
+                display: "background",         // bloque de fondo para diferenciar
+                backgroundColor: "rgba(16,185,129,0.15)", // emerald-500/15 aprox
+              });
+            }
+          }
+        }
+
+        // 3) Actividades por curso (solo estado "programada")
+        const actividadesPorCurso = await Promise.all(
+          cursos.map(async (c: any) => {
+            const acts = await window.electronAPI.actividadesDeCurso(c.id);
+            return (acts || [])
+              .filter((a: any) => a.estado === "programada")
+              .map((a: any) => ({
+                id: a.id,
+                title: `${a.nombre} · ${c.nombre}`,
+                start: `${a.fecha}T${a.horaInicio ? a.horaInicio + ":00" : "08:00:00"}`,
+                end: a.horaFin ? `${a.fecha}T${a.horaFin}:00` : undefined,
+              })) as Evento[];
+          })
+        );
+        const eventosActividades = actividadesPorCurso.flat();
+
         if (!alive) return;
-  
-        const evts: Evento[] = (acts || []).map((a: any) => ({
-          id: a.id,
-          title: `${a.nombre}${a.cursoNombre ? ` · ${a.cursoNombre}` : ""}`,
-          start: `${a.fecha}T${a.horaInicio ? a.horaInicio + ":00" : "08:00:00"}`,
-          end: a.horaFin ? `${a.fecha}T${a.horaFin}:00` : undefined,
-        }));
-  
-        setEvents(evts);
+        setEvents([...eventosHorarios, ...eventosActividades]);
         setDiasPermitidos(undefined); // global: sin restricción
       } catch (e) {
         console.error(e);
-        toast.error("No se pudieron cargar las actividades.");
+        toast.error("No se pudieron cargar horarios y actividades.");
       }
     })();
+
     return () => { alive = false; };
   }, [refreshKey]);
 
-  // Crear actividad desde click en calendario
+  // Crear actividad desde click
   const handleCreate = useCallback((date: Date) => {
     setFechaPreseleccionada(date);
     setOpenDialog(true);
   }, []);
 
-  // Mover actividad
+  // Mover actividad (reprogramar)
   const handleMove = useCallback(async ({ id, start }: { id: string; start: Date }) => {
     try {
       const nuevaFecha = ymdLocal(start);
@@ -99,10 +118,10 @@ export default function CalendarioGlobalPage() {
       <AppSidebar />
       <SidebarInset>
         {/* Header */}
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
@@ -125,22 +144,22 @@ export default function CalendarioGlobalPage() {
           </div>
 
           <Calendario
-  events={events}
-  diasPermitidos={diasPermitidos}
-  initialView="timeGridWeek"
-  onDateClick={handleCreate}      
-  onEventMove={handleMove}        
-  slotMinTime="08:00:00"
-  slotMaxTime="20:00:00"
-  height="auto"
-/>
+            events={events}
+            diasPermitidos={diasPermitidos}
+            initialView="timeGridWeek"
+            onDateClick={handleCreate}
+            onEventMove={handleMove}
+            slotMinTime="08:00:00"
+            slotMaxTime="20:00:00"
+            height="auto"
+          />
 
-<DialogCrearActividad
-  open={openDialog}
-  onOpenChange={setOpenDialog}
-  setRefreshKey={setRefreshKey}
-  fechaInicial={fechaPreseleccionada}
-/>
+          <DialogCrearActividad
+            open={openDialog}
+            onOpenChange={setOpenDialog}
+            setRefreshKey={setRefreshKey}
+            fechaInicial={fechaPreseleccionada}
+          />
         </div>
       </SidebarInset>
     </SidebarProvider>

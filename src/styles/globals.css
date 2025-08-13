@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 🎨 Overrides de FullCalendar */
+.fc-col-header-cell {
+  @apply bg-slate-800 text-white font-semibold uppercase;
+}
+
+.fc-col-header-cell-cushion {
+  @apply py-1 text-xs;
+}
+
+/* Opcional: bordes y separación */
+.fc-scrollgrid {
+  @apply border border-slate-700;
+}

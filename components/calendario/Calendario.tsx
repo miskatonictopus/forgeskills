@@ -22,17 +22,19 @@ export type FCEvent = {
   start?: string | Date;
   end?: string | Date;
   allDay?: boolean;
-  // Opcionalmente puedes pasar rrule si usas eventos recurrentes:
-  rrule?: {
-    freq: "daily" | "weekly" | "monthly" | "yearly";
-    dtstart?: string;
-    until?: string;
-    interval?: number;
-    byweekday?: Array<"mo" | "tu" | "we" | "th" | "fr" | "sa" | "su">;
-    bymonth?: number[];
-    bymonthday?: number[];
-  };
-  duration?: string; // p.ej. "01:00"
+
+  // ➕ para horarios recurrentes sin RRULE:
+  daysOfWeek?: number[];         // [0..6] (0=Domingo)
+  startTime?: string;            // "HH:mm"
+  endTime?: string;              // "HH:mm"
+  startRecur?: string;           // opcional (YYYY-MM-DD)
+  endRecur?: string;             // opcional (YYYY-MM-DD)
+  display?: "auto" | "block" | "list-item" | "background" | "inverse-background" | "none";
+  backgroundColor?: string;
+
+  // (si usas rrule, deja también tu campo rrule?: {...})
+  rrule?: any;
+  duration?: string;
   extendedProps?: Record<string, any>;
 };
 
