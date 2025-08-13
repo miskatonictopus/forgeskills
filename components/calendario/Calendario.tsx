@@ -23,16 +23,20 @@ export type FCEvent = {
   end?: string | Date;
   allDay?: boolean;
 
-  // ➕ para horarios recurrentes sin RRULE:
-  daysOfWeek?: number[];         // [0..6] (0=Domingo)
-  startTime?: string;            // "HH:mm"
-  endTime?: string;              // "HH:mm"
-  startRecur?: string;           // opcional (YYYY-MM-DD)
-  endRecur?: string;             // opcional (YYYY-MM-DD)
+  // ➕ para eventos recurrentes tipo timeGrid
+  daysOfWeek?: number[];   // 0..6
+  startTime?: string;      // "HH:mm"
+  endTime?: string;        // "HH:mm"
+  startRecur?: string;
+  endRecur?: string;
+
+  // ➕ estilado / control
+  classNames?: string[];   // <— esto quita tu error
+  editable?: boolean;
   display?: "auto" | "block" | "list-item" | "background" | "inverse-background" | "none";
   backgroundColor?: string;
 
-  // (si usas rrule, deja también tu campo rrule?: {...})
+  // si usas rrule
   rrule?: any;
   duration?: string;
   extendedProps?: Record<string, any>;
@@ -96,7 +100,7 @@ export default function Calendario({
       initialDate={initialDate}
       height={height}
       firstDay={1}            // Lunes
-      weekends={true}
+      weekends={false}
       nowIndicator={true}
       slotMinTime={slotMinTime}
       slotMaxTime={slotMaxTime}

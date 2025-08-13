@@ -15,3 +15,7 @@
 .fc-scrollgrid {
   @apply border border-slate-700;
 }
+
+.fc-event-main{
+    @apply m-3;
+}

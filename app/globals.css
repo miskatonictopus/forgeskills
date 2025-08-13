@@ -159,5 +159,70 @@
       @apply border border-gray-700;
     }
   }
-  
+
+  .fc .fc-col-header-cell {
+    @apply bg-slate-800 text-white text-xs bg-zinc-900 lowercase;
+  }
+  .fc-scrollgrid-sync-inner{
+    @apply pt-1 pb-1;
+  }
+
+  .fc table,
+.fc th,
+.fc td {
+  border-width: 1px !important; /* más fino */
+  border-color: #343434 !important; /* o el color que quieras */
+}
+
+/* Opcional: encabezado con borde más suave */
+.fc-col-header-cell {
+  border-width: 1px !important;
+  border-color: #ccc !important;
+}
+
+.fc .fc-theme-standard td,
+.fc .fc-theme-standard th {
+  border-width: 1px !important;
+  border-color: rgba(255, 255, 255, 0.08) !important; /* oscuro: baja contraste */
+}
+
+/* ↓ Eventos de horario (encima de la rejilla, sin borde) */
+.fc .horario-event {
+  background-color: rgba(0, 0, 0, 0.18) !important; /* verde suave */
+  border: 0 !important;                                  /* tapa líneas */
+  border-radius: 8px;                                     /* queda más “pastilla” */
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);    /* filo sutil */
+  overflow: hidden;                                       /* por si hay radios */
+}
+
+/* Texto del evento de horario: más legible */
+.fc .horario-event .fc-event-main {
+  color: #e5e7eb;          /* slate-200 */
+  font-weight: 400;
+  font-size: 12px;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.35); /* contraste en dark */
+}
+
+/* (Opcional) al pasar el ratón, sube un poco el contraste */
+.fc .horario-event:hover {
+  background-color: rgba(34, 197, 94, 0.26) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(34, 197, 94, 0.35),
+    0 0 0 1px rgba(34, 197, 94, 0.18);
+}
+
+/* (Opcional) los eventos “normales” (actividades) con estilo propio */
+.fc .fc-timegrid-event,
+.fc .fc-daygrid-event {
+  border-width: 0 !important;
+  border-radius: 8px;
+  /* si quieres, un fondo neutro: */
+  /* background-color: rgba(59,130,246,0.2) !important; */
+}
+
+.fc-event-main-frame {
+  padding: 6px 8px; /* vertical horizontal */
+}
+
+
 }

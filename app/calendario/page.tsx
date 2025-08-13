@@ -54,11 +54,12 @@ export default function CalendarioGlobalPage() {
               eventosHorarios.push({
                 id: `horario-${c.id}-${a.id}-${h.diaSemana}-${h.horaInicio}`,
                 title: `${a.nombre} · ${c.nombre}`,
-                daysOfWeek: [h.diaSemana],     // 0..6 ya normalizado
-                startTime: h.horaInicio,       // "HH:mm"
-                endTime: h.horaFin,            // "HH:mm"
-                display: "background",         // bloque de fondo para diferenciar
-                backgroundColor: "rgba(16,185,129,0.15)", // emerald-500/15 aprox
+                daysOfWeek: [h.diaSemana], // 0..6
+                startTime: h.horaInicio,   // "HH:mm"
+                endTime: h.horaFin,        // "HH:mm"
+                // display: "background",  // ❌ quítalo
+                classNames: ["horario-event"], // ✅ ponle una clase
+                editable: false,
               });
             }
           }
