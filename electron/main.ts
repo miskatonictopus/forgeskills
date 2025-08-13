@@ -729,4 +729,35 @@ ipcMain.handle("horarios-de-asignatura", (event, { cursoId, asignaturaId }) => {
   return rows.filter(r => r.diaSemana !== null);
 });
 
+ipcMain.handle("listar-actividades-global", () => {
+  // Si usas better-sqlite3:
+  const rows = db.prepare(`
+    SELECT
+      a.id,
+      a.nombre,
+      a.fecha,
+      a.descripcion,
+      a.curso_id        AS cursoId,
+      c.nombre          AS cursoNombre,
+      a.asignatura_id   AS asignaturaId,
+      s.nombre          AS asignaturaNombre,
+      /* si tienes columnas de hora, pon sus nombres reales: */
+      COALESCE(a.hora_inicio, a.horaInicio) AS horaInicio,
+      COALESCE(a.hora_fin,    a.horaFin)    AS horaFin
+    FROM actividades a
+    LEFT JOIN cursos c      ON c.id = a.curso_id
+    LEFT JOIN asignaturas s ON s.id = a.asignatura_id
+    ORDER BY a.fecha ASC, a.nombre ASC
+  `).all();
+  return rows;
+});
+
+// Actualiza la fecha de una actividad
+ipcMain.handle("actualizar-actividad-fecha", (_evt, id: string, fecha: string) => {
+  db.prepare(`UPDATE actividades SET fecha = ? WHERE id = ?`).run(fecha, id);
+  return { ok: true };
+});
+
+
+
 

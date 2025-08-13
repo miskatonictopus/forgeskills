@@ -16,131 +16,65 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 import { CEDetectedList } from "@/components/CEDetectedList";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
 
-type Horario = { diaSemana: any; horaInicio: string; horaFin: string };
+type Horario = { diaSemana: number; horaInicio: string; horaFin: string };
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cursoId: string;
+  /** En calendario global pueden venir vacíos y se pedirán en el propio diálogo */
+  cursoId?: string;
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
   asignaturaId?: string;
   asignaturaNombre?: string;
+  /** Fecha a preseleccionar cuando se abre desde el calendario */
+  fechaInicial?: Date;
 };
 
 const NOMBRE_DIA = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-
-/* ================= Helpers ================= */
-
-// YYYY-MM-DD local (sin UTC)
-const ymdLocal = (d: Date) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-};
-
-// mapea texto (“jue”, “jueves”) → 0..6
-const mapTextoADia = (s: string): number | null => {
-  const t = s.toLowerCase().trim();
-  const tabla: Record<string, number> = {
-    dom: 0, domingo: 0,
-    lun: 1, lunes: 1,
-    mar: 2, martes: 2,
-    mie: 3, "mié": 3, miercoles: 3, miércoles: 3,
-    jue: 4, jueves: 4,
-    vie: 5, viernes: 5,
-    sab: 6, "sáb": 6, sabado: 6, sábado: 6,
-  };
-  return (t in tabla) ? tabla[t] : null;
-};
-
-// Prueba varias convenciones y elige la que da más laborables (1..5)
-const normalizaDias = (rawVals: any[]): Set<number> => {
-  const textMapped: number[] = [];
-  for (const v of rawVals) {
-    if (typeof v === "string" && isNaN(Number(v))) {
-      const d = mapTextoADia(v);
-      if (d !== null) textMapped.push(d);
-    }
-  }
-  if (textMapped.length > 0) return new Set(textMapped);
-
-  const nums = rawVals
-    .map((v) => Number(String(v).trim()))
-    .filter((n) => !Number.isNaN(n));
-
-  const candA = new Set(nums.map((n) => { // JS: 0..6 (Dom..Sáb)
-    if (n >= 0 && n <= 6) return n;
-    if (n >= 1 && n <= 7) return n % 7;
-    return NaN;
-  }).filter((x) => !Number.isNaN(x)));
-
-  const candB = new Set(nums.map((n) => { // Lunes=0..Dom=6 → JS: (n+1)%7
-    if (n >= 0 && n <= 6) return (n + 1) % 7;
-    return NaN;
-  }).filter((x) => !Number.isNaN(x)));
-
-  const candC = new Set(nums.map((n) => { // ISO 1..7 (Lu..Do) → n%7
-    if (n >= 1 && n <= 7) return n % 7;
-    return NaN;
-  }).filter((x) => !Number.isNaN(x)));
-
-  const score = (set: Set<number>) => {
-    const weekdays = [...set].filter((d) => d >= 1 && d <= 5).length;
-    return weekdays * 10 + set.size;
-  };
-
-  const candidates = [candA, candB, candC].sort((a, b) => score(b) - score(a));
-  return candidates[0];
-};
-
-// Para chips coherentes con la normalización elegida
-const toDisplayDay = (raw: any, diasPermitidos: Set<number>): number | null => {
-  const txt = typeof raw === "string" && isNaN(Number(raw)) ? mapTextoADia(raw) : null;
-  if (txt !== null) return txt;
-
-  const n = Number(String(raw).trim());
-  if (Number.isNaN(n)) return null;
-
-  const candidates = new Set<number>();
-  if (n >= 0 && n <= 6) candidates.add(n);               // JS 0..6
-  if (n >= 1 && n <= 7) candidates.add(n % 7);           // ISO 1..7
-  if (n >= 0 && n <= 6) candidates.add((n + 1) % 7);     // lunes=0
-
-  for (const d of candidates) if (diasPermitidos.has(d)) return d;
-  return candidates.values().next().value ?? null;
-};
-
-/* ================= Componente ================= */
 
 export function DialogCrearActividad({
   open,
   onOpenChange,
   cursoId,
   setRefreshKey,
-  asignaturaId: asignaturaIdExterna,
+  asignaturaId: asignaturaIdProp,
+  fechaInicial,
 }: Props) {
-  const snap = useSnapshot(asignaturasPorCurso);
-  const asignaturas = snap[cursoId] || [];
-
+  // ======= estado base =======
   const [fechaObj, setFechaObj] = useState<Date | undefined>(undefined);
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
-  const [asignaturaId, setAsignaturaId] = useState(asignaturaIdExterna || "");
   const [descripcion, setDescripcion] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
   const [cesDetectados, setCesDetectados] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [horarios, setHorarios] = useState<Horario[]>([]);
+  // ======= contexto (cursos / asignaturas cuando no llegan por props) =======
+  const [cursoIdLocal, setCursoIdLocal] = useState<string | undefined>(cursoId);
+  const [asignaturaIdLocal, setAsignaturaIdLocal] = useState<string | undefined>(asignaturaIdProp);
 
-  // Set final de días permitidos (0=Dom .. 6=Sáb)
+  const [cursos, setCursos] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [asigsDeCurso, setAsigsDeCurso] = useState<Array<{ id: string; nombre: string }>>([]);
+
+  const cursoIdEf = cursoId ?? cursoIdLocal;
+  const asignaturaIdEf = asignaturaIdProp ?? asignaturaIdLocal;
+
+  // ======= horarios y días permitidos =======
+  const [horarios, setHorarios] = useState<Horario[]>([]);
   const diasPermitidos = useMemo(() => {
-    // si desde IPC ya normalizas, puedes sustituir esto por un simple Set(h.diaSemana)
-    const raw = horarios.map((h) => (h as any).diaSemana);
-    const set = normalizaDias(raw);
-    return set.size > 0 ? set : new Set<number>(); // vacío => no restringimos
+    const set = new Set<number>();
+    for (const h of horarios) {
+      if (typeof h.diaSemana === "number" && h.diaSemana >= 0 && h.diaSemana <= 6) set.add(h.diaSemana);
+    }
+    return set; // si vacío, no restringimos
   }, [horarios]);
 
   const deshabilitarNoPermitidos = useCallback(
@@ -148,19 +82,76 @@ export function DialogCrearActividad({
     [diasPermitidos]
   );
 
-  useEffect(() => {
-    if (open && asignaturaIdExterna) setAsignaturaId(asignaturaIdExterna);
-  }, [open, asignaturaIdExterna]);
+  // ======= Snapshot del store (solo para pintar el nombre si llega por props) =======
+  const snap = useSnapshot(asignaturasPorCurso);
+  const todasAsignsDelCurso = cursoIdEf ? (snap[cursoIdEf] || []) : [];
+  const asignaturaNombre =
+    (todasAsignsDelCurso.find((a: any) => a.id === asignaturaIdEf)?.nombre as string) || "";
 
+  // ======= efectos =======
+  // Preselección de fecha y reseteo de selects al abrir
+  useEffect(() => {
+    if (!open) return;
+
+    if (fechaInicial) {
+      setFechaObj(fechaInicial);
+      setFecha(fechaInicial.toISOString().split("T")[0]);
+    }
+
+    // si no llega curso por props, cargamos lista de cursos
+    (async () => {
+      if (!cursoId) {
+        try {
+          const cs = await window.electronAPI.leerCursos();
+          setCursos(cs || []);
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        setCursoIdLocal(cursoId);
+      }
+    })();
+
+    // si llega asignatura por props, set local
+    setAsignaturaIdLocal(asignaturaIdProp);
+
+    // limpieza al cerrar
+    return () => {
+      if (!open) {
+        setArchivo(null);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Cargar asignaturas cuando haya curso efectivo
+  useEffect(() => {
+    (async () => {
+      const cId = cursoIdEf;
+      if (!cId) {
+        setAsigsDeCurso([]);
+        return;
+      }
+      try {
+        const asigs = await window.electronAPI.asignaturasDeCurso(cId);
+        setAsigsDeCurso(asigs || []);
+      } catch (e) {
+        console.error(e);
+        setAsigsDeCurso([]);
+      }
+    })();
+  }, [cursoIdEf]);
+
+  // Cargar horarios cuando haya curso + asignatura efectiva
   useEffect(() => {
     let activo = true;
     (async () => {
       try {
-        if (!open || !cursoId || !asignaturaId) {
+        if (!cursoIdEf || !asignaturaIdEf) {
           setHorarios([]);
           return;
         }
-        const rows = await window.electronAPI.getHorariosAsignatura(cursoId, asignaturaId);
+        const rows = await window.electronAPI.getHorariosAsignatura(cursoIdEf, asignaturaIdEf);
         if (!activo) return;
         setHorarios(Array.isArray(rows) ? rows : []);
       } catch (e) {
@@ -168,18 +159,25 @@ export function DialogCrearActividad({
         setHorarios([]);
       }
     })();
-    return () => { activo = false; };
-  }, [open, cursoId, asignaturaId]);
+    return () => {
+      activo = false;
+    };
+  }, [cursoIdEf, asignaturaIdEf]);
 
+  // ======= acciones =======
   const handleGuardar = async () => {
-    if (!nombre || !fecha || !asignaturaId || !fechaObj) {
-      toast.error("Por favor, completa todos los campos.");
+    if (!nombre || !fecha) {
+      toast.error("Por favor, completa nombre y fecha.");
       return;
     }
-    // Valida con el Date real (evita TZ issues)
+    if (!cursoIdEf || !asignaturaIdEf) {
+      toast.error("Selecciona curso y asignatura.");
+      return;
+    }
+    // Validación de día conforme a horario (si lo hay)
     if (diasPermitidos.size > 0) {
-      const day = fechaObj.getDay();
-      if (!diasPermitidos.has(day)) {
+      const d = new Date(fecha);
+      if (!diasPermitidos.has(d.getDay())) {
         toast.error("La fecha seleccionada no coincide con el horario de la asignatura.");
         return;
       }
@@ -188,22 +186,22 @@ export function DialogCrearActividad({
     const nuevaActividad = {
       id: uuidv4(),
       nombre,
-      fecha, // YYYY-MM-DD local
-      cursoId,
-      asignaturaId,
+      fecha,
+      cursoId: cursoIdEf,
+      asignaturaId: asignaturaIdEf,
       descripcion,
     };
 
     try {
-      await window.electronAPI.guardarActividad(nuevaActividad);
-      añadirActividad(cursoId, nuevaActividad);
+      await window.electronAPI.guardarActividad(nuevaActividad as any);
+      añadirActividad(cursoIdEf, nuevaActividad as any);
       toast.success("Actividad guardada correctamente.");
 
       onOpenChange(false);
+      // reset
       setNombre("");
       setFecha("");
       setFechaObj(undefined);
-      setAsignaturaId(asignaturaIdExterna || "");
       setDescripcion("");
       setArchivo(null);
       setCesDetectados([]);
@@ -216,8 +214,8 @@ export function DialogCrearActividad({
   };
 
   const handleExtraerTexto = async (filePath: string) => {
-    if (!asignaturaId) {
-      toast.warning("Selecciona primero una asignatura.");
+    if (!asignaturaIdEf) {
+      toast.warning("Selecciona primero curso y asignatura.");
       return;
     }
     const texto = await window.electronAPI.extraerTextoPDF(filePath);
@@ -227,7 +225,7 @@ export function DialogCrearActividad({
       return;
     }
     setDescripcion(texto);
-    const ceDetectados = await window.electronAPI.analizarDescripcionDesdeTexto(texto, asignaturaId);
+    const ceDetectados = await window.electronAPI.analizarDescripcionDesdeTexto(texto, asignaturaIdEf);
     if (!ceDetectados || ceDetectados.length === 0) {
       toast.warning("No se han detectado CE relevantes.");
     } else {
@@ -236,21 +234,72 @@ export function DialogCrearActividad({
     }
   };
 
-  const asignaturaNombre =
-    asignaturas.find((a) => a.id === asignaturaId)?.nombre || "";
-
+  // ======= render =======
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="font-light">
-            Crear nueva actividad {asignaturaNombre && <>para<br/><p className="font-bold mt-2">{asignaturaNombre}</p></>}
+            Crear nueva actividad
+            {asignaturaNombre && cursoIdEf && asignaturaIdEf && (
+              <>
+                {" "}para<br />
+                <p className="font-bold mt-2">{asignaturaNombre}</p>
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         <Separator className="my-3" />
 
         <div className="space-y-4">
+          {/* Cuando faltan curso/asignatura, pedimos selección */}
+          {!cursoId && (
+            <div>
+              <Label className="mb-2">Curso</Label>
+              <Select
+                value={cursoIdLocal}
+                onValueChange={(v) => {
+                  setCursoIdLocal(v);
+                  setAsignaturaIdLocal(undefined);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecciona curso" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cursos.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {!asignaturaIdProp && (
+            <div>
+              <Label className="mb-2">Asignatura</Label>
+              <Select
+                disabled={!cursoIdEf}
+                value={asignaturaIdLocal}
+                onValueChange={setAsignaturaIdLocal}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={cursoIdEf ? "Selecciona asignatura" : "Elige antes un curso"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {asigsDeCurso.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div>
             <Label className="mb-2">Nombre de la actividad</Label>
             <Input
@@ -275,7 +324,7 @@ export function DialogCrearActividad({
                   selected={fechaObj}
                   onSelect={(date) => {
                     setFechaObj(date);
-                    setFecha(date ? ymdLocal(date) : ""); // << sin UTC
+                    setFecha(date ? date.toISOString().split("T")[0] : "");
                   }}
                   disabled={deshabilitarNoPermitidos}
                   initialFocus
@@ -283,18 +332,18 @@ export function DialogCrearActividad({
               </PopoverContent>
             </Popover>
 
-            {/* Ayuda visual: días permitidos normalizados */}
+            {/* Chips de horario */}
             {horarios.length > 0 ? (
               <div className="mt-2 text-xs text-muted-foreground flex flex-wrap gap-2">
-                {Array.from(diasPermitidos).sort().map((d) => (
-                  <span key={d} className="rounded-full border px-2 py-0.5">
-                    {NOMBRE_DIA[d]}
+                {horarios.map((h, i) => (
+                  <span key={i} className="rounded-full border px-2 py-0.5">
+                    {NOMBRE_DIA[h.diaSemana]} {h.horaInicio}–{h.horaFin}
                   </span>
                 ))}
               </div>
             ) : (
               <p className="mt-2 text-xs text-muted-foreground">
-                No hay horario registrado: se permiten todos los días.
+                {asignaturaIdEf ? "No hay horario registrado: se permiten todos los días." : "Selecciona curso y asignatura para aplicar restricciones de día."}
               </p>
             )}
           </div>
@@ -313,7 +362,7 @@ export function DialogCrearActividad({
             <Label className="mb-2 flex justify-between items-center w-full">
               O bien sube un archivo
               <span className="text-xs text-neutral-500">
-                archivos permitidos:<br/>PDF / Pages / Word / txt
+                archivos permitidos:<br />PDF / Pages / Word / txt
               </span>
             </Label>
             <div className="flex items-center gap-2 mt-2">

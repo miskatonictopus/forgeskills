@@ -3,6 +3,8 @@ import type { Asignatura } from "@/models/asignatura";
 import type { Alumno, AlumnoEntrada } from "@/models/alumno";
 import type { Horario } from "@/models/horario";
 import type { Actividad } from "@/store/actividadesPorCurso"; // 👈 faltaba
+import { ipcMain } from "electron";
+
 
 export interface ElectronAPI {
   // Cursos
@@ -82,6 +84,21 @@ export interface ElectronAPI {
   getHorariosAsignatura(cursoId: string, asignaturaId: string): Promise<
   { diaSemana: number; horaInicio: string; horaFin: string }[]
 >;
+
+listarActividadesGlobal: () => Promise<Array<{
+  id: string;
+  nombre: string;
+  fecha: string;                 // "YYYY-MM-DD"
+  descripcion?: string | null;
+  cursoId?: string | null;
+  cursoNombre?: string | null;
+  asignaturaId?: string | null;
+  asignaturaNombre?: string | null;
+  horaInicio?: string | null;    // "HH:mm"
+  horaFin?: string | null;       // "HH:mm"
+}>>;
+
+actualizarActividadFecha: (id: string, fecha: string) => Promise<{ ok: boolean }>;
   
 }
 

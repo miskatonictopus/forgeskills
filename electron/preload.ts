@@ -104,4 +104,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     getHorariosAsignatura: (cursoId: string, asignaturaId: string) =>
     ipcRenderer.invoke("horarios-de-asignatura", { cursoId, asignaturaId }),
 
+    llistarActividadesGlobal: () => ipcRenderer.invoke("listar-actividades-global"),
+    actualizarActividadFecha: (id: string, fecha: string) =>
+      ipcRenderer.invoke("actualizar-actividad-fecha", id, fecha),
+
 });
