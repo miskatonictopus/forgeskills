@@ -758,6 +758,29 @@ ipcMain.handle("actualizar-actividad-fecha", (_evt, id: string, fecha: string) =
   return { ok: true };
 });
 
+ipcMain.handle("lectivo:leer", async () => {
+  const row = db.prepare(`SELECT start, end FROM rango_lectivo WHERE id = 1`).get();
+  return row ?? null; // { start, end } | null
+});
+
+ipcMain.handle("lectivo:guardar", async (_e, payload: { start: string; end: string }) => {
+  const { start, end } = payload || {};
+  // Validación mínima
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+    throw new Error("Formato de fecha inválido. Usa YYYY-MM-DD.");
+  }
+  const stmt = db.prepare(`
+    INSERT INTO rango_lectivo (id, start, end, updated_at)
+    VALUES (1, @start, @end, datetime('now'))
+    ON CONFLICT(id) DO UPDATE SET
+      start = excluded.start,
+      end = excluded.end,
+      updated_at = datetime('now')
+  `);
+  stmt.run({ start, end });
+  return { ok: true };
+});
+
 
 
 

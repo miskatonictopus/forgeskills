@@ -108,4 +108,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     actualizarActividadFecha: (id: string, fecha: string) =>
       ipcRenderer.invoke("actualizar-actividad-fecha", id, fecha),
 
+      leerRangoLectivo: () => ipcRenderer.invoke("lectivo:leer"),
+  guardarRangoLectivo: (r: { start: string; end: string }) => ipcRenderer.invoke("lectivo:guardar", r),
+
 });

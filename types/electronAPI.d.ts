@@ -2,9 +2,11 @@ import type { Curso } from "@/models/curso";
 import type { Asignatura } from "@/models/asignatura";
 import type { Alumno, AlumnoEntrada } from "@/models/alumno";
 import type { Horario } from "@/models/horario";
-import type { Actividad } from "@/store/actividadesPorCurso"; // 👈 faltaba
-import { ipcMain } from "electron";
+import type { Actividad } from "@/store/actividadesPorCurso";
 
+// 🆕 Tipos calendario
+export type RangoLectivo = { start: string; end: string };              // "YYYY-MM-DD"
+export type Festivo = { id?: string; title: string; start: string; end?: string };
 
 export interface ElectronAPI {
   // Cursos
@@ -27,14 +29,13 @@ export interface ElectronAPI {
 
   // Horarios
   leerHorarios(asignaturaId: string, cursoId?: string): Promise<Array<{
-    id: number|string;
+    id: number | string;
     cursoId: string;
     asignaturaId: string;
     dia: string;
     horaInicio: string;
     horaFin: string;
   }>>;
-
   leerHorariosTodos: () => Promise<Horario[]>;
   guardarHorario(data: {
     cursoId: string;
@@ -49,10 +50,27 @@ export interface ElectronAPI {
     dia: string;
     horaInicio: string;
   }): Promise<{ changes: number }>;
+  getHorariosAsignatura(cursoId: string, asignaturaId: string): Promise<
+    { diaSemana: number; horaInicio: string; horaFin: string }[]
+  >;
 
   // Actividades
   guardarActividad: (actividad: Actividad) => Promise<{ success: boolean }>;
   actividadesDeCurso: (cursoId: string) => Promise<Actividad[]>;
+  listarActividadesGlobal: () => Promise<Array<{
+    id: string;
+    nombre: string;
+    fecha: string;
+    descripcion?: string | null;
+    cursoId?: string | null;
+    cursoNombre?: string | null;
+    asignaturaId?: string | null;
+    asignaturaNombre?: string | null;
+    horaInicio?: string | null;
+    horaFin?: string | null;
+  }>>;
+  actualizarActividadFecha: (id: string, fecha: string) => Promise<{ ok: boolean }>;
+  borrarActividad: (actividadId: string) => Promise<void>;
 
   // RA/CE
   obtenerRAPorAsignatura: (asignaturaId: string) => Promise<
@@ -68,38 +86,20 @@ export interface ElectronAPI {
   extraerTextoPDF: (rutaPDF: string) => Promise<string | null>;
   guardarPDF: (buffer: ArrayBuffer, filename: string) => Promise<string>;
   guardarInformePDF: (data: Uint8Array, sugerido: string) => Promise<{ ok: boolean; filePath?: string }>;
-
-  // Persistencia del análisis
   guardarAnalisisActividad: (
     actividadId: string,
     umbral: number,
     ces: { codigo: string; puntuacion: number; reason?: "evidence" | "high_sim" | "lang_rule"; evidencias?: string[] }[]
   ) => Promise<{ ok: boolean }>;
-  leerAnalisisActividad: (
-    actividadId: string
-  ) => Promise<{ umbral: number; fecha: string | null; ces: CEDetectado[] }>;
-  
-  borrarActividad: (actividadId: string) => Promise<void>;
+  leerAnalisisActividad: (actividadId: string) => Promise<{ umbral: number; fecha: string | null; ces: CEDetectado[] }>;
 
-  getHorariosAsignatura(cursoId: string, asignaturaId: string): Promise<
-  { diaSemana: number; horaInicio: string; horaFin: string }[]
->;
+  // 🆕 Calendario — rango lectivo y festivos (opcionales para no romper si aún no hay IPC)
+  leerRangoLectivo?: () => Promise<RangoLectivo | null>;
+  guardarRangoLectivo?: (r: RangoLectivo) => Promise<void>;
+  listarFestivos?: () => Promise<Festivo[]>;
 
-listarActividadesGlobal: () => Promise<Array<{
-  id: string;
-  nombre: string;
-  fecha: string;                 // "YYYY-MM-DD"
-  descripcion?: string | null;
-  cursoId?: string | null;
-  cursoNombre?: string | null;
-  asignaturaId?: string | null;
-  asignaturaNombre?: string | null;
-  horaInicio?: string | null;    // "HH:mm"
-  horaFin?: string | null;       // "HH:mm"
-}>>;
-
-actualizarActividadFecha: (id: string, fecha: string) => Promise<{ ok: boolean }>;
-  
+  leerRangoLectivo: () => Promise<RangoLectivo | null>;
+  guardarRangoLectivo: (r: RangoLectivo) => Promise<{ ok: boolean } | void>;
 }
 
 declare global {
@@ -112,7 +112,7 @@ declare global {
   };
 
   interface Window {
-    electronAPI: ElectronAPI; // 👈 una única firma completa
+    electronAPI: ElectronAPI; // único global ✅
   }
 }
 

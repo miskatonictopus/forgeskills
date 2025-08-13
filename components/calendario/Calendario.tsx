@@ -6,8 +6,6 @@ import dynamic from "next/dynamic";
 // FullCalendar (React wrapper sin SSR)
 const FullCalendar = dynamic(() => import("@fullcalendar/react"), { ssr: false });
 
-// Estilos de FullCalendar (solo aquí, para no tocar Tailwind global)
-
 // Plugins
 import esLocale from "@fullcalendar/core/locales/es";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -23,20 +21,20 @@ export type FCEvent = {
   end?: string | Date;
   allDay?: boolean;
 
-  // ➕ para eventos recurrentes tipo timeGrid
+  // recurrentes
   daysOfWeek?: number[];   // 0..6
   startTime?: string;      // "HH:mm"
   endTime?: string;        // "HH:mm"
   startRecur?: string;
   endRecur?: string;
 
-  // ➕ estilado / control
-  classNames?: string[];   // <— esto quita tu error
+  // estilo / control
+  classNames?: string[];
   editable?: boolean;
   display?: "auto" | "block" | "list-item" | "background" | "inverse-background" | "none";
   backgroundColor?: string;
 
-  // si usas rrule
+  // rrule opcional
   rrule?: any;
   duration?: string;
   extendedProps?: Record<string, any>;
@@ -55,12 +53,20 @@ type Props = {
   slotMaxTime?: string;
   /** Alto del calendario. Por defecto "auto" */
   height?: number | "auto" | "parent";
+  /** Rango lectivo (YYYY-MM-DD) */
+  validRange?: { start: string; end: string };
+  festivos?: Array<{ start: string; end?: string }>; // ⬅️ NUEVO
   /** Callbacks */
   onDateClick?: (date: Date) => void;
   onSelectRange?: (start: Date, end: Date) => void;
   onEventMove?: (e: { id: string; start: Date; end?: Date }) => void;
   onEventResize?: (e: { id: string; start: Date; end?: Date }) => void;
 };
+
+/* ===================== Helpers ===================== */
+const parseISODate = (iso: string) => new Date(`${iso}T00:00:00`);
+const parseISOEndDay = (iso: string) => new Date(`${iso}T23:59:59`);
+const between = (start: Date, d: Date, end: Date) => start <= d && d <= end;
 
 /* ===================== Componente ===================== */
 export default function Calendario({
@@ -71,6 +77,8 @@ export default function Calendario({
   slotMinTime = "08:00:00",
   slotMaxTime = "20:00:00",
   height = "auto",
+  validRange,
+  festivos,    
   onDateClick,
   onSelectRange,
   onEventMove,
@@ -81,14 +89,42 @@ export default function Calendario({
     [diasPermitidos]
   );
 
+  const hiddenDays = React.useMemo(() => {
+    if (!diasPermitidos) return undefined;
+    const all = [0, 1, 2, 3, 4, 5, 6];
+    return all.filter((d) => !diasPermitidos.includes(d));
+  }, [diasPermitidos]);
+
+  const rangoStart = React.useMemo(
+    () => (validRange?.start ? parseISODate(validRange.start) : undefined),
+    [validRange?.start]
+  );
+  const rangoEnd = React.useMemo(
+    () => (validRange?.end ? parseISOEndDay(validRange.end) : undefined),
+    [validRange?.end]
+  );
+
+  const dentroDeRango = React.useCallback(
+    (d: Date) => (!rangoStart || !rangoEnd ? true : between(rangoStart, d, rangoEnd)),
+    [rangoStart, rangoEnd]
+  );
+
   const selectAllow = React.useCallback(
-    (info: any) => (setPermitidos ? setPermitidos.has(info.start.getDay()) : true),
-    [setPermitidos]
+    (info: any) => {
+      const dayOk = setPermitidos ? setPermitidos.has(info.start.getDay()) : true;
+      const rangoOk = dentroDeRango(info.start) && dentroDeRango(info.end ?? info.start);
+      return dayOk && rangoOk;
+    },
+    [setPermitidos, dentroDeRango]
   );
 
   const eventAllow = React.useCallback(
-    (dropInfo: any) => (setPermitidos ? setPermitidos.has(dropInfo.start.getDay()) : true),
-    [setPermitidos]
+    (dropInfo: any) => {
+      const dayOk = setPermitidos ? setPermitidos.has(dropInfo.start.getDay()) : true;
+      const rangoOk = dentroDeRango(dropInfo.start) && dentroDeRango(dropInfo.end ?? dropInfo.start);
+      return dayOk && rangoOk;
+    },
+    [setPermitidos, dentroDeRango]
   );
 
   return (
@@ -101,6 +137,7 @@ export default function Calendario({
       height={height}
       firstDay={1}            // Lunes
       weekends={false}
+      hiddenDays={hiddenDays} // ⬅️ respeta diasPermitidos
       nowIndicator={true}
       slotMinTime={slotMinTime}
       slotMaxTime={slotMaxTime}
@@ -111,6 +148,7 @@ export default function Calendario({
         center: "title",
         right: "dayGridMonth,timeGridWeek,timeGridDay",
       }}
+      validRange={validRange} // ⬅️ limita navegación
       selectable
       selectMirror
       editable
@@ -120,28 +158,43 @@ export default function Calendario({
       eventAllow={eventAllow}
       events={events as any}
       dateClick={(info) => {
+        // día permitido + dentro de rango
         if (setPermitidos && !setPermitidos.has(info.date.getDay())) return;
+        if (!dentroDeRango(info.date)) return;
         onDateClick?.(info.date);
       }}
       select={(info) => {
         if (setPermitidos && !setPermitidos.has(info.start.getDay())) return;
+        if (!dentroDeRango(info.start) || !dentroDeRango(info.end)) return;
         onSelectRange?.(info.start, info.end);
       }}
       eventDrop={(info) => {
-        if (setPermitidos && !setPermitidos.has(info.event.start!.getDay())) {
+        const start = info.event.start!;
+        const end = info.event.end ?? start;
+        if (setPermitidos && !setPermitidos.has(start.getDay())) {
+          info.revert();
+          return;
+        }
+        if (!dentroDeRango(start) || !dentroDeRango(end)) {
           info.revert();
           return;
         }
         onEventMove?.({
           id: info.event.id,
-          start: info.event.start!,
+          start,
           end: info.event.end ?? undefined,
         });
       }}
       eventResize={(info) => {
+        const start = info.event.start!;
+        const end = info.event.end ?? start;
+        if (!dentroDeRango(start) || !dentroDeRango(end)) {
+          info.revert();
+          return;
+        }
         onEventResize?.({
           id: info.event.id,
-          start: info.event.start!,
+          start,
           end: info.event.end ?? undefined,
         });
       }}
