@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import type { FCTTramo } from "@/types/electronAPI";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
@@ -64,6 +65,12 @@ export default function ConfiguracionPage() {
   const [horaInicio, setHoraInicio] = useState<string>("08:00");
   const [horaFin, setHoraFin] = useState<string>("09:00");
 
+  // ====== FCT (tramos recurrentes) ======
+  const [fct, setFct] = useState<FCTTramo[]>([]);
+  const [fctDia, setFctDia] = useState<string>("1");
+  const [fctInicio, setFctInicio] = useState<string>("08:00");
+  const [fctFin, setFctFin] = useState<string>("10:00");
+
   const canSaveFestivo = !!festivoRange?.from && !!motivo.trim();
   const rangoListo = useMemo(() => !!range?.from && !!range?.to && range.from <= range.to, [range]);
 
@@ -89,15 +96,23 @@ export default function ConfiguracionPage() {
     return () => { alive = false; };
   }, []);
 
-  // Cargar periodo lectivo, festivos y presencialidades al entrar
+  // Cargar periodo lectivo, festivos, presencialidades y FCT al entrar
   const cargarFestivos = useCallback(async () => {
     const f = await window.electronAPI.listarFestivos?.();
     if (Array.isArray(f)) setFestivos(f as Festivo[]);
   }, []);
+
   const cargarPresencialidades = useCallback(async () => {
     try {
       const rows = await window.electronAPI.listarPresencialidades?.();
       if (Array.isArray(rows)) setPresencialidades(rows as Presencialidad[]);
+    } catch { /* no-op */ }
+  }, []);
+
+  const cargarFCT = useCallback(async () => {
+    try {
+      const rows = await window.electronAPI.listarFCT?.();
+      if (Array.isArray(rows)) setFct(rows);
     } catch { /* no-op */ }
   }, []);
 
@@ -115,12 +130,11 @@ export default function ConfiguracionPage() {
         console.warn("leerRangoLectivo no disponible aún");
       }
       try {
-        await cargarFestivos();
-        await cargarPresencialidades();
+        await Promise.all([cargarFestivos(), cargarPresencialidades(), cargarFCT()]);
       } catch { /* no-op */ }
     })();
     return () => { alive = false; };
-  }, [cargarFestivos, cargarPresencialidades]);
+  }, [cargarFestivos, cargarPresencialidades, cargarFCT]);
 
   // Guardar periodo lectivo
   const handleSaveLectivo = useCallback(async () => {
@@ -209,6 +223,41 @@ export default function ConfiguracionPage() {
     }
   }, [cargarPresencialidades]);
 
+  // Crear FCT
+  const handleAddFCT = useCallback(async () => {
+    if (!fctDia || !fctInicio || !fctFin) {
+      toast.warning("Completa día y horas.");
+      return;
+    }
+    if (fctFin <= fctInicio) {
+      toast.warning("La hora fin debe ser posterior a la de inicio.");
+      return;
+    }
+    try {
+      await window.electronAPI.crearFCT?.({
+        diaSemana: Number(fctDia),
+        horaInicio: fctInicio,
+        horaFin: fctFin,
+      });
+      toast.success("FCT añadida.");
+      setFctInicio("08:00");
+      setFctFin("10:00");
+      await cargarFCT();
+    } catch (e: any) {
+      toast.error(e?.message || "No se pudo añadir la FCT.");
+    }
+  }, [fctDia, fctInicio, fctFin, cargarFCT]);
+
+  // Borrar FCT
+  const handleDeleteFCT = useCallback(async (id: string) => {
+    try {
+      await window.electronAPI.borrarFCT?.(id);
+      await cargarFCT();
+    } catch {
+      toast.error("No se pudo borrar la FCT.");
+    }
+  }, [cargarFCT]);
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -236,9 +285,9 @@ export default function ConfiguracionPage() {
         <div className="p-6 space-y-6">
           <h1 className="text-3xl font-bold tracking-tight">Configuración</h1>
 
-          {/* ===== Fila 50/50: Periodo lectivo + Presencialidades ===== */}
+          {/* ===== Fila 50/50 ===== */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* ===== Card Periodo lectivo ===== */}
+            {/* Columna izquierda: Periodo lectivo */}
             <Card>
               <CardHeader>
                 <CardTitle>Periodo lectivo</CardTitle>
@@ -300,91 +349,174 @@ export default function ConfiguracionPage() {
               </CardContent>
             </Card>
 
-            {/* ===== Card Presencialidades ===== */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Presencialidades</CardTitle>
-                <CardDescription>
-                  Tramos fijos y recurrentes de presencia en el centro (no lectivos).
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Formulario alta */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-sm font-medium">Día</label>
-                    <Select value={diaSemana} onValueChange={setDiaSemana}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Día" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DIAS.map((d) => (
-                          <SelectItem key={d.value} value={String(d.value)}>
-                            {d.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+            {/* Columna derecha: Presencialidades + FCT */}
+            <div className="space-y-6">
+              {/* ===== Card Presencialidades ===== */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Presencialidades</CardTitle>
+                  <CardDescription>
+                    Tramos fijos y recurrentes de presencia en el centro (no lectivos).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Formulario alta */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-sm font-medium">Día</label>
+                      <Select value={diaSemana} onValueChange={setDiaSemana}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Día" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DIAS.map((d) => (
+                            <SelectItem key={d.value} value={String(d.value)}>
+                              {d.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Inicio</label>
+                      <Input className="mt-1" type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Fin</label>
+                      <Input className="mt-1" type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium">Inicio</label>
-                    <Input className="mt-1" type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Fin</label>
-                    <Input className="mt-1" type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
-                  </div>
-                </div>
 
-                <Button onClick={handleAddPresencialidad} className="gap-2 w-full sm:w-auto">
-                  <Plus className="h-4 w-4" />
-                  Añadir presencialidad
-                </Button>
+                  <Button onClick={handleAddPresencialidad} className="gap-2 w-full sm:w-auto">
+                    <Plus className="h-4 w-4" />
+                    Añadir presencialidad
+                  </Button>
 
-                {/* Listado */}
-                <Separator />
-                {presencialidades.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No hay presencialidades registradas.</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[180px]">Día</TableHead>
-                          <TableHead>Horario</TableHead>
-                          <TableHead className="w-[80px] text-right">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {presencialidades.map((p) => (
-                          <TableRow key={p.id}>
-                            <TableCell className="font-medium">
-                              {DIAS.find((d) => d.value === p.diaSemana)?.label ?? p.diaSemana}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary">{p.horaInicio} — {p.horaFin}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeletePresencialidad(p.id)}
-                                aria-label="Eliminar presencialidad"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
+                  {/* Listado */}
+                  <Separator />
+                  {presencialidades.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No hay presencialidades registradas.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[180px]">Día</TableHead>
+                            <TableHead>Horario</TableHead>
+                            <TableHead className="w-[80px] text-right">Acciones</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {presencialidades.map((p) => (
+                            <TableRow key={p.id}>
+                              <TableCell className="font-medium">
+                                {DIAS.find((d) => d.value === p.diaSemana)?.label ?? p.diaSemana}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">{p.horaInicio} — {p.horaFin}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeletePresencialidad(p.id)}
+                                  aria-label="Eliminar presencialidad"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* ===== Card FCT ===== */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>FCT (prácticas con alumnado)</CardTitle>
+                  <CardDescription>Tramos fijos y recurrentes (no lectivos) asociados a FCT.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-sm font-medium">Día</label>
+                      <Select value={fctDia} onValueChange={setFctDia}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Día" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DIAS.map((d) => (
+                            <SelectItem key={d.value} value={String(d.value)}>
+                              {d.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Inicio</label>
+                      <Input className="mt-1" type="time" value={fctInicio} onChange={(e) => setFctInicio(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Fin</label>
+                      <Input className="mt-1" type="time" value={fctFin} onChange={(e) => setFctFin(e.target.value)} />
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+
+                  <Button onClick={handleAddFCT} className="gap-2 w-full sm:w-auto">
+                    <Plus className="h-4 w-4" />
+                    Añadir FCT
+                  </Button>
+
+                  <Separator />
+
+                  {fct.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No hay FCT registradas.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[180px]">Día</TableHead>
+                            <TableHead>Horario</TableHead>
+                            <TableHead className="w-[80px] text-right">Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {fct.map((t) => (
+                            <TableRow key={t.id}>
+                              <TableCell className="font-medium">
+                                {DIAS.find((d) => d.value === t.diaSemana)?.label ?? t.diaSemana}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">{t.horaInicio} — {t.horaFin}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteFCT(t.id)}
+                                  aria-label="Eliminar FCT"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
-          {/* ===== Card Festivos (debajo, como la tenías) ===== */}
+          {/* ===== Card Festivos (debajo) ===== */}
           <Card className="max-w-3xl">
             <CardHeader>
               <CardTitle>Festivos</CardTitle>

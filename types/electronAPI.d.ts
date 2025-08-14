@@ -13,6 +13,14 @@ export type Festivo = {
   title: string;          
 };
 
+export type FCTTramo = {
+  id: string;
+  diaSemana: number;   // 1..5
+  horaInicio: string;  // "HH:MM"
+  horaFin: string;     // "HH:MM"
+};
+
+
 export type Presencialidad = {
   id: string;
   diaSemana: number;   // 1..5 (L..V) (ajusta si usas 0..6)
@@ -131,7 +139,13 @@ export interface ElectronAPI {
  listarPresencialidades: () => Promise<Presencialidad[]>;
  crearPresencialidad: (p: { diaSemana: number; horaInicio: string; horaFin: string }) => Promise<Presencialidad>;
  borrarPresencialidad: (id: string) => Promise<{ ok: boolean }>;
+
+ listarFCT: () => Promise<FCTTramo[]>;
+      crearFCT: (p: { diaSemana: number; horaInicio: string; horaFin: string }) => Promise<FCTTramo>;
+      borrarFCT: (id: string) => Promise<{ ok: boolean }>;
+
 }
+
 
 declare global {
   type CEDetectado = {

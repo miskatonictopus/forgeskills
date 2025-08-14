@@ -861,6 +861,34 @@ ipcMain.handle("presencialidades-borrar", (event, id: string) => {
   return { ok: true };
 });
 
+ipcMain.handle("fct-listar", () => {
+  return db.prepare(`
+    SELECT id, dia_semana AS diaSemana, hora_inicio AS horaInicio, hora_fin AS horaFin
+    FROM fct_tramos
+    ORDER BY dia_semana ASC, hora_inicio ASC
+  `).all();
+});
+
+ipcMain.handle("fct-crear", (event, p: { diaSemana: number; horaInicio: string; horaFin: string }) => {
+  const id = uuidv4();
+  const stmt = db.prepare(`INSERT INTO fct_tramos (id, dia_semana, hora_inicio, hora_fin) VALUES (?, ?, ?, ?)`);
+  try {
+    stmt.run(id, p.diaSemana, p.horaInicio, p.horaFin);
+    return { id, ...p };
+  } catch (e: any) {
+    if (e?.message?.includes("UNIQUE")) {
+      throw new Error("Ya existe una FCT con ese día y franja horaria.");
+    }
+    throw e;
+  }
+});
+
+ipcMain.handle("fct-borrar", (event, id: string) => {
+  db.prepare(`DELETE FROM fct_tramos WHERE id = ?`).run(id);
+  return { ok: true };
+});
+
+
 
 
 

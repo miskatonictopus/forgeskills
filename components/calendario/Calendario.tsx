@@ -159,7 +159,7 @@ export default function Calendario({
       eventAllow={eventAllow}
       events={events as any} // ⬅️ PASAMOS TAL CUAL (incluye display/backgroundColor/classNames)
 
-      /* ⬇️ Forzamos visibilidad de background events (presencialidades/festivos) */
+      /* ⬇️ Forzamos visibilidad de background events (presencialidades/festivos/FCT) */
       eventClassNames={(arg) => arg.event.classNames}
       eventDidMount={(info) => {
         if (info.event.display === "background") {
@@ -176,8 +176,11 @@ export default function Calendario({
           if (!color && info.event.classNames?.includes("festivo-background")) {
             color = "rgba(80,200,120,0.20)";
           }
+          if (!color && info.event.classNames?.includes("fct-bg")) {
+            color = "rgba(200,120,255,0.26)"; // ⬅️ NUEVO: FCT
+          }
 
-          // 3) fallback final para cualquier background
+          // 3) fallback general
           if (!color) color = "rgba(180,180,180,0.18)";
 
           const el = info.el as HTMLElement;

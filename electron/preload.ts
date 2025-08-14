@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { Asignatura } from "../models/asignatura";
 import type { Alumno, AlumnoEntrada } from "../models/alumno";
 import type { Festivo, FestivoCreate, Presencialidad } from "../types/electronAPI";
-
+import type { FCTTramo } from "../types/electronAPI"; 
 type GuardarHorarioIn = {
   cursoId: string;
   asignaturaId: string;
@@ -124,5 +124,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("presencialidades-crear", p),
   borrarPresencialidad: (id: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke("presencialidades-borrar", id),
+  
+    listarFCT: (): Promise<FCTTramo[]> => ipcRenderer.invoke("fct-listar"),
+    crearFCT: (p: { diaSemana: number; horaInicio: string; horaFin: string }): Promise<FCTTramo> =>
+      ipcRenderer.invoke("fct-crear", p),
+    borrarFCT: (id: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke("fct-borrar", id),
 
 });
