@@ -13,6 +13,16 @@ export type Festivo = {
   title: string;          
 };
 
+export type Presencialidad = {
+  id: string;
+  diaSemana: number;   // 1..5 (L..V) (ajusta si usas 0..6)
+  horaInicio: string;  // "HH:MM"
+  horaFin: string;     // "HH:MM"
+};
+
+export type Festivo = { id: string; start: string; end: string | null; title: string };
+export type FestivoCreate = { start: string; end?: string | null; title: string };
+
 export interface ElectronAPI {
   // Cursos
   leerCursos: () => Promise<Curso[]>;
@@ -107,6 +117,20 @@ export interface ElectronAPI {
   listarFestivos: () => Promise<Festivo[]>;
   crearFestivo: (f: { start: string; end?: string | null; title: string }) => Promise<Festivo>;
   borrarFestivo: (id: string) => Promise<{ ok: boolean }>;
+
+ // Lectivo
+ leerRangoLectivo: () => Promise<{ start?: string; end?: string }>;
+ guardarRangoLectivo: (r: { start: string; end: string }) => Promise<void>;
+
+ // Festivos
+ listarFestivos: () => Promise<Festivo[]>;
+ crearFestivo: (f: FestivoCreate) => Promise<Festivo>;
+ borrarFestivo: (id: string) => Promise<{ ok: boolean }>;
+
+ // Presencialidades
+ listarPresencialidades: () => Promise<Presencialidad[]>;
+ crearPresencialidad: (p: { diaSemana: number; horaInicio: string; horaFin: string }) => Promise<Presencialidad>;
+ borrarPresencialidad: (id: string) => Promise<{ ok: boolean }>;
 }
 
 declare global {

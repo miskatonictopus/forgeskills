@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { Asignatura } from "../models/asignatura";
 import type { Alumno, AlumnoEntrada } from "../models/alumno";
+import type { Festivo, FestivoCreate, Presencialidad } from "../types/electronAPI";
 
 type GuardarHorarioIn = {
   cursoId: string;
@@ -116,5 +117,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   crearFestivo: (f: { start: string; end?: string | null; title: string }) =>
     ipcRenderer.invoke("festivos:crear", f),
   borrarFestivo: (id: string) => ipcRenderer.invoke("festivos:borrar", id),
+
+  listarPresencialidades: (): Promise<Presencialidad[]> =>
+    ipcRenderer.invoke("presencialidades-listar"),
+  crearPresencialidad: (p: { diaSemana: number; horaInicio: string; horaFin: string }): Promise<Presencialidad> =>
+    ipcRenderer.invoke("presencialidades-crear", p),
+  borrarPresencialidad: (id: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke("presencialidades-borrar", id),
 
 });

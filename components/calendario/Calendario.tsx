@@ -55,7 +55,7 @@ type Props = {
   height?: number | "auto" | "parent";
   /** Rango lectivo (YYYY-MM-DD) */
   validRange?: { start: string; end: string };
-  festivos?: Array<{ start: string; end?: string }>; // ⬅️ NUEVO
+  festivos?: Array<{ start: string; end?: string }>;
   /** Callbacks */
   onDateClick?: (date: Date) => void;
   onSelectRange?: (start: Date, end: Date) => void;
@@ -78,7 +78,7 @@ export default function Calendario({
   slotMaxTime = "20:00:00",
   height = "auto",
   validRange,
-  festivos,    
+  festivos,
   onDateClick,
   onSelectRange,
   onEventMove,
@@ -135,9 +135,10 @@ export default function Calendario({
       initialView={initialView}
       initialDate={initialDate}
       height={height}
-      firstDay={1}            // Lunes
+      allDaySlot={false}
+      firstDay={1}
       weekends={false}
-      hiddenDays={hiddenDays} // ⬅️ respeta diasPermitidos
+      hiddenDays={hiddenDays}
       nowIndicator={true}
       slotMinTime={slotMinTime}
       slotMaxTime={slotMaxTime}
@@ -148,7 +149,7 @@ export default function Calendario({
         center: "title",
         right: "dayGridMonth,timeGridWeek,timeGridDay",
       }}
-      validRange={validRange} // ⬅️ limita navegación
+      validRange={validRange}
       selectable
       selectMirror
       editable
@@ -156,9 +157,36 @@ export default function Calendario({
       eventDurationEditable
       selectAllow={selectAllow}
       eventAllow={eventAllow}
-      events={events as any}
+      events={events as any} // ⬅️ PASAMOS TAL CUAL (incluye display/backgroundColor/classNames)
+
+      /* ⬇️ Forzamos visibilidad de background events (presencialidades/festivos) */
+      eventClassNames={(arg) => arg.event.classNames}
+      eventDidMount={(info) => {
+        if (info.event.display === "background") {
+          // 1) usa el color del evento si viene definido
+          let color =
+            (info.event as any).backgroundColor ||
+            (info.event as any)._def?.ui?.backgroundColor ||
+            "";
+
+          // 2) si no viene, decide por clase
+          if (!color && info.event.classNames?.includes("presencial-bg")) {
+            color = "rgba(120,160,255,0.28)";
+          }
+          if (!color && info.event.classNames?.includes("festivo-background")) {
+            color = "rgba(80,200,120,0.20)";
+          }
+
+          // 3) fallback final para cualquier background
+          if (!color) color = "rgba(180,180,180,0.18)";
+
+          const el = info.el as HTMLElement;
+          el.style.backgroundColor = color;
+          el.style.opacity = "1";
+        }
+      }}
+
       dateClick={(info) => {
-        // día permitido + dentro de rango
         if (setPermitidos && !setPermitidos.has(info.date.getDay())) return;
         if (!dentroDeRango(info.date)) return;
         onDateClick?.(info.date);

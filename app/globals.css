@@ -224,5 +224,9 @@
   padding: 6px 8px; /* vertical horizontal */
 }
 
+.fc .fc-bgevent.presencial-bg {
+  background-color: rgba(120,160,255,0.28) !important;
+  opacity: 1 !important;
+}
 
 }

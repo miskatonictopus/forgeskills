@@ -13,6 +13,7 @@ import fs from "fs";
 import { writeFile } from "node:fs/promises"; // o: import * as fs from "
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
+import { v4 as uuidv4 } from "uuid";
 
 db.pragma("foreign_keys = ON");
 
@@ -808,6 +809,59 @@ ipcMain.handle("festivos:borrar", async (_e, id: string) => {
   db.prepare(`DELETE FROM festivos WHERE id = ?`).run(id);
   return { ok: true };
 });
+
+ipcMain.handle("festivos-rango", (event, rango: { start: string; end: string }) => {
+  // start/end en formato YYYY-MM-DD (end EXCLUSIVO típico de FullCalendar)
+  const stmt = db.prepare(`
+    SELECT
+      id,
+      start,
+      COALESCE(end, start) AS end,
+      title
+    FROM festivos
+    WHERE date(start) <= date(?)      -- empieza antes o el mismo día que termina la vista
+      AND date(COALESCE(end, start)) >= date(?)  -- termina después o el mismo día que empieza la vista
+    ORDER BY start ASC
+  `);
+  return stmt.all(rango.end, rango.start);
+});
+
+/** Listar todas */
+ipcMain.handle("presencialidades-listar", () => {
+  const stmt = db.prepare(`
+    SELECT id, dia_semana as diaSemana, hora_inicio as horaInicio, hora_fin as horaFin
+    FROM presencialidades
+    ORDER BY dia_semana ASC, hora_inicio ASC
+  `);
+  return stmt.all();
+});
+
+/** Crear */
+ipcMain.handle("presencialidades-crear", (event, p: { diaSemana: number; horaInicio: string; horaFin: string }) => {
+  const id = uuidv4();
+  const stmt = db.prepare(`
+    INSERT INTO presencialidades (id, dia_semana, hora_inicio, hora_fin)
+    VALUES (?, ?, ?, ?)
+  `);
+  try {
+    stmt.run(id, p.diaSemana, p.horaInicio, p.horaFin);
+    return { id, ...p };
+  } catch (e: any) {
+    if (e?.message?.includes("UNIQUE")) {
+      throw new Error("Ya existe una presencialidad con ese día y franja horaria.");
+    }
+    throw e;
+  }
+});
+
+/** Borrar */
+ipcMain.handle("presencialidades-borrar", (event, id: string) => {
+  const stmt = db.prepare(`DELETE FROM presencialidades WHERE id = ?`);
+  stmt.run(id);
+  return { ok: true };
+});
+
+
 
 
 

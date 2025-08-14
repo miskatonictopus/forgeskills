@@ -25,6 +25,8 @@ import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 // Helpers
 const ymd = (d: Date) =>
@@ -33,6 +35,18 @@ const parseISO = (iso?: string) => (iso ? new Date(`${iso}T00:00:00`) : undefine
 
 // Tipos festivos
 type Festivo = { id: string; start: string; end?: string | null; title: string };
+
+// Tipos presencialidades
+type Presencialidad = { id: string; diaSemana: number; horaInicio: string; horaFin: string };
+
+const DIAS = [
+  { value: 1, label: "Lunes" },
+  { value: 2, label: "Martes" },
+  { value: 3, label: "Miércoles" },
+  { value: 4, label: "Jueves" },
+  { value: 5, label: "Viernes" },
+  // añade 0 y 6 si quieres fines de semana
+];
 
 export default function ConfiguracionPage() {
   // ====== Periodo lectivo ======
@@ -43,6 +57,12 @@ export default function ConfiguracionPage() {
   const [festivos, setFestivos] = useState<Festivo[]>([]);
   const [festivoRange, setFestivoRange] = useState<DateRange | undefined>(undefined);
   const [motivo, setMotivo] = useState("");
+
+  // ====== Presencialidades ======
+  const [presencialidades, setPresencialidades] = useState<Presencialidad[]>([]);
+  const [diaSemana, setDiaSemana] = useState<string>("1");
+  const [horaInicio, setHoraInicio] = useState<string>("08:00");
+  const [horaFin, setHoraFin] = useState<string>("09:00");
 
   const canSaveFestivo = !!festivoRange?.from && !!motivo.trim();
   const rangoListo = useMemo(() => !!range?.from && !!range?.to && range.from <= range.to, [range]);
@@ -69,7 +89,18 @@ export default function ConfiguracionPage() {
     return () => { alive = false; };
   }, []);
 
-  // Cargar periodo lectivo y festivos al entrar
+  // Cargar periodo lectivo, festivos y presencialidades al entrar
+  const cargarFestivos = useCallback(async () => {
+    const f = await window.electronAPI.listarFestivos?.();
+    if (Array.isArray(f)) setFestivos(f as Festivo[]);
+  }, []);
+  const cargarPresencialidades = useCallback(async () => {
+    try {
+      const rows = await window.electronAPI.listarPresencialidades?.();
+      if (Array.isArray(rows)) setPresencialidades(rows as Presencialidad[]);
+    } catch { /* no-op */ }
+  }, []);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -84,13 +115,12 @@ export default function ConfiguracionPage() {
         console.warn("leerRangoLectivo no disponible aún");
       }
       try {
-        const f = await window.electronAPI.listarFestivos?.();
-        if (!alive) return;
-        if (Array.isArray(f)) setFestivos(f as Festivo[]);
+        await cargarFestivos();
+        await cargarPresencialidades();
       } catch { /* no-op */ }
     })();
     return () => { alive = false; };
-  }, []);
+  }, [cargarFestivos, cargarPresencialidades]);
 
   // Guardar periodo lectivo
   const handleSaveLectivo = useCallback(async () => {
@@ -116,15 +146,13 @@ export default function ConfiguracionPage() {
       toast.warning("Selecciona fecha o rango y escribe un motivo.");
       return;
     }
-  
     const payload = {
       start: ymd(festivoRange.from),
       end: festivoRange.to ? ymd(festivoRange.to) : null,
       title: motivo.trim(),
     };
-  
     try {
-      const nuevo: Festivo = await window.electronAPI.crearFestivo(payload); // ✅ id string
+      const nuevo: Festivo = await window.electronAPI.crearFestivo(payload);
       setFestivos((prev) => [nuevo, ...prev]);
       setFestivoRange(undefined);
       setMotivo("");
@@ -145,6 +173,41 @@ export default function ConfiguracionPage() {
       toast.error("No se pudo eliminar el festivo.");
     }
   }, []);
+
+  // Crear presencialidad
+  const handleAddPresencialidad = useCallback(async () => {
+    if (!diaSemana || !horaInicio || !horaFin) {
+      toast.warning("Completa día y horas.");
+      return;
+    }
+    if (horaFin <= horaInicio) {
+      toast.warning("La hora fin debe ser posterior a la de inicio.");
+      return;
+    }
+    try {
+      await window.electronAPI.crearPresencialidad?.({
+        diaSemana: Number(diaSemana),
+        horaInicio,
+        horaFin,
+      });
+      toast.success("Presencialidad añadida.");
+      setHoraInicio("08:00");
+      setHoraFin("09:00");
+      await cargarPresencialidades();
+    } catch (e: any) {
+      toast.error(e?.message || "No se pudo añadir la presencialidad.");
+    }
+  }, [diaSemana, horaInicio, horaFin, cargarPresencialidades]);
+
+  // Borrar presencialidad
+  const handleDeletePresencialidad = useCallback(async (id: string) => {
+    try {
+      await window.electronAPI.borrarPresencialidad?.(id);
+      await cargarPresencialidades();
+    } catch {
+      toast.error("No se pudo borrar la presencialidad.");
+    }
+  }, [cargarPresencialidades]);
 
   return (
     <SidebarProvider>
@@ -173,69 +236,155 @@ export default function ConfiguracionPage() {
         <div className="p-6 space-y-6">
           <h1 className="text-3xl font-bold tracking-tight">Configuración</h1>
 
-          {/* ===== Card Periodo lectivo ===== */}
-          <Card className="max-w-2xl">
-            <CardHeader>
-              <CardTitle>Periodo lectivo</CardTitle>
-              <CardDescription>
-                Define el intervalo de clases. Se usará para bloquear navegación, creación y movimiento de eventos fuera de rango.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <Popover modal={false}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn("w-[280px] justify-start text-left font-normal", !range && "text-muted-foreground")}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {range?.from ? (
-                        range.to ? (
-                          <>
-                            {range.from.toLocaleDateString()} — {range.to.toLocaleDateString()}
-                          </>
+          {/* ===== Fila 50/50: Periodo lectivo + Presencialidades ===== */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* ===== Card Periodo lectivo ===== */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Periodo lectivo</CardTitle>
+                <CardDescription>
+                  Define el intervalo de clases. Se usará para bloquear navegación, creación y movimiento de eventos fuera de rango.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Popover modal={false}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn("w-[280px] justify-start text-left font-normal", !range && "text-muted-foreground")}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {range?.from ? (
+                          range.to ? (
+                            <>
+                              {range.from.toLocaleDateString()} — {range.to.toLocaleDateString()}
+                            </>
+                          ) : (
+                            range.from.toLocaleDateString()
+                          )
                         ) : (
-                          range.from.toLocaleDateString()
-                        )
-                      ) : (
-                        <span>Selecciona periodo</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="z-50 w-auto p-0"
-                    align="start"
-                    side="bottom"
-                    sideOffset={8}
-                    avoidCollisions={false}
-                    collisionPadding={0}
-                    // @ts-expect-error prop Radix
-                    position="popper"
-                  >
-                    <Calendar mode="range" selected={range} onSelect={setRange} numberOfMonths={2} initialFocus />
-                  </PopoverContent>
-                </Popover>
+                          <span>Selecciona periodo</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="z-50 w-auto p-0"
+                      align="start"
+                      side="bottom"
+                      sideOffset={8}
+                      avoidCollisions={false}
+                      collisionPadding={0}
+                      // @ts-expect-error prop Radix
+                      position="popper"
+                    >
+                      <Calendar mode="range" selected={range} onSelect={setRange} numberOfMonths={2} initialFocus />
+                    </PopoverContent>
+                  </Popover>
 
-                <Button onClick={handleSaveLectivo} disabled={!rangoListo} className="gap-2">
-                  <Save className="h-4 w-4" />
-                  Guardar periodo
+                  <Button onClick={handleSaveLectivo} disabled={!rangoListo} className="gap-2">
+                    <Save className="h-4 w-4" />
+                    Guardar periodo
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="text-sm text-muted-foreground">
+                  {persisted?.start && persisted?.end ? (
+                    <>Lectivo actual: <span className="font-medium">{persisted.start}</span> → <span className="font-medium">{persisted.end}</span></>
+                  ) : (
+                    <>Aún no hay periodo lectivo guardado.</>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ===== Card Presencialidades ===== */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Presencialidades</CardTitle>
+                <CardDescription>
+                  Tramos fijos y recurrentes de presencia en el centro (no lectivos).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Formulario alta */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-sm font-medium">Día</label>
+                    <Select value={diaSemana} onValueChange={setDiaSemana}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Día" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DIAS.map((d) => (
+                          <SelectItem key={d.value} value={String(d.value)}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Inicio</label>
+                    <Input className="mt-1" type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Fin</label>
+                    <Input className="mt-1" type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
+                  </div>
+                </div>
+
+                <Button onClick={handleAddPresencialidad} className="gap-2 w-full sm:w-auto">
+                  <Plus className="h-4 w-4" />
+                  Añadir presencialidad
                 </Button>
-              </div>
 
-              <Separator />
-
-              <div className="text-sm text-muted-foreground">
-                {persisted?.start && persisted?.end ? (
-                  <>Lectivo actual: <span className="font-medium">{persisted.start}</span> → <span className="font-medium">{persisted.end}</span></>
+                {/* Listado */}
+                <Separator />
+                {presencialidades.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No hay presencialidades registradas.</div>
                 ) : (
-                  <>Aún no hay periodo lectivo guardado.</>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[180px]">Día</TableHead>
+                          <TableHead>Horario</TableHead>
+                          <TableHead className="w-[80px] text-right">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {presencialidades.map((p) => (
+                          <TableRow key={p.id}>
+                            <TableCell className="font-medium">
+                              {DIAS.find((d) => d.value === p.diaSemana)?.label ?? p.diaSemana}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{p.horaInicio} — {p.horaFin}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeletePresencialidad(p.id)}
+                                aria-label="Eliminar presencialidad"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
-          {/* ===== Card Festivos ===== */}
+          {/* ===== Card Festivos (debajo, como la tenías) ===== */}
           <Card className="max-w-3xl">
             <CardHeader>
               <CardTitle>Festivos</CardTitle>
