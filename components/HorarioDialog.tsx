@@ -195,16 +195,16 @@ export function HorarioDialog({ open, onClose, asignatura, onSave }: Props) {
     }
   };
 
-  const handleEliminar = async (d: string, hIni: string) => {
+  const handleEliminar = async (cursoIdParam: string, d: string, hIni: string) => {
     try {
       // @ts-ignore
       await window.electronAPI.borrarHorario({
-        cursoId,
+        cursoId: cursoIdParam,
         asignaturaId: asignatura.id,
         dia: d,
         horaInicio: hIni,
       });
-
+  
       await cargarHorarios(asignatura.id);
       onSave?.(asignatura.id);
       toast.success("Horario eliminado");
@@ -213,6 +213,7 @@ export function HorarioDialog({ open, onClose, asignatura, onSave }: Props) {
       console.error(error);
     }
   };
+  
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -304,22 +305,24 @@ export function HorarioDialog({ open, onClose, asignatura, onSave }: Props) {
           {/* Lista de horarios */}
           {horarios.length > 0 && (
             <ul className="text-sm text-white space-y-2 border-t border-zinc-700 pt-2">
-              {horarios.map((h, i) => (
-                <li key={i} className="flex justify-between items-center border-b border-zinc-800 pb-1">
-                  <span>
-                    {h.dia}: {h.horaInicio} → {h.horaFin} ·{" "}
-                    <span className="font-bold text-emerald-200">
-                      {calcularDuracion(h.horaInicio, h.horaFin)}h
-                    </span>
-                  </span>
-                  <button
-                    onClick={() => handleEliminar(h.dia, h.horaInicio)}
-                    className="text-zinc-400 hover:text-red-400"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </li>
-              ))}
+             {horarios.map((h, i) => (
+  <li key={i} className="flex justify-between items-center border-b border-zinc-800 pb-1">
+    <span>
+      {h.dia}: {h.horaInicio} → {h.horaFin} ·{" "}
+      <span className="font-bold text-emerald-200">
+        {calcularDuracion(h.horaInicio, h.horaFin)}h
+      </span>
+    </span>
+    <button
+      onClick={() => handleEliminar(h.cursoId || cursoId, h.dia, h.horaInicio)}
+      className="text-zinc-400 hover:text-red-400"
+      disabled={!(h.cursoId || cursoId)} // opcional: evita clic si falta cursoId
+      title={!(h.cursoId || cursoId) ? "Selecciona un curso" : "Eliminar"}
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+  </li>
+))}
             </ul>
           )}
         </div>

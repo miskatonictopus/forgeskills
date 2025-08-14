@@ -888,8 +888,57 @@ ipcMain.handle("fct-borrar", (event, id: string) => {
   return { ok: true };
 });
 
+type BorrarHorarioPayload = {
+  cursoId?: string;
+  asignaturaId?: string;
+  dia?: string;         // "lunes" | "martes" | ...
+  horaInicio?: string;  // "HH:mm"
+};
 
+ipcMain.removeHandler("borrar-horario");
 
+ipcMain.handle("borrar-horario", (_event, payload: BorrarHorarioPayload) => {
+  console.log("[borrar-horario] payload:", payload);
+
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Payload inválido");
+  }
+
+  const { cursoId, asignaturaId, dia, horaInicio } = payload;
+
+  // Validación mínima (estos 4 campos son los que envías desde el front)
+  if (!cursoId || !asignaturaId || !dia || !horaInicio) {
+    throw new Error("Faltan parámetros: cursoId, asignaturaId, dia, horaInicio");
+  }
+
+  // Normaliza el día igual que en el front (por si acaso)
+  const norm = (d: string) => {
+    const x = (d || "").trim().toLowerCase();
+    if (x === "miercoles") return "miércoles";
+    if (x === "sabado") return "sábado";
+    return x;
+  };
+
+  const params = {
+    curso_id: cursoId,
+    asignatura_id: asignaturaId,
+    dia: norm(dia),
+    hora_inicio: horaInicio,
+  };
+
+  const sql = `
+    DELETE FROM horarios
+    WHERE curso_id = @curso_id
+      AND asignatura_id = @asignatura_id
+      AND dia = @dia
+      AND hora_inicio = @hora_inicio
+  `;
+
+  console.log("[borrar-horario] SQL:", sql, params);
+
+  const info = db.prepare(sql).run(params);
+  return { ok: info.changes > 0, changes: info.changes };
+});
 
 
 

@@ -3,6 +3,7 @@ import type { Asignatura } from "../models/asignatura";
 import type { Alumno, AlumnoEntrada } from "../models/alumno";
 import type { Festivo, FestivoCreate, Presencialidad } from "../types/electronAPI";
 import type { FCTTramo } from "../types/electronAPI"; 
+
 type GuardarHorarioIn = {
   cursoId: string;
   asignaturaId: string;
@@ -17,6 +18,7 @@ type BorrarHorarioIn = {
   dia: string;
   horaInicio: string;
 };
+
 
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -65,8 +67,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("leer-horarios", asignaturaId, cursoId),
   leerHorariosTodos: () => ipcRenderer.invoke("leer-horarios-todos"),
 
-  borrarHorario: (data: BorrarHorarioIn) =>
-  ipcRenderer.invoke("borrar-horario", data),
+  borrarHorario: (payload: {
+    cursoId: string;
+    asignaturaId: string;
+    dia: string;
+    horaInicio: string;
+  }) => ipcRenderer.invoke("borrar-horario", payload),
+  
 
   actividadesDeCurso: (cursoId: string) =>
     ipcRenderer.invoke("actividades-de-curso", cursoId),
