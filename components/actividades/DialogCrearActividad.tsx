@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import dynamic from "next/dynamic";
+const TiptapEditor = dynamic(() => import("@/components/TiptapEditor"), { ssr: false });
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
@@ -56,6 +58,8 @@ export function DialogCrearActividad({
   const [cesDetectados, setCesDetectados] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [lectivo, setLectivo] = useState<{ start?: string; end?: string } | null>(null);
+  const [descripcionHtml, setDescripcionHtml] = useState<string>("");
+const [descripcionPlain, setDescripcionPlain] = useState<string>("");
 
   const [cursoIdLocal, setCursoIdLocal] = useState<string | undefined>(cursoId);
   const [asignaturaIdLocal, setAsignaturaIdLocal] = useState<string | undefined>(asignaturaIdProp);
@@ -169,7 +173,7 @@ export function DialogCrearActividad({
   // ================== GUARDAR (con respuesta ok/error) ==================
   const handleGuardar = async () => {
     const hoy = hoyLocal();
-
+    
     if (!nombre || !fecha) {
       toast.error("Por favor, completa nombre y fecha.");
       return;
@@ -249,7 +253,18 @@ if (!res.ok) {
       toast.error(`Texto insuficiente: ${palabras} palabras detectadas.`);
       return;
     }
-    setDescripcion(texto);
+  
+    // Renderizamos texto como HTML simple (respetando saltos de línea)
+    const html = `<p>${texto
+      .replace(/\r\n/g, "\n")
+      .split(/\n{2,}/)
+      .map(p => p.trim().length ? p.trim().replace(/\n/g, "<br/>") : "<br/>")
+      .join("</p><p>")}</p>`;
+  
+    setDescripcionHtml(html);
+    setDescripcion(html);         // BDD
+    setDescripcionPlain(texto);   // CE
+  
     const ceDetectados = await window.electronAPI.analizarDescripcionDesdeTexto(texto, asignaturaIdEf);
     if (!ceDetectados || ceDetectados.length === 0) {
       toast.warning("No se han detectado CE relevantes.");
@@ -258,13 +273,16 @@ if (!res.ok) {
       setCesDetectados(ceDetectados);
     }
   };
+  
 
   const fromDate = lectivo?.start ? new Date(lectivo.start + "T00:00:00") : undefined;
   const toDate   = lectivo?.end   ? new Date(lectivo.end   + "T23:59:59") : undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent
+  className="w-[min(95vw,1000px)] sm:max-w-[1000px] max-h-[90vh] overflow-y-auto"
+>
         <DialogHeader>
           <DialogTitle className="font-bold">
             ¡Crea una nueva actividad
@@ -380,12 +398,15 @@ if (!res.ok) {
 
           <div>
             <Label className="mb-2">Descripción de la actividad</Label>
-            <textarea
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              placeholder="Describe aquí la actividad..."
-              className="w-full border rounded px-2 py-1 text-sm bg-background min-h-[120px]"
-            />
+            <TiptapEditor
+  valueHtml={descripcionHtml}
+  onChange={(html, plain) => {
+    setDescripcionHtml(html);     // lo que guardaremos en BDD para PDF
+    setDescripcionPlain(plain);   // para análisis CE
+    setDescripcion(html);         // si tu BDD usa campo 'descripcion' (TEXT) guardamos HTML
+  }}
+  className="w-full"
+/>
           </div>
 
           <div>
