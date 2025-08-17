@@ -29,16 +29,16 @@ type Horario = { diaSemana: number; horaInicio: string; horaFin: string };
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** En calendario global pueden venir vacíos y se pedirán en el propio diálogo */
   cursoId?: string;
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
   asignaturaId?: string;
   asignaturaNombre?: string;
-  /** Fecha a preseleccionar cuando se abre desde el calendario */
   fechaInicial?: Date;
 };
 
 const NOMBRE_DIA = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const ymdLocal = (d: Date) => format(d, "yyyy-MM-dd");
+const hoyLocal = () => ymdLocal(new Date());
 
 export function DialogCrearActividad({
   open,
@@ -48,7 +48,6 @@ export function DialogCrearActividad({
   asignaturaId: asignaturaIdProp,
   fechaInicial,
 }: Props) {
-  // ======= estado base =======
   const [fechaObj, setFechaObj] = useState<Date | undefined>(undefined);
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
@@ -56,8 +55,8 @@ export function DialogCrearActividad({
   const [archivo, setArchivo] = useState<File | null>(null);
   const [cesDetectados, setCesDetectados] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lectivo, setLectivo] = useState<{ start?: string; end?: string } | null>(null);
 
-  // ======= contexto (cursos / asignaturas cuando no llegan por props) =======
   const [cursoIdLocal, setCursoIdLocal] = useState<string | undefined>(cursoId);
   const [asignaturaIdLocal, setAsignaturaIdLocal] = useState<string | undefined>(asignaturaIdProp);
 
@@ -67,149 +66,175 @@ export function DialogCrearActividad({
   const cursoIdEf = cursoId ?? cursoIdLocal;
   const asignaturaIdEf = asignaturaIdProp ?? asignaturaIdLocal;
 
-  // ======= horarios y días permitidos =======
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const diasPermitidos = useMemo(() => {
     const set = new Set<number>();
     for (const h of horarios) {
       if (typeof h.diaSemana === "number" && h.diaSemana >= 0 && h.diaSemana <= 6) set.add(h.diaSemana);
     }
-    return set; // si vacío, no restringimos
+    return set;
   }, [horarios]);
 
   const deshabilitarNoPermitidos = useCallback(
-    (day: Date) => (diasPermitidos.size === 0 ? false : !diasPermitidos.has(day.getDay())),
-    [diasPermitidos]
+    (day: Date) => {
+      const ymd = ymdLocal(day);
+      const hoy = hoyLocal();
+      if (ymd < hoy) return true;
+      if (lectivo?.start && lectivo?.end) {
+        if (ymd < lectivo.start || ymd > lectivo.end) return true;
+      }
+      if (diasPermitidos.size > 0 && !diasPermitidos.has(day.getDay())) return true;
+      return false;
+    },
+    [lectivo?.start, lectivo?.end, diasPermitidos]
   );
 
-  // ======= Snapshot del store (solo para pintar el nombre si llega por props) =======
   const snap = useSnapshot(asignaturasPorCurso);
   const todasAsignsDelCurso = cursoIdEf ? (snap[cursoIdEf] || []) : [];
   const asignaturaNombre =
     (todasAsignsDelCurso.find((a: any) => a.id === asignaturaIdEf)?.nombre as string) || "";
 
-  // ======= efectos =======
-  // Preselección de fecha y reseteo de selects al abrir
   useEffect(() => {
     if (!open) return;
-
     if (fechaInicial) {
       setFechaObj(fechaInicial);
-      setFecha(fechaInicial.toISOString().split("T")[0]);
+      setFecha(ymdLocal(fechaInicial));
     }
-
-    // si no llega curso por props, cargamos lista de cursos
+    (async () => {
+      try {
+        const r = await window.electronAPI.leerRangoLectivo();
+        setLectivo(r || null);
+      } catch {
+        setLectivo(null);
+      }
+    })();
     (async () => {
       if (!cursoId) {
         try {
           const cs = await window.electronAPI.leerCursos();
           setCursos(cs || []);
-        } catch (e) {
-          console.error(e);
-        }
+        } catch {}
       } else {
         setCursoIdLocal(cursoId);
       }
     })();
-
-    // si llega asignatura por props, set local
     setAsignaturaIdLocal(asignaturaIdProp);
-
-    // limpieza al cerrar
     return () => {
-      if (!open) {
-        setArchivo(null);
-      }
+      if (!open) setArchivo(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Cargar asignaturas cuando haya curso efectivo
   useEffect(() => {
     (async () => {
-      const cId = cursoIdEf;
-      if (!cId) {
-        setAsigsDeCurso([]);
-        return;
-      }
-      try {
-        const asigs = await window.electronAPI.asignaturasDeCurso(cId);
-        setAsigsDeCurso(asigs || []);
-      } catch (e) {
-        console.error(e);
-        setAsigsDeCurso([]);
-      }
+      if (!cursoIdEf) return setAsigsDeCurso([]);
+      const asigs = await window.electronAPI.asignaturasDeCurso(cursoIdEf);
+      setAsigsDeCurso(asigs || []);
     })();
   }, [cursoIdEf]);
-
-  // Cargar horarios cuando haya curso + asignatura efectiva
   useEffect(() => {
     let activo = true;
     (async () => {
+      if (!open) return;
+      if (!cursoIdEf || !asignaturaIdEf) {
+        if (activo) setHorarios([]);
+        return;
+      }
       try {
-        if (!cursoIdEf || !asignaturaIdEf) {
-          setHorarios([]);
-          return;
-        }
         const rows = await window.electronAPI.getHorariosAsignatura(cursoIdEf, asignaturaIdEf);
         if (!activo) return;
-        setHorarios(Array.isArray(rows) ? rows : []);
+        const mapped = Array.isArray(rows)
+          ? rows
+              .map((r: any) => ({
+                diaSemana: Number(r.diaSemana ?? r.dia_semana ?? r.dia ?? r.weekday ?? r.dow),
+                horaInicio: r.horaInicio ?? r.hora_inicio ?? r.inicio ?? r.start,
+                horaFin: r.horaFin ?? r.hora_fin ?? r.fin ?? r.end,
+              }))
+              .filter(h =>
+                Number.isFinite(h.diaSemana) &&
+                h.diaSemana >= 0 && h.diaSemana <= 6 &&
+                typeof h.horaInicio === "string" &&
+                typeof h.horaFin === "string"
+              )
+          : [];
+        setHorarios(mapped);
       } catch (e) {
         console.error("Error cargando horarios:", e);
-        setHorarios([]);
+        if (activo) setHorarios([]);
       }
     })();
-    return () => {
-      activo = false;
-    };
-  }, [cursoIdEf, asignaturaIdEf]);
+    return () => { activo = false; };
+  }, [open, cursoIdEf, asignaturaIdEf]);
+  
 
-  // ======= acciones =======
+  // ================== GUARDAR (con respuesta ok/error) ==================
   const handleGuardar = async () => {
+    const hoy = hoyLocal();
+
     if (!nombre || !fecha) {
       toast.error("Por favor, completa nombre y fecha.");
       return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      toast.error(`Formato de fecha inválido: ${fecha}`);
+      return;
+    }
+    if (fecha < hoy) {
+      toast.error("No puedes crear actividades en fechas pasadas.");
+      return;
+    }
+    if (lectivo?.start && lectivo?.end) {
+      if (fecha < lectivo.start || fecha > lectivo.end) {
+        toast.error("La fecha seleccionada está fuera del periodo lectivo.");
+        return;
+      }
     }
     if (!cursoIdEf || !asignaturaIdEf) {
       toast.error("Selecciona curso y asignatura.");
       return;
     }
-    // Validación de día conforme a horario (si lo hay)
-    if (diasPermitidos.size > 0) {
-      const d = new Date(fecha);
-      if (!diasPermitidos.has(d.getDay())) {
-        toast.error("La fecha seleccionada no coincide con el horario de la asignatura.");
-        return;
-      }
+    if (diasPermitidos.size > 0 && fechaObj && !diasPermitidos.has(fechaObj.getDay())) {
+      toast.error("La fecha seleccionada no coincide con un día de clase para esta asignatura.");
+      return;
     }
 
     const nuevaActividad = {
       id: uuidv4(),
       nombre,
-      fecha,
+      fecha, // YYYY-MM-DD
       cursoId: cursoIdEf,
       asignaturaId: asignaturaIdEf,
       descripcion,
     };
 
     try {
-      await window.electronAPI.guardarActividad(nuevaActividad as any);
+      setLoading(true);
+      type GuardarActividadResult = { ok: boolean; error?: string };
+
+// ⚠️ cast defensivo: sirve aunque tu preload siga devolviendo `any` o `void`
+const raw = await window.electronAPI.guardarActividad(nuevaActividad as any);
+const res = (raw ?? {}) as Partial<GuardarActividadResult>;
+
+if (!res.ok) {
+  toast.error(`No se guardó: ${res?.error ?? "Error desconocido"}`);
+  return;
+}
+
       añadirActividad(cursoIdEf, nuevaActividad as any);
       toast.success("Actividad guardada correctamente.");
 
-      onOpenChange(false);
       // reset
+      onOpenChange(false);
       setNombre("");
       setFecha("");
       setFechaObj(undefined);
       setDescripcion("");
       setArchivo(null);
       setCesDetectados([]);
-      setHorarios([]);
       setRefreshKey((k) => k + 1);
-    } catch (err) {
+    } catch {
       toast.error("Error al guardar la actividad.");
-      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -234,17 +259,19 @@ export function DialogCrearActividad({
     }
   };
 
-  // ======= render =======
+  const fromDate = lectivo?.start ? new Date(lectivo.start + "T00:00:00") : undefined;
+  const toDate   = lectivo?.end   ? new Date(lectivo.end   + "T23:59:59") : undefined;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="font-light">
-            Crear nueva actividad
+          <DialogTitle className="font-bold">
+            ¡Crea una nueva actividad
             {asignaturaNombre && cursoIdEf && asignaturaIdEf && (
               <>
                 {" "}para<br />
-                <p className="font-bold mt-2">{asignaturaNombre}</p>
+                <p className="font-bold mt-2 text-yellow-300">{asignaturaNombre}!</p>
               </>
             )}
           </DialogTitle>
@@ -253,7 +280,6 @@ export function DialogCrearActividad({
         <Separator className="my-3" />
 
         <div className="space-y-4">
-          {/* Cuando faltan curso/asignatura, pedimos selección */}
           {!cursoId && (
             <div>
               <Label className="mb-2">Curso</Label>
@@ -313,7 +339,7 @@ export function DialogCrearActividad({
             <Label className="mb-2">Fecha</Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={loading}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {fechaObj ? format(fechaObj, "dd/MM/yyyy") : <span>Elige una fecha</span>}
                 </Button>
@@ -323,16 +349,18 @@ export function DialogCrearActividad({
                   mode="single"
                   selected={fechaObj}
                   onSelect={(date) => {
-                    setFechaObj(date);
-                    setFecha(date ? date.toISOString().split("T")[0] : "");
+                    setFechaObj(date || undefined);
+                    setFecha(date ? ymdLocal(date) : "");
                   }}
                   disabled={deshabilitarNoPermitidos}
+                  fromDate={fromDate}
+                  toDate={toDate}
+                  showOutsideDays={false}
                   initialFocus
                 />
               </PopoverContent>
             </Popover>
 
-            {/* Chips de horario */}
             {horarios.length > 0 ? (
               <div className="mt-2 text-xs text-muted-foreground flex flex-wrap gap-2">
                 {horarios.map((h, i) => (
@@ -343,7 +371,9 @@ export function DialogCrearActividad({
               </div>
             ) : (
               <p className="mt-2 text-xs text-muted-foreground">
-                {asignaturaIdEf ? "No hay horario registrado: se permiten todos los días." : "Selecciona curso y asignatura para aplicar restricciones de día."}
+                {asignaturaIdEf
+                  ? "No hay horario registrado: se permiten todos los días."
+                  : "Selecciona curso y asignatura para aplicar restricciones de día."}
               </p>
             )}
           </div>
@@ -406,8 +436,8 @@ export function DialogCrearActividad({
             </div>
           )}
 
-          <Button className="w-full mt-4" onClick={handleGuardar}>
-            <Bot className="w-4 h-4 mr-2" /> Guardar actividad
+          <Button className="w-full mt-4" onClick={handleGuardar} disabled={loading}>
+            <Bot className="w-4 h-4 mr-2" /> {loading ? "Guardando..." : "Guardar actividad"}
           </Button>
         </div>
       </DialogContent>

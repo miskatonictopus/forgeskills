@@ -13,6 +13,17 @@ export type Festivo = {
   title: string;          
 };
 
+export type GuardarActividadPayload = {
+  id: string;
+  nombre: string;
+  fecha: string;        // "YYYY-MM-DD"
+  cursoId: string;
+  asignaturaId: string;
+  descripcion?: string | null;
+};
+
+export type GuardarActividadResult = { ok: boolean; error?: string };
+
 export type FCTTramo = {
   id: string;
   diaSemana: number;   // 1..5
@@ -78,7 +89,7 @@ export interface ElectronAPI {
   >;
 
   // Actividades
-  guardarActividad: (actividad: Actividad) => Promise<{ success: boolean }>;
+  guardarActividad(payload: GuardarActividadPayload): Promise<GuardarActividadResult>;
   actividadesDeCurso: (cursoId: string) => Promise<Actividad[]>;
   listarActividadesGlobal: () => Promise<Array<{
     id: string;
@@ -143,6 +154,9 @@ export interface ElectronAPI {
  listarFCT: () => Promise<FCTTramo[]>;
       crearFCT: (p: { diaSemana: number; horaInicio: string; horaFin: string }) => Promise<FCTTramo>;
       borrarFCT: (id: string) => Promise<{ ok: boolean }>;
+
+      horariosDeAsignatura: (params: { cursoId: string; asignaturaId: string }) =>
+      Promise<Array<{ diaSemana: number; horaInicio: string; horaFin: string }>>;
 
 }
 

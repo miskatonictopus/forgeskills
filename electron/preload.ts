@@ -3,6 +3,7 @@ import type { Asignatura } from "../models/asignatura";
 import type { Alumno, AlumnoEntrada } from "../models/alumno";
 import type { Festivo, FestivoCreate, Presencialidad } from "../types/electronAPI";
 import type { FCTTramo } from "../types/electronAPI"; 
+import type { GuardarActividadPayload, GuardarActividadResult } from "../types/electronAPI";
 
 type GuardarHorarioIn = {
   cursoId: string;
@@ -78,8 +79,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   actividadesDeCurso: (cursoId: string) =>
     ipcRenderer.invoke("actividades-de-curso", cursoId),
 
-    guardarActividad: (actividad: { id: string; nombre: string; fecha: string; cursoId: string; asignaturaId: string }) =>
-    ipcRenderer.invoke("guardar-actividad", actividad),
+    guardarActividad: (payload: GuardarActividadPayload) =>
+    ipcRenderer.invoke("guardarActividad", payload) as Promise<GuardarActividadResult>,
 
     obtenerRAPorAsignatura: (asignaturaId: string) =>
     ipcRenderer.invoke("obtener-ra-por-asignatura", asignaturaId),
@@ -111,6 +112,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
     getHorariosAsignatura: (cursoId: string, asignaturaId: string) =>
     ipcRenderer.invoke("horarios-de-asignatura", { cursoId, asignaturaId }),
+
+    horariosDeAsignatura: (params: { cursoId: string; asignaturaId: string }) =>
+    ipcRenderer.invoke("horarios-de-asignatura", params),
 
     llistarActividadesGlobal: () => ipcRenderer.invoke("listar-actividades-global"),
     actualizarActividadFecha: (id: string, fecha: string) =>

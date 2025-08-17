@@ -1,21 +1,26 @@
+/* main.ts */
+
 import * as dotenv from "dotenv";
 dotenv.config();
 console.log("🔑 API KEY:", process.env.OPENAI_API_KEY);
-import { app, BrowserWindow, ipcMain, dialog } from "electron"
-import * as path from "path"
-import { db, initDB } from "./database"
-import type { Asignatura } from "../models/asignatura"
+import { v4 as uuid } from "uuid"; 
+import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import * as path from "path";
+import { db, initDB } from "./database";
+import type { Asignatura } from "../models/asignatura";
 import { analizarDescripcionActividad } from "../src/lib/analizarDescripcionActividad";
 import { analizarTextoPlano } from "../src/lib/analizarTextoPlano";
 import { extraerTextoConMutool } from "../src/lib/extraerTextoMutool";
 import { execSync } from "child_process";
 import fs from "fs";
-import { writeFile } from "node:fs/promises"; // o: import * as fs from "
+import { writeFile } from "node:fs/promises";
 import * as crypto from "crypto";
 import { randomUUID } from "crypto";
 import { v4 as uuidv4 } from "uuid";
 
 db.pragma("foreign_keys = ON");
+
+/* ----------------------------- Utils generales ----------------------------- */
 
 function extraerTextoPDF(path: string): string {
   try {
@@ -29,12 +34,18 @@ function extraerTextoPDF(path: string): string {
   }
 }
 
-initDB()
+initDB();
 
-// --- Migración idempotente (better-sqlite3) ---
+/* ------------------------------- Migraciones -------------------------------- */
+
 function colExists(table: string, col: string) {
   const rows = db.prepare(`PRAGMA table_info(${table})`).all() as any[];
-  return rows.some(r => r.name === col);
+  return rows.some((r) => r.name === col);
+}
+
+function tableExists(table: string) {
+  const row = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(table);
+  return !!row;
 }
 
 function ensureSchema() {
@@ -49,10 +60,10 @@ function ensureSchema() {
     db.prepare(`ALTER TABLE actividades ADD COLUMN analisis_fecha TEXT`).run();
   }
   if (!colExists("actividades", "programada_para")) {
-    db.prepare(`ALTER TABLE actividades ADD COLUMN programada_para TEXT`).run();
+    db.prepare(`ALTER TABLE actividades ADD COLUMN programada_para TEXT`).run(); // "YYYY-MM-DD HH:MM"
   }
   if (!colExists("actividades", "programada_fin")) {
-    db.prepare(`ALTER TABLE actividades ADD COLUMN programada_fin TEXT`).run();
+    db.prepare(`ALTER TABLE actividades ADD COLUMN programada_fin TEXT`).run(); // "YYYY-MM-DD HH:MM"
   }
 
   // tablas snapshot y auditoría
@@ -72,19 +83,66 @@ function ensureSchema() {
     CREATE TABLE IF NOT EXISTS actividad_estado_historial (
       id TEXT PRIMARY KEY,
       actividad_id TEXT NOT NULL,
-      estado TEXT NOT NULL,
-      fecha TEXT NOT NULL,
+      estado TEXT NOT NULL,              -- 'borrador' | 'analizada' | 'programada' | ...
+      fecha TEXT NOT NULL,               -- ISO datetime
       meta TEXT
     )
   `).run();
+
+  // festivos (por si no existiera aún)
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS festivos (
+      id TEXT PRIMARY KEY,
+      start TEXT NOT NULL,               -- "YYYY-MM-DD"
+      end   TEXT,                        -- opcional ("YYYY-MM-DD")
+      title TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `).run();
+  db.prepare(`CREATE INDEX IF NOT EXISTS idx_festivos_start ON festivos (start)`).run();
+  db.prepare(`
+    CREATE UNIQUE INDEX IF NOT EXISTS unq_festivos_start_end_title
+    ON festivos (start, COALESCE(end, start), title)
+  `).run();
+
+  // horarios: asegurar curso_id y crear índices
+  if (tableExists("horarios") && !colExists("horarios", "curso_id")) {
+    db.prepare(`ALTER TABLE horarios ADD COLUMN curso_id TEXT`).run();
+  }
+
+  db.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_horarios_curso_asig_dia
+    ON horarios(curso_id, asignatura_id, dia, hora_inicio, hora_fin)
+  `).run();
+
+  db.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_actividades_prog
+    ON actividades(curso_id, programada_para, programada_fin)
+  `).run();
 }
 
-// Llama al iniciar la app, antes de registrar handlers IPC
 ensureSchema();
 
+function hoyYYYYMMDD() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function lectivoGet(): { start?: string; end?: string } {
+  const row = db.prepare(`SELECT start, end FROM rango_lectivo WHERE id = 1`).get() as
+    | { start?: string; end?: string }
+    | undefined;
+  return row || {};
+}
+
+/** true si ymd está dentro del lectivo (si existe) */
+function lectivoContains(ymd: string): boolean {
+  const { start, end } = lectivoGet();
+  if (!start || !end) return true; // si no hay rango guardado, no bloqueamos desde backend
+  return ymd >= start && ymd <= end;
+}
 
 
-// Tabla ALUMNOS
+/* ---------------------------- Tablas básicas ---------------------------- */
 
 db.prepare(`
   CREATE TABLE IF NOT EXISTS alumnos (
@@ -94,27 +152,28 @@ db.prepare(`
     curso TEXT,
     mail TEXT
   )
-`).run()
-
-// Tabla HORARIOS
+`).run();
 
 db.prepare(`
   CREATE TABLE IF NOT EXISTS horarios (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    curso_id TEXT,                -- puede ser NULL si vino de DB antigua; ensureSchema ya lo añade
     asignatura_id TEXT NOT NULL,
-    dia TEXT NOT NULL,
-    hora_inicio TEXT NOT NULL,
-    hora_fin TEXT NOT NULL
+    dia TEXT NOT NULL,            -- 'lunes' ... 'viernes'
+    hora_inicio TEXT NOT NULL,    -- 'HH:MM'
+    hora_fin TEXT NOT NULL        -- 'HH:MM'
   )
-`).run()
+`).run();
 
-const isDev = !app.isPackaged
+/* ------------------------------- Ventana ------------------------------- */
+
+const isDev = !app.isPackaged;
 
 const createWindow = () => {
   const win = new BrowserWindow({
     width: 1600,
     height: 1000,
-    minWidth: 1400, 
+    minWidth: 1400,
     minHeight: 800,
     resizable: true,
     webPreferences: {
@@ -122,51 +181,117 @@ const createWindow = () => {
       nodeIntegration: false,
       contextIsolation: true,
     },
-  })
+  });
 
   if (isDev) {
-    win.loadURL("http://localhost:3000")
-    win.webContents.openDevTools()
+    win.loadURL("http://localhost:3000");
+    win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(__dirname, "../.next/renderer/index.html"))
+    win.loadFile(path.join(__dirname, "../.next/renderer/index.html"));
   }
-}
+};
 
-app.whenReady().then(createWindow)
-
+app.whenReady().then(createWindow);
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit()
-})
+  if (process.platform !== "darwin") app.quit();
+});
+
+/* ------------------------------ Helpers ------------------------------ */
 
 function getEstadoActividad(id: string): string | null {
   try {
-    const row = db
-      .prepare(`SELECT estado FROM actividades WHERE id = ?`)
-      .get(id) as { estado?: string } | undefined;
+    const row = db.prepare(`SELECT estado FROM actividades WHERE id = ?`).get(id) as { estado?: string } | undefined;
     return row?.estado ?? null;
   } catch {
-    // Si no existe la columna, no bloqueamos el borrado por estado
     return null;
   }
 }
 
-// ---------------------------
-// IPC handlers para CURSOS
-// ---------------------------
+// Helpers de programación
+function weekdayEsFromISO(iso: string): string {
+  const dt = new Date(iso.replace(" ", "T"));
+  const dias = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  return dias[dt.getDay()];
+}
+function hhmmFromISO(iso: string): string {
+  return iso.slice(11, 16);
+}
+function diffMin(h1: string, h2: string): number {
+  const [H1, M1] = h1.split(":").map(Number);
+  const [H2, M2] = h2.split(":").map(Number);
+  return H2 * 60 + M2 - (H1 * 60 + M1);
+}
+function addMinutesSameDay(startISO: string, minutes: number): string {
+  const date = new Date(startISO.replace(" ", "T") + ":00");
+  date.setMinutes(date.getMinutes() + minutes);
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${startISO.slice(0, 10)} ${hh}:${mm}`;
+}
+
+/* ----------------------- Consultas preparadas (prog) ----------------------- */
+
+const qGetActividadMin = db.prepare(`
+  SELECT id, curso_id, asignatura_id
+  FROM actividades
+  WHERE id = ?
+`);
+
+const qHorarioBloque = db.prepare(`
+  SELECT id, curso_id, asignatura_id, dia, hora_inicio, hora_fin
+  FROM horarios
+  WHERE curso_id = ?
+    AND asignatura_id = ?
+    AND lower(dia) = lower(?)
+    AND time(?) >= time(hora_inicio)
+    AND time(?) <= time(hora_fin)
+  ORDER BY hora_inicio ASC
+  LIMIT 1
+`);
+
+const qEsFestivo = db.prepare(`
+  SELECT 1
+  FROM festivos
+  WHERE date(?) BETWEEN date(start) AND date(COALESCE(end, start))
+  LIMIT 1
+`);
+
+const qSolapeProgramadas = db.prepare(`
+  WITH ult AS (
+    SELECT actividad_id, MAX(rowid) AS max_rowid
+    FROM actividad_estado_historial
+    GROUP BY actividad_id
+  ),
+  estados AS (
+    SELECT h.actividad_id
+    FROM actividad_estado_historial h
+    JOIN ult u ON u.actividad_id = h.actividad_id AND u.max_rowid = h.rowid
+    WHERE lower(h.estado) = 'programada'
+  )
+  SELECT a.id
+  FROM actividades a
+  JOIN estados e ON e.actividad_id = a.id
+  WHERE a.curso_id = ?
+    AND NOT (datetime(COALESCE(a.programada_fin, a.fecha)) <= datetime(?) OR
+             datetime(COALESCE(a.programada_para, a.fecha)) >= datetime(?))
+  LIMIT 1
+`);
+
+/* --------------------------- IPC handlers: CURSOS --------------------------- */
 
 ipcMain.handle("leer-cursos", () => {
-  return db.prepare("SELECT * FROM cursos").all()
-})
+  return db.prepare("SELECT * FROM cursos").all();
+});
 
 ipcMain.handle("guardar-curso", (_event, curso) => {
-  console.log("📅 Curso recibido en main:", curso)
-  const { acronimo, nombre, nivel, grado, clase } = curso
+  console.log("📅 Curso recibido en main:", curso);
+  const { acronimo, nombre, nivel, grado, clase } = curso;
 
   if (!acronimo || !nivel || !clase) {
-    throw new Error("Faltan campos obligatorios: acrónimo, nivel o clase.")
+    throw new Error("Faltan campos obligatorios: acrónimo, nivel o clase.");
   }
 
-  const id = `${acronimo}${nivel}${clase}`.toUpperCase()
+  const id = `${acronimo}${nivel}${clase}`.toUpperCase();
 
   db.prepare(`
     INSERT OR REPLACE INTO cursos (id, acronimo, nombre, nivel, grado, clase)
@@ -178,45 +303,39 @@ ipcMain.handle("guardar-curso", (_event, curso) => {
     nivel,
     grado,
     clase,
-  })
+  });
 
-  return { success: true, id }
-})
+  return { success: true, id };
+});
 
-ipcMain.handle("borrar-curso", (event, id: string) => {
-  const stmt = db.prepare("DELETE FROM cursos WHERE id = ?")
-  return stmt.run(id)
-})
+ipcMain.handle("borrar-curso", (_event, id: string) => {
+  const stmt = db.prepare("DELETE FROM cursos WHERE id = ?");
+  return stmt.run(id);
+});
 
-
-// ---------------------------
-// IPC handlers para NOMBRES
-// ---------------------------
+/* --------------------------- IPC handlers: NOMBRES -------------------------- */
 
 ipcMain.handle("leer-nombres", () => {
-  return db.prepare("SELECT * FROM nombres").all()
-})
+  return db.prepare("SELECT * FROM nombres").all();
+});
 
 ipcMain.handle("guardar-nombre", (_event, nombre: string) => {
-  db.prepare("INSERT INTO nombres (nombre) VALUES (?)").run(nombre)
-})
+  db.prepare("INSERT INTO nombres (nombre) VALUES (?)").run(nombre);
+});
 
-// ---------------------------
-// IPC handler para ASIGNATURAS
-// ---------------------------
+/* ------------------------ IPC handlers: ASIGNATURAS ------------------------ */
 
-ipcMain.handle("actualizar-color-asignatura", (event, id: string, color: string) => {
-  const stmt = db.prepare(`UPDATE asignaturas SET color = ? WHERE id = ?`)
-  stmt.run(color, id)
-})
-
+ipcMain.handle("actualizar-color-asignatura", (_event, id: string, color: string) => {
+  const stmt = db.prepare(`UPDATE asignaturas SET color = ? WHERE id = ?`);
+  stmt.run(color, id);
+});
 
 ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
   try {
-    const { id, nombre, creditos, descripcion, RA } = asignatura
+    const { id, nombre, creditos, descripcion, RA } = asignatura;
 
     if (!id || !nombre || !creditos || !descripcion || !RA) {
-      throw new Error("Faltan campos en la asignatura.")
+      throw new Error("Faltan campos en la asignatura.");
     }
 
     db.prepare(`
@@ -228,24 +347,24 @@ ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
       creditos,
       descripcion: JSON.stringify(descripcion),
       RA: JSON.stringify(RA),
-    })
+    });
 
-    return { success: true }
+    return { success: true };
   } catch (error) {
-    console.error("❌ Error al guardar asignatura:", error)
-    throw error
+    console.error("❌ Error al guardar asignatura:", error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle("leer-asignaturas", () => {
   const rows = db.prepare("SELECT * FROM asignaturas").all() as {
-    id: string
-    nombre: string
-    creditos: string
-    descripcion: string
-    RA: string
-    color: string // ✅ añadimos color aquí también
-  }[]
+    id: string;
+    nombre: string;
+    creditos: string;
+    descripcion: string;
+    RA: string;
+    color: string;
+  }[];
 
   return rows.map((row) => ({
     id: row.id,
@@ -253,23 +372,23 @@ ipcMain.handle("leer-asignaturas", () => {
     creditos: row.creditos,
     descripcion: JSON.parse(row.descripcion),
     RA: JSON.parse(row.RA),
-    color: row.color, // ✅ ahora se incluye en el resultado
-  })) satisfies Asignatura[]
-})
+    color: row.color,
+  })) satisfies Asignatura[];
+});
 
-ipcMain.handle("leer-asignatura", (event, asignaturaId: string) => {
-  const stmt = db.prepare(`SELECT * FROM asignaturas WHERE id = ?`)
-  const row = stmt.get(asignaturaId)
+ipcMain.handle("leer-asignatura", (_event, asignaturaId: string) => {
+  const stmt = db.prepare(`SELECT * FROM asignaturas WHERE id = ?`);
+  const row = stmt.get(asignaturaId);
   const typedRow = row as {
-    id: string
-    nombre: string
-    descripcion: string
-    creditos: string
-    color: string
-    RA: string
-  }
+    id: string;
+    nombre: string;
+    descripcion: string;
+    creditos: string;
+    color: string;
+    RA: string;
+  };
 
-  if (!row) return null
+  if (!row) return null;
 
   const asignatura = {
     id: typedRow.id,
@@ -277,84 +396,71 @@ ipcMain.handle("leer-asignatura", (event, asignaturaId: string) => {
     descripcion: typedRow.descripcion,
     creditos: typedRow.creditos,
     color: typedRow.color,
-    ra: [],
-  }
+    ra: [] as any[],
+  };
 
   try {
     if (typeof typedRow.RA === "string") {
-      const rawRA = JSON.parse(typedRow.RA)
+      const rawRA = JSON.parse(typedRow.RA);
       asignatura.ra = rawRA.map((ra: any) => ({
         ...ra,
-        ce: ra.CE, // <- Renombramos aquí
-      }))
+        ce: ra.CE,
+      }));
     }
   } catch (err) {
-    console.error("Error al parsear RA:", err)
-    asignatura.ra = []
+    console.error("Error al parsear RA:", err);
+    asignatura.ra = [];
   }
 
-  console.log("🚀 Asignatura enviada al frontend:", asignatura)
-  return asignatura
-})
+  console.log("🚀 Asignatura enviada al frontend:", asignatura);
+  return asignatura;
+});
 
-
-
-
-// ---------------------------
-// IPC handler para ALUMNOS
-// ---------------------------
+/* --------------------------- IPC handlers: ALUMNOS -------------------------- */
 
 ipcMain.handle("guardar-alumno", async (_event, alumno) => {
-  console.log("📩 Guardando alumno en SQLite:", alumno)
+  console.log("📩 Guardando alumno en SQLite:", alumno);
   try {
     const stmt = db.prepare(`
       INSERT INTO alumnos (nombre, apellidos, curso, mail)
       VALUES (?, ?, ?, ?)
-    `)
+    `);
 
-    stmt.run(
-      alumno.nombre,
-      alumno.apellidos,
-      alumno.curso,
-      alumno.mail
-    )
+    stmt.run(alumno.nombre, alumno.apellidos, alumno.curso, alumno.mail);
 
-    return { success: true }
+    return { success: true };
   } catch (error) {
-    console.error("❌ Error al guardar alumno en SQLite:", error)
-    throw error
+    console.error("❌ Error al guardar alumno en SQLite:", error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle("leer-alumnos", () => {
-  return db.prepare("SELECT * FROM alumnos").all()
-})
+  return db.prepare("SELECT * FROM alumnos").all();
+});
 
-ipcMain.handle("leer-alumnos-por-curso", (event, cursoId: string) => {
-  const stmt = db.prepare(`SELECT * FROM alumnos WHERE curso = ?`)
-  const alumnos = stmt.all(cursoId)
-  return alumnos
-})
+ipcMain.handle("leer-alumnos-por-curso", (_event, cursoId: string) => {
+  const stmt = db.prepare(`SELECT * FROM alumnos WHERE curso = ?`);
+  const alumnos = stmt.all(cursoId);
+  return alumnos;
+});
 
-// ---------------------------
-// IPC handler para HORARIOS
-// ---------------------------
+/* ---------------------------- IPC: HORARIOS CRUD --------------------------- */
 
-
-ipcMain.handle("guardar-horario", (e, payload) => {
-  const cursoId      = String(payload.cursoId ?? "").trim();
+ipcMain.handle("guardar-horario", (_e, payload) => {
+  const cursoId = String(payload.cursoId ?? "").trim();
   const asignaturaId = String(payload.asignaturaId ?? "").trim();
-  const diaRaw       = String(payload.dia ?? "").trim().toLowerCase();
-  const dia          = diaRaw === "miercoles" ? "miércoles" : diaRaw === "sabado" ? "sábado" : diaRaw;
-  const horaInicio   = String(payload.horaInicio ?? "").trim();
-  const horaFin      = String(payload.horaFin ?? "").trim();
+  const diaRaw = String(payload.dia ?? "").trim().toLowerCase();
+  const dia = diaRaw === "miercoles" ? "miércoles" : diaRaw === "sabado" ? "sábado" : diaRaw;
+  const horaInicio = String(payload.horaInicio ?? "").trim();
+  const horaFin = String(payload.horaFin ?? "").trim();
 
   const faltan = [];
-  if (!cursoId)      faltan.push("cursoId");
+  if (!cursoId) faltan.push("cursoId");
   if (!asignaturaId) faltan.push("asignaturaId");
-  if (!dia)          faltan.push("dia");
-  if (!horaInicio)   faltan.push("horaInicio");
-  if (!horaFin)      faltan.push("horaFin");
+  if (!dia) faltan.push("dia");
+  if (!horaInicio) faltan.push("horaInicio");
+  if (!horaFin) faltan.push("horaFin");
   if (faltan.length) throw new Error(`Faltan campos (${faltan.join(", ")})`);
 
   const insert = db.prepare(`
@@ -363,7 +469,9 @@ ipcMain.handle("guardar-horario", (e, payload) => {
   `);
   const info = insert.run(cursoId, asignaturaId, dia, horaInicio, horaFin);
 
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT id,
            curso_id      AS cursoId,
            asignatura_id AS asignaturaId,
@@ -371,10 +479,12 @@ ipcMain.handle("guardar-horario", (e, payload) => {
            hora_inicio   AS horaInicio,
            hora_fin      AS horaFin
     FROM horarios WHERE id = ?
-  `).get(info.lastInsertRowid as number);
+  `
+    )
+    .get(info.lastInsertRowid as number);
 });
 
-ipcMain.handle("leer-horarios", (e, asignaturaId: string, cursoId?: string) => {
+ipcMain.handle("leer-horarios", (_e, asignaturaId: string, cursoId?: string) => {
   let query = `
     SELECT 
       id,
@@ -405,47 +515,35 @@ ipcMain.handle("leer-horarios", (e, asignaturaId: string, cursoId?: string) => {
 
   return db.prepare(query).all(...params);
 });
-// ---------------------------
-// IPC handler para HORARIOS de FULLCALENDAR
-// ---------------------------
 
+/* --------------------- IPC: HORARIOS de FULLCALENDAR (stub) -------------------- */
 
-// ---------------------------
-// IPC handler para ASOCIAR ASIGNATURAS A LOS CURSOS
-// ---------------------------
+/* ---------------- IPC: ASOCIAR ASIGNATURAS A LOS CURSOS ---------------- */
 
-ipcMain.handle("asociar-asignaturas-curso", (event, cursoId: string, asignaturaIds: string[]) => {
-  db.prepare("DELETE FROM curso_asignatura WHERE curso_id = ?").run(cursoId)
+ipcMain.handle("asociar-asignaturas-curso", (_event, cursoId: string, asignaturaIds: string[]) => {
+  db.prepare("DELETE FROM curso_asignatura WHERE curso_id = ?").run(cursoId);
 
-  const insert = db.prepare(
-    "INSERT INTO curso_asignatura (curso_id, asignatura_id) VALUES (?, ?)"
-  )
-
+  const insert = db.prepare("INSERT INTO curso_asignatura (curso_id, asignatura_id) VALUES (?, ?)");
   for (const asigId of asignaturaIds) {
-    insert.run(cursoId, asigId)
+    insert.run(cursoId, asigId);
   }
+  return true;
+});
 
-  return true
-})
+/* ---------------- IPC: LEER ASIGNATURAS DE UN CURSO ---------------- */
 
-// ---------------------------
-// IPC handler para LEER LAS ASIGNATURAS DE LOS CURSOS
-// ---------------------------
-
-ipcMain.handle("leer-asignaturas-curso", (event, cursoId: string) => {
+ipcMain.handle("leer-asignaturas-curso", (_event, cursoId: string) => {
   const stmt = db.prepare(`
     SELECT a.id, a.nombre
     FROM asignaturas a
     JOIN curso_asignatura ca ON a.id = ca.asignatura_id
     WHERE ca.curso_id = ?
-  `)
+  `);
 
-  return stmt.all(cursoId)
-})
+  return stmt.all(cursoId);
+});
 
-// ---------------------------
-// IPC handler para ACTIVIDADES POR ASIGNATURA / CURSO
-// ---------------------------
+/* ---------------- IPC: ACTIVIDADES POR ASIGNATURA / CURSO ---------------- */
 
 type ActividadCruda = {
   id: string;
@@ -459,52 +557,69 @@ type ActividadCruda = {
   umbral_aplicado?: number | null;
 };
 
-ipcMain.handle("actividades-de-curso", (event, cursoId: string) => {
+ipcMain.handle("actividades-de-curso", (_event, cursoId: string) => {
   const stmt = db.prepare(`
-    SELECT id, nombre, fecha, curso_id, asignatura_id, descripcion,
-           estado, analisis_fecha, umbral_aplicado
-    FROM actividades
-    WHERE curso_id = ?
-    ORDER BY date(fecha) ASC, nombre ASC
+    WITH ult AS (
+      SELECT h.actividad_id, MAX(h.rowid) AS max_rowid
+      FROM actividad_estado_historial h
+      GROUP BY h.actividad_id
+    ),
+    estados AS (
+      SELECT h.actividad_id, lower(h.estado) AS estado
+      FROM actividad_estado_historial h
+      JOIN ult u ON u.actividad_id = h.actividad_id AND u.max_rowid = h.rowid
+    )
+    SELECT 
+      a.id,
+      a.nombre,
+      a.fecha,
+      a.curso_id,
+      a.asignatura_id,
+      a.descripcion,
+      a.umbral_aplicado,
+      a.analisis_fecha,
+      a.programada_para,       -- NUEVO
+      a.programada_fin,        -- NUEVO
+      COALESCE(e.estado, a.estado) AS estado_derivado
+    FROM actividades a
+    LEFT JOIN estados e ON e.actividad_id = a.id
+    WHERE a.curso_id = ?
+    ORDER BY date(a.fecha) ASC, a.nombre ASC
   `);
 
-  const actividades = stmt.all(cursoId) as ActividadCruda[];
+  const actividades = stmt.all(cursoId) as Array<{
+    id: string;
+    nombre: string;
+    fecha: string | null;
+    curso_id: string;
+    asignatura_id: string;
+    descripcion?: string | null;
+    umbral_aplicado?: number | null;
+    analisis_fecha?: string | null;
+    programada_para?: string | null;
+    programada_fin?: string | null;
+    estado_derivado?: string | null;
+  }>;
 
   return actividades.map((a) => ({
     id: a.id,
     nombre: a.nombre,
-    fecha: a.fecha,
+    fecha: a.fecha ?? "",
     cursoId: a.curso_id,
     asignaturaId: a.asignatura_id,
     descripcion: a.descripcion ?? "",
-    estado: a.estado ?? "borrador",
+    estado: a.estado_derivado ?? "borrador",
     analisisFecha: a.analisis_fecha ?? null,
     umbralAplicado: a.umbral_aplicado ?? null,
+    programadaPara: a.programada_para ?? null,
+    programadaFin: a.programada_fin ?? null,
   }));
 });
 
 
-ipcMain.handle("guardar-actividad", (event, actividad) => {
-  const stmt = db.prepare(`
-    INSERT INTO actividades (id, nombre, fecha, curso_id, asignatura_id, descripcion)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `)
+/* -------------------- IPC: RA/CE y análisis de actividades ------------------- */
 
-  stmt.run(
-    actividad.id,
-    actividad.nombre,
-    actividad.fecha,
-    actividad.cursoId,
-    actividad.asignaturaId,
-    actividad.descripcion || null 
-  )
-
-  return { success: true }
-})
-
-
-// Obtener todos los RA de una asignatura
-ipcMain.handle("obtener-ra-por-asignatura", (event, asignaturaId: string) => {
+ipcMain.handle("obtener-ra-por-asignatura", (_event, asignaturaId: string) => {
   const stmt = db.prepare(`
     SELECT id, codigo, descripcion
     FROM ra
@@ -514,8 +629,7 @@ ipcMain.handle("obtener-ra-por-asignatura", (event, asignaturaId: string) => {
   return stmt.all(asignaturaId);
 });
 
-// Obtener todos los CE de un RA
-ipcMain.handle("obtener-ce-por-ra", (event, raId: string) => {
+ipcMain.handle("obtener-ce-por-ra", (_event, raId: string) => {
   const stmt = db.prepare(`
     SELECT id, codigo, descripcion
     FROM ce
@@ -526,28 +640,27 @@ ipcMain.handle("obtener-ce-por-ra", (event, raId: string) => {
 });
 
 ipcMain.handle("analizar-descripcion", async (_e, actividadId: string) => {
-  // tu función real:
   const resultado = await analizarDescripcionActividad(actividadId);
-  return resultado; // debe devolver el array con {codigo, descripcion, puntuacion, ...}
-});
-
-// Extraemos textos planos extraidos desde un PDF
-ipcMain.handle("analizar-descripcion-desde-texto", async (event, texto: string, asignaturaId: string) => {
-  const resultado = await analizarTextoPlano(texto, asignaturaId); // función idéntica a `analizarDescripcionActividad` pero con texto plano
   return resultado;
 });
 
-ipcMain.handle("extraer-texto-pdf", async (event, filePath: string) => {
+ipcMain.handle("analizar-descripcion-desde-texto", async (_event, texto: string, asignaturaId: string) => {
+  const resultado = await analizarTextoPlano(texto, asignaturaId);
+  return resultado;
+});
+
+ipcMain.handle("extraer-texto-pdf", async (_event, filePath: string) => {
   return extraerTextoPDF(filePath);
 });
 
-const rutaPDFs = path.join(__dirname, "..", "data", "archivos_pdf");
+/* --------------------------- Archivos PDF (guardar) ------------------------- */
 
+const rutaPDFs = path.join(__dirname, "..", "data", "archivos_pdf");
 if (!fs.existsSync(rutaPDFs)) {
   fs.mkdirSync(rutaPDFs, { recursive: true });
 }
 
-ipcMain.handle("guardar-pdf", async (event, buffer: ArrayBuffer, nombre: string) => {
+ipcMain.handle("guardar-pdf", async (_event, buffer: ArrayBuffer, nombre: string) => {
   try {
     const rutaFinal = path.join(__dirname, "../data/archivos_pdf", nombre);
     fs.writeFileSync(rutaFinal, Buffer.from(buffer));
@@ -569,18 +682,22 @@ ipcMain.handle("guardar-informe-pdf", async (_e, data: Uint8Array, sugerido: str
   return { ok: true, filePath };
 });
 
+/* -------------------- Guardar/leer análisis y su historial ------------------- */
+
 ipcMain.handle("actividad.guardar-analisis", (_e, payload) => {
   const { actividadId, umbral, ces } = payload;
   const now = new Date().toISOString();
 
   const tx = db.transaction(() => {
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE actividades
       SET estado = 'analizada',
           umbral_aplicado = ?,
           analisis_fecha = ?
       WHERE id = ?
-    `).run(umbral, now, actividadId);
+    `
+    ).run(umbral, now, actividadId);
 
     const upsert = db.prepare(`
       INSERT INTO actividad_ce (actividad_id, ce_codigo, puntuacion, razon, evidencias, incluido)
@@ -602,10 +719,12 @@ ipcMain.handle("actividad.guardar-analisis", (_e, payload) => {
       );
     }
 
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha, meta)
       VALUES (?, ?, 'analizada', ?, ?)
-    `).run(crypto.randomUUID(), actividadId, now, JSON.stringify({ umbral }));
+    `
+    ).run(crypto.randomUUID(), actividadId, now, JSON.stringify({ umbral }));
   });
 
   tx();
@@ -613,27 +732,38 @@ ipcMain.handle("actividad.guardar-analisis", (_e, payload) => {
 });
 
 ipcMain.handle("actividad.leer-analisis", (_e, actividadId: string) => {
-  const meta = db.prepare(`
+  const meta = db
+    .prepare(
+      `
     SELECT umbral_aplicado, analisis_fecha
     FROM actividades
     WHERE id = ?
-  `).get(actividadId) as { umbral_aplicado: number|null; analisis_fecha: string|null } | undefined;
+  `
+    )
+    .get(actividadId) as { umbral_aplicado: number | null; analisis_fecha: string | null } | undefined;
 
-  const ces = db.prepare(`
+  const ces = db
+    .prepare(
+      `
     SELECT ce_codigo AS codigo, puntuacion, razon, evidencias
     FROM actividad_ce
     WHERE actividad_id = ? AND incluido = 1
     ORDER BY puntuacion DESC
-  `).all(actividadId) as {
-    codigo: string; puntuacion: number; razon?: string; evidencias?: string|null;
-  }[];
+  `
+    )
+    .all(actividadId) as {
+      codigo: string;
+      puntuacion: number;
+      razon?: string;
+      evidencias?: string | null;
+    }[];
 
   return {
     umbral: meta?.umbral_aplicado ?? 0,
     fecha: meta?.analisis_fecha ?? null,
-    ces: ces.map(c => ({
+    ces: ces.map((c) => ({
       codigo: c.codigo,
-      descripcion: "", // rellena si tienes descripción maestra
+      descripcion: "",
       puntuacion: c.puntuacion,
       reason: (c.razon as any) ?? undefined,
       evidencias: c.evidencias ? JSON.parse(c.evidencias) : undefined,
@@ -641,17 +771,11 @@ ipcMain.handle("actividad.leer-analisis", (_e, actividadId: string) => {
   };
 });
 
-// ---------------------------
-// IPC handler: BORRAR ACTIVIDAD (con validación de estado)
-// ---------------------------
+/* ------------------- BORRAR ACTIVIDAD (con validación estado) ---------------- */
 
-// Transacción de borrado segura (borra dependencias si no usas FK con CASCADE)
 const txBorrarActividad = db.transaction((id: string) => {
-  // Si tienes claves foráneas con ON DELETE CASCADE hacia actividades.id,
-  // podrías omitir estos dos deletes manuales.
   db.prepare(`DELETE FROM actividad_ce WHERE actividad_id = ?`).run(id);
   db.prepare(`DELETE FROM actividad_estado_historial WHERE actividad_id = ?`).run(id);
-
   const info = db.prepare(`DELETE FROM actividades WHERE id = ?`).run(id);
   if (info.changes === 0) throw new Error("NOT_FOUND");
 });
@@ -659,7 +783,6 @@ const txBorrarActividad = db.transaction((id: string) => {
 ipcMain.handle("borrar-actividad", (_event, id: string) => {
   if (!id || typeof id !== "string") throw new Error("ID inválido");
 
-  // Validar estado si existe la columna (ya tienes getEstadoActividad arriba)
   const estado = getEstadoActividad(id);
   if (estado && !["borrador", "analizada"].includes(estado)) {
     throw new Error("Solo se puede eliminar una actividad en estado 'borrador' o 'analizada'");
@@ -675,30 +798,30 @@ ipcMain.handle("borrar-actividad", (_event, id: string) => {
   }
 });
 
-// main.ts
-ipcMain.handle("horarios-de-asignatura", (event, { cursoId, asignaturaId }) => {
+/* ---------------------- HORARIOS normalizados (consulta) --------------------- */
+
+ipcMain.handle("horarios-de-asignatura", (_event, { cursoId, asignaturaId }) => {
   const cols = db.prepare("PRAGMA table_info(horarios)").all().map((c: any) => c.name);
 
   const colDia =
     cols.includes("dia_semana") ? "dia_semana" :
-    cols.includes("diaSemana")  ? "diaSemana"  :
-    cols.includes("dia")        ? "dia"        : null;
+    cols.includes("diaSemana") ? "diaSemana" :
+    cols.includes("dia") ? "dia" : null;
 
   const colInicio =
     cols.includes("hora_inicio") ? "hora_inicio" :
-    cols.includes("horaInicio")  ? "horaInicio"  :
-    cols.includes("inicio")      ? "inicio"      : null;
+    cols.includes("horaInicio") ? "horaInicio" :
+    cols.includes("inicio") ? "inicio" : null;
 
   const colFin =
     cols.includes("hora_fin") ? "hora_fin" :
-    cols.includes("horaFin")  ? "horaFin"  :
-    cols.includes("fin")      ? "fin"      : null;
+    cols.includes("horaFin") ? "horaFin" :
+    cols.includes("fin") ? "fin" : null;
 
   if (!colDia || !colInicio || !colFin) {
     throw new Error(`Tabla 'horarios' sin columnas esperadas. Columns: ${cols.join(", ")}`);
   }
 
-  // Normalización robusta en SQL → diaSemana: 0=Dom..6=Sáb
   const sql = `
     SELECT
       CASE
@@ -709,12 +832,8 @@ ipcMain.handle("horarios-de-asignatura", (event, { cursoId, asignaturaId }) => {
         WHEN lower(${colDia}) IN ('jueves','jue')  THEN 4
         WHEN lower(${colDia}) IN ('viernes','vie') THEN 5
         WHEN lower(${colDia}) IN ('sabado','sábado','sab','sáb') THEN 6
-
-        -- numérico 0..6 (JS)
         WHEN CAST(${colDia} AS INTEGER) BETWEEN 0 AND 6 THEN CAST(${colDia} AS INTEGER)
-        -- numérico 1..7 (ISO: Lu..Do)
         WHEN CAST(${colDia} AS INTEGER) BETWEEN 1 AND 7 THEN (CAST(${colDia} AS INTEGER) % 7)
-
         ELSE NULL
       END AS diaSemana,
       ${colInicio} AS horaInicio,
@@ -723,17 +842,16 @@ ipcMain.handle("horarios-de-asignatura", (event, { cursoId, asignaturaId }) => {
     WHERE curso_id = ? AND asignatura_id = ?
   `;
 
-  const rows = db.prepare(sql).all(cursoId, asignaturaId) as {
-    diaSemana: number | null; horaInicio: string; horaFin: string;
-  }[];
-
-  // filtrar nulos por seguridad
-  return rows.filter(r => r.diaSemana !== null);
+  const rows = db.prepare(sql).all(cursoId, asignaturaId) as { diaSemana: number | null; horaInicio: string; horaFin: string }[];
+  return rows.filter((r) => r.diaSemana !== null);
 });
 
+/* ----------------------------- Listados y fechas ----------------------------- */
+
 ipcMain.handle("listar-actividades-global", () => {
-  // Si usas better-sqlite3:
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT
       a.id,
       a.nombre,
@@ -743,31 +861,32 @@ ipcMain.handle("listar-actividades-global", () => {
       c.nombre          AS cursoNombre,
       a.asignatura_id   AS asignaturaId,
       s.nombre          AS asignaturaNombre,
-      /* si tienes columnas de hora, pon sus nombres reales: */
       COALESCE(a.hora_inicio, a.horaInicio) AS horaInicio,
       COALESCE(a.hora_fin,    a.horaFin)    AS horaFin
     FROM actividades a
     LEFT JOIN cursos c      ON c.id = a.curso_id
     LEFT JOIN asignaturas s ON s.id = a.asignatura_id
     ORDER BY a.fecha ASC, a.nombre ASC
-  `).all();
+  `
+    )
+    .all();
   return rows;
 });
 
-// Actualiza la fecha de una actividad
 ipcMain.handle("actualizar-actividad-fecha", (_evt, id: string, fecha: string) => {
   db.prepare(`UPDATE actividades SET fecha = ? WHERE id = ?`).run(fecha, id);
   return { ok: true };
 });
 
+/* --------------------------- Rango lectivo y festivos ------------------------ */
+
 ipcMain.handle("lectivo:leer", async () => {
   const row = db.prepare(`SELECT start, end FROM rango_lectivo WHERE id = 1`).get();
-  return row ?? null; // { start, end } | null
+  return row ?? null;
 });
 
 ipcMain.handle("lectivo:guardar", async (_e, payload: { start: string; end: string }) => {
   const { start, end } = payload || {};
-  // Validación mínima
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
     throw new Error("Formato de fecha inválido. Usa YYYY-MM-DD.");
   }
@@ -783,13 +902,16 @@ ipcMain.handle("lectivo:guardar", async (_e, payload: { start: string; end: stri
   return { ok: true };
 });
 
-/* ---------- Festivos ---------- */
 ipcMain.handle("festivos:listar", async () => {
-  return db.prepare(`
+  return db
+    .prepare(
+      `
     SELECT id, start, end, title
     FROM festivos
     ORDER BY start DESC, id DESC
-  `).all();
+  `
+    )
+    .all();
 });
 
 ipcMain.handle("festivos:crear", async (_e, f: { start: string; end?: string | null; title: string }) => {
@@ -799,19 +921,22 @@ ipcMain.handle("festivos:crear", async (_e, f: { start: string; end?: string | n
   if (!startOk || !endOk) throw new Error("Fechas inválidas (YYYY-MM-DD).");
   if (!f.title?.trim()) throw new Error("El motivo es obligatorio.");
 
-  db.prepare(`INSERT INTO festivos (id, start, end, title) VALUES (@id, @start, @end, @title)`)
-    .run({ id, start: f.start, end: f.end ?? null, title: f.title.trim() });
-
-    return { id, start: f.start, end: f.end ?? null, title: f.title.trim() };
+  db.prepare(`INSERT INTO festivos (id, start, end, title) VALUES (@id, @start, @end, @title)`).run({
+    id,
+    start: f.start,
+    end: f.end ?? null,
+    title: f.title.trim(),
   });
+
+  return { id, start: f.start, end: f.end ?? null, title: f.title.trim() };
+});
 
 ipcMain.handle("festivos:borrar", async (_e, id: string) => {
   db.prepare(`DELETE FROM festivos WHERE id = ?`).run(id);
   return { ok: true };
 });
 
-ipcMain.handle("festivos-rango", (event, rango: { start: string; end: string }) => {
-  // start/end en formato YYYY-MM-DD (end EXCLUSIVO típico de FullCalendar)
+ipcMain.handle("festivos-rango", (_event, rango: { start: string; end: string }) => {
   const stmt = db.prepare(`
     SELECT
       id,
@@ -819,14 +944,15 @@ ipcMain.handle("festivos-rango", (event, rango: { start: string; end: string }) 
       COALESCE(end, start) AS end,
       title
     FROM festivos
-    WHERE date(start) <= date(?)      -- empieza antes o el mismo día que termina la vista
-      AND date(COALESCE(end, start)) >= date(?)  -- termina después o el mismo día que empieza la vista
+    WHERE date(start) <= date(?)
+      AND date(COALESCE(end, start)) >= date(?)
     ORDER BY start ASC
   `);
   return stmt.all(rango.end, rango.start);
 });
 
-/** Listar todas */
+/* ------------------------- Presencialidades / FCT --------------------------- */
+
 ipcMain.handle("presencialidades-listar", () => {
   const stmt = db.prepare(`
     SELECT id, dia_semana as diaSemana, hora_inicio as horaInicio, hora_fin as horaFin
@@ -836,8 +962,7 @@ ipcMain.handle("presencialidades-listar", () => {
   return stmt.all();
 });
 
-/** Crear */
-ipcMain.handle("presencialidades-crear", (event, p: { diaSemana: number; horaInicio: string; horaFin: string }) => {
+ipcMain.handle("presencialidades-crear", (_event, p: { diaSemana: number; horaInicio: string; horaFin: string }) => {
   const id = uuidv4();
   const stmt = db.prepare(`
     INSERT INTO presencialidades (id, dia_semana, hora_inicio, hora_fin)
@@ -854,22 +979,23 @@ ipcMain.handle("presencialidades-crear", (event, p: { diaSemana: number; horaIni
   }
 });
 
-/** Borrar */
-ipcMain.handle("presencialidades-borrar", (event, id: string) => {
+ipcMain.handle("presencialidades-borrar", (_event, id: string) => {
   const stmt = db.prepare(`DELETE FROM presencialidades WHERE id = ?`);
   stmt.run(id);
   return { ok: true };
 });
 
 ipcMain.handle("fct-listar", () => {
-  return db.prepare(`
+  return db
+    .prepare(`
     SELECT id, dia_semana AS diaSemana, hora_inicio AS horaInicio, hora_fin AS horaFin
     FROM fct_tramos
     ORDER BY dia_semana ASC, hora_inicio ASC
-  `).all();
+  `)
+    .all();
 });
 
-ipcMain.handle("fct-crear", (event, p: { diaSemana: number; horaInicio: string; horaFin: string }) => {
+ipcMain.handle("fct-crear", (_event, p: { diaSemana: number; horaInicio: string; horaFin: string }) => {
   const id = uuidv4();
   const stmt = db.prepare(`INSERT INTO fct_tramos (id, dia_semana, hora_inicio, hora_fin) VALUES (?, ?, ?, ?)`);
   try {
@@ -883,16 +1009,18 @@ ipcMain.handle("fct-crear", (event, p: { diaSemana: number; horaInicio: string; 
   }
 });
 
-ipcMain.handle("fct-borrar", (event, id: string) => {
+ipcMain.handle("fct-borrar", (_event, id: string) => {
   db.prepare(`DELETE FROM fct_tramos WHERE id = ?`).run(id);
   return { ok: true };
 });
 
+/* ------------------------------ Borrar horario ------------------------------ */
+
 type BorrarHorarioPayload = {
   cursoId?: string;
   asignaturaId?: string;
-  dia?: string;         // "lunes" | "martes" | ...
-  horaInicio?: string;  // "HH:mm"
+  dia?: string;
+  horaInicio?: string;
 };
 
 ipcMain.removeHandler("borrar-horario");
@@ -906,18 +1034,16 @@ ipcMain.handle("borrar-horario", (_event, payload: BorrarHorarioPayload) => {
 
   const { cursoId, asignaturaId, dia, horaInicio } = payload;
 
-  // Validación mínima (estos 4 campos son los que envías desde el front)
   if (!cursoId || !asignaturaId || !dia || !horaInicio) {
     throw new Error("Faltan parámetros: cursoId, asignaturaId, dia, horaInicio");
   }
 
-  // Normaliza el día igual que en el front (por si acaso)
   const norm = (d: string) => {
     const x = (d || "").trim().toLowerCase();
     if (x === "miercoles") return "miércoles";
     if (x === "sabado") return "sábado";
     return x;
-  };
+    };
 
   const params = {
     curso_id: cursoId,
@@ -940,7 +1066,319 @@ ipcMain.handle("borrar-horario", (_event, payload: BorrarHorarioPayload) => {
   return { ok: info.changes > 0, changes: info.changes };
 });
 
+/* ------------------- NUEVO: Programación de actividades -------------------- */
+
+/** Listar duraciones posibles: 1h..máximo del bloque actual (sin cruzar bloque) */
+ipcMain.handle(
+  "actividad:duraciones-posibles",
+  (_e, payload: { actividadId: string; startISO: string }) => {
+    try {
+      const { actividadId, startISO } = payload || {};
+      if (!actividadId || !startISO) {
+        return { success: false, error: "Parámetros incompletos" };
+      }
+
+      // YYYY-MM-DD de la fecha seleccionada
+      const ymd = startISO.slice(0, 10);
+
+      // ⛔ no permitir fuera del periodo lectivo
+      if (!lectivoContains(ymd)) {
+        return { success: false, error: "La fecha está fuera del periodo lectivo" };
+      }
+
+      // ⛔ no permitir pasado
+      if (ymd < hoyYYYYMMDD()) {
+        return { success: false, error: "No hay duraciones para fechas pasadas" };
+      }
+
+      // Buscar datos mínimos de la actividad
+      const act = qGetActividadMin.get(actividadId) as
+        | { id: string; curso_id: string; asignatura_id: string }
+        | undefined;
+      if (!act) return { success: false, error: "Actividad no encontrada" };
+
+      // ⛔ no permitir festivos
+      if (qEsFestivo.get(startISO)) {
+        return { success: false, error: "No se puede programar en un día festivo" };
+      }
+
+      // Comprobar que la hora cae dentro de un bloque de horario
+      const dia = weekdayEsFromISO(startISO);
+      const hhmm = hhmmFromISO(startISO);
+
+      const bloque = qHorarioBloque.get(
+        act.curso_id,
+        act.asignatura_id,
+        dia,
+        hhmm,
+        hhmm
+      ) as { hora_inicio: string; hora_fin: string } | undefined;
+
+      if (!bloque) {
+        return { success: false, error: "Fuera del horario de la asignatura para ese curso" };
+      }
+
+      // Duración máxima dentro del bloque
+      const maxMin = diffMin(hhmm, bloque.hora_fin);
+      if (maxMin < 60) {
+        return { success: false, error: "El tramo disponible es inferior a 1 hora" };
+      }
+
+      // Opciones en horas enteras
+      const opciones: number[] = [];
+      for (let m = 60; m <= maxMin; m += 60) opciones.push(m);
+
+      return { success: true, opciones };
+    } catch (e) {
+      console.error("actividad:duraciones-posibles error:", e);
+      return { success: false, error: "Error interno" };
+    }
+  }
+);
 
 
+/** Programar actividad dentro de un bloque, sin solapes, con historial */
+ipcMain.handle("actividad:bloques-dia", (_e, payload: { actividadId: string; date: string }) => {
+  try {
+    const { actividadId, date } = payload || {};
+    if (!actividadId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return { success: false, error: "Parámetros inválidos" };
+    }
+
+    const act = qGetActividadMin.get(actividadId) as
+      | { id: string; curso_id: string; asignatura_id: string }
+      | undefined;
+    if (!act) return { success: false, error: "Actividad no encontrada" };
+
+    const dia = weekdayEsFromISO(`${date} 12:00`);
+    // normaliza por si tu tabla guarda "miercoles"/"miércoles"
+    const rows = db.prepare(`
+      SELECT hora_inicio AS inicio, hora_fin AS fin
+      FROM horarios
+      WHERE curso_id = ? AND asignatura_id = ? AND lower(dia) = lower(?)
+      ORDER BY hora_inicio ASC
+    `).all(act.curso_id, act.asignatura_id, dia) as { inicio: string; fin: string }[];
+
+    return { success: true, bloques: rows };
+  } catch (e) {
+    console.error("actividad:bloques-dia error", e);
+    return { success: false, error: "Error interno" };
+  }
+});
+
+
+
+ipcMain.handle(
+  "actividad:programar",
+  (
+    _e,
+    payload: { actividadId: string; startISO: string; duracionMin: number }
+  ) => {
+    try {
+      // 1) Desestructurar al inicio
+      const { actividadId, startISO, duracionMin } = payload || {};
+      if (!actividadId || !startISO || !duracionMin) {
+        return { success: false, error: "Parámetros incompletos" };
+      }
+      if (duracionMin <= 0 || duracionMin % 60 !== 0) {
+        return { success: false, error: "Duración inválida (múltiplos de 60)" };
+      }
+
+      // 2) Validaciones de fecha
+      const ymd = startISO.slice(0, 10); // YYYY-MM-DD
+      if (ymd < hoyYYYYMMDD()) {
+        return { success: false, error: "No puedes programar en fechas pasadas" };
+      }
+      if (!lectivoContains(ymd)) {
+        return {
+          success: false,
+          error: "La fecha está fuera del periodo lectivo",
+        };
+      }
+
+      // 3) Buscar actividad
+      const act = qGetActividadMin.get(actividadId) as
+        | { id: string; curso_id: string; asignatura_id: string }
+        | undefined;
+      if (!act) return { success: false, error: "Actividad no encontrada" };
+
+      // 4) Festivos
+      if (qEsFestivo.get(startISO)) {
+        return { success: false, error: "No se puede programar en un día festivo" };
+      }
+
+      // 5) Horario de la asignatura
+      const dia = weekdayEsFromISO(startISO);
+      const hhmmStart = hhmmFromISO(startISO);
+
+      const bloque = qHorarioBloque.get(
+        act.curso_id,
+        act.asignatura_id,
+        dia,
+        hhmmStart,
+        hhmmStart
+      ) as { hora_inicio: string; hora_fin: string } | undefined;
+
+      if (!bloque) {
+        return {
+          success: false,
+          error: "Fuera del horario de la asignatura para ese curso",
+        };
+      }
+
+      // 6) Duración vs bloque
+      const maxMin = diffMin(hhmmStart, bloque.hora_fin);
+      if (duracionMin > maxMin) {
+        return { success: false, error: "La duración excede el bloque de clase" };
+      }
+
+      // 7) Solapes
+      const endISO = addMinutesSameDay(startISO, duracionMin);
+      const fechaSolo = startISO.slice(0, 10);
+
+      if (qSolapeProgramadas.get(act.curso_id, startISO, endISO)) {
+        return { success: false, error: "Solapa con otra actividad programada" };
+      }
+
+      // 8) Transacción DB
+      const tx = db.transaction(() => {
+        db.prepare(
+          `
+          UPDATE actividades
+          SET estado = 'programada',
+              programada_para = ?,
+              programada_fin  = ?,
+              fecha = ?
+          WHERE id = ?
+        `
+        ).run(startISO, endISO, fechaSolo, actividadId);
+
+        db.prepare(
+          `
+          INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha, meta)
+          VALUES (?, ?, 'programada', datetime('now'), json_object('duracionMin', ?))
+        `
+        ).run(crypto.randomUUID(), actividadId, duracionMin);
+      });
+      tx();
+
+      return { success: true, startISO, endISO };
+    } catch (err) {
+      console.error("Error al programar actividad:", err);
+      return { success: false, error: "Error interno" };
+    }
+  }
+);
+
+ipcMain.handle("actividad:desprogramar", (_e, payload: { actividadId: string }) => {
+  const { actividadId } = payload || {};
+  if (!actividadId) return { success: false, error: "ID requerido" };
+
+  try {
+    // Determinar a qué estado volver (si estaba analizada, volver a 'analizada'; si no, 'borrador')
+    const meta = db.prepare(`
+      SELECT COALESCE(analisis_fecha, '') AS analisis_fecha
+      FROM actividades
+      WHERE id = ?
+    `).get(actividadId) as { analisis_fecha: string } | undefined;
+
+    const nuevoEstado = meta?.analisis_fecha ? "analizada" : "borrador";
+
+    const tx = db.transaction(() => {
+      db.prepare(`
+        UPDATE actividades
+        SET estado = ?,
+            programada_para = NULL,
+            programada_fin  = NULL
+        WHERE id = ?
+      `).run(nuevoEstado, actividadId);
+
+      db.prepare(`
+        INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha, meta)
+        VALUES (?, ?, ?, datetime('now'), json_object('accion', 'desprogramar'))
+      `).run(crypto.randomUUID(), actividadId, nuevoEstado);
+    });
+    tx();
+
+    return { success: true, estado: nuevoEstado };
+  } catch (e) {
+    console.error("Error al desprogramar:", e);
+    return { success: false, error: "Error interno" };
+  }
+});
+
+function alumnosDeCurso(cursoId: string) {
+  return db.prepare(`SELECT id FROM alumnos WHERE curso_id=?`).all(cursoId) as { id: string }[];
+}
+
+/**
+ * Crea (si faltan) las filas en ce_notas para: actividad × (todos los alumnos del curso) × (cada CE)
+ * NO pisa notas existentes. Devuelve cuántas filas intentó crear.
+ */
+ipcMain.handle(
+  "ceNotas:seedActividad",
+  (_evt, actividadId: string, ceCodigos: string[]) => {
+    if (!actividadId || !Array.isArray(ceCodigos) || ceCodigos.length === 0) {
+      return { ok: false, error: "actividadId o ceCodigos inválidos." };
+    }
+
+    // 1) Curso de la actividad
+    const act = db
+      .prepare(`SELECT curso_id FROM actividades WHERE id=?`)
+      .get(actividadId) as { curso_id?: string } | undefined;
+
+    if (!act?.curso_id) {
+      return { ok: false, error: "No se encontró curso_id de la actividad." };
+    }
+
+    // 2) Alumnos del curso
+    const alumnos = alumnosDeCurso(act.curso_id);
+
+    // 3) Insertar si no existe
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO ce_notas (actividad_id, alumno_id, ce_codigo, nota)
+      VALUES (?, ?, ?, NULL)
+    `);
+
+    const tx = db.transaction(() => {
+      for (const al of alumnos) {
+        for (const cod of ceCodigos) {
+          insert.run(actividadId, al.id, cod);
+        }
+      }
+    });
+    tx();
+
+    // 4) Contadores (OPCIONAL)
+    const totalInt = alumnos.length * ceCodigos.length;
+    return { ok: true, totalInt }; // total intentados
+  }
+);
+
+// main.ts
+ipcMain.handle("guardarActividad", async (_e, payload) => {
+  try {
+    let { id, nombre, fecha, cursoId, asignaturaId, descripcion } = payload;
+
+    if (fecha?.includes("T")) fecha = fecha.slice(0, 10);
+    if (!id || !nombre || !fecha || !cursoId || !asignaturaId) throw new Error("Campos requeridos ausentes");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) throw new Error(`Formato de fecha inválido: ${fecha}`);
+
+    const curso = db.prepare("SELECT 1 FROM cursos WHERE id=?").get(cursoId);
+    const asig  = db.prepare("SELECT 1 FROM asignaturas WHERE id=?").get(asignaturaId);
+    if (!curso) throw new Error(`curso_id inexistente: ${cursoId}`);
+    if (!asig)  throw new Error(`asignatura_id inexistente: ${asignaturaId}`);
+
+    db.prepare(`
+      INSERT INTO actividades (id, nombre, fecha, curso_id, asignatura_id, descripcion)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, nombre, fecha, cursoId, asignaturaId, descripcion ?? null);
+
+    return { ok: true };
+  } catch (err: any) {
+    console.error("[guardarActividad] Error insert:", err?.message, { payload });
+    return { ok: false, error: String(err?.message || err) };
+  }
+});
 
 
