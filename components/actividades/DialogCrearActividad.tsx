@@ -36,7 +36,7 @@ type Props = {
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
   asignaturaId?: string;
   fechaInicial?: Date;
-  asignaturaNombre?: string;
+  asignaturaNombre?: string;     // <- se usará en el título animado
   cursoIdEf?: string;
   asignaturaIdEf?: string;
 };
@@ -45,6 +45,19 @@ const NOMBRE_DIA = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const ymdLocal = (d: Date) => format(d, "yyyy-MM-dd");
 const hoyLocal = () => ymdLocal(new Date());
 
+// Variants para animación en cascada
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.2 },
+  },
+};
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+};
+
 export function DialogCrearActividad({
   open,
   onOpenChange,
@@ -52,6 +65,7 @@ export function DialogCrearActividad({
   setRefreshKey,
   asignaturaId: asignaturaIdProp,
   fechaInicial,
+  asignaturaNombre,     // <- ahora se recibe correctamente
 }: Props) {
   const [fechaObj, setFechaObj] = useState<Date | undefined>(undefined);
   const [nombre, setNombre] = useState("");
@@ -62,7 +76,7 @@ export function DialogCrearActividad({
   const [loading, setLoading] = useState(false);
   const [lectivo, setLectivo] = useState<{ start?: string; end?: string } | null>(null);
   const [descripcionHtml, setDescripcionHtml] = useState<string>("");
-const [descripcionPlain, setDescripcionPlain] = useState<string>("");
+  const [descripcionPlain, setDescripcionPlain] = useState<string>("");
 
   const [cursoIdLocal, setCursoIdLocal] = useState<string | undefined>(cursoId);
   const [asignaturaIdLocal, setAsignaturaIdLocal] = useState<string | undefined>(asignaturaIdProp);
@@ -98,8 +112,11 @@ const [descripcionPlain, setDescripcionPlain] = useState<string>("");
 
   const snap = useSnapshot(asignaturasPorCurso);
   const todasAsignsDelCurso = cursoIdEf ? (snap[cursoIdEf] || []) : [];
-  const asignaturaNombre =
+  const asignaturaNombreFromStore =
     (todasAsignsDelCurso.find((a: any) => a.id === asignaturaIdEf)?.nombre as string) || "";
+
+  // si no llega por props, tomamos del store
+  const asignaturaNombreEf = asignaturaNombre ?? asignaturaNombreFromStore;
 
   useEffect(() => {
     if (!open) return;
@@ -138,6 +155,7 @@ const [descripcionPlain, setDescripcionPlain] = useState<string>("");
       setAsigsDeCurso(asigs || []);
     })();
   }, [cursoIdEf]);
+
   useEffect(() => {
     let activo = true;
     (async () => {
@@ -171,12 +189,11 @@ const [descripcionPlain, setDescripcionPlain] = useState<string>("");
     })();
     return () => { activo = false; };
   }, [open, cursoIdEf, asignaturaIdEf]);
-  
 
   // ================== GUARDAR (con respuesta ok/error) ==================
   const handleGuardar = async () => {
     const hoy = hoyLocal();
-    
+
     if (!nombre || !fecha) {
       toast.error("Por favor, completa nombre y fecha.");
       return;
@@ -217,14 +234,14 @@ const [descripcionPlain, setDescripcionPlain] = useState<string>("");
       setLoading(true);
       type GuardarActividadResult = { ok: boolean; error?: string };
 
-// ⚠️ cast defensivo: sirve aunque tu preload siga devolviendo `any` o `void`
-const raw = await window.electronAPI.guardarActividad(nuevaActividad as any);
-const res = (raw ?? {}) as Partial<GuardarActividadResult>;
+      // ⚠️ cast defensivo
+      const raw = await window.electronAPI.guardarActividad(nuevaActividad as any);
+      const res = (raw ?? {}) as Partial<GuardarActividadResult>;
 
-if (!res.ok) {
-  toast.error(`No se guardó: ${res?.error ?? "Error desconocido"}`);
-  return;
-}
+      if (!res.ok) {
+        toast.error(`No se guardó: ${res?.error ?? "Error desconocido"}`);
+        return;
+      }
 
       añadirActividad(cursoIdEf, nuevaActividad as any);
       toast.success("Actividad guardada correctamente.");
@@ -256,18 +273,18 @@ if (!res.ok) {
       toast.error(`Texto insuficiente: ${palabras} palabras detectadas.`);
       return;
     }
-  
+
     // Renderizamos texto como HTML simple (respetando saltos de línea)
     const html = `<p>${texto
       .replace(/\r\n/g, "\n")
       .split(/\n{2,}/)
       .map(p => p.trim().length ? p.trim().replace(/\n/g, "<br/>") : "<br/>")
       .join("</p><p>")}</p>`;
-  
+
     setDescripcionHtml(html);
     setDescripcion(html);         // BDD
     setDescripcionPlain(texto);   // CE
-  
+
     const ceDetectados = await window.electronAPI.analizarDescripcionDesdeTexto(texto, asignaturaIdEf);
     if (!ceDetectados || ceDetectados.length === 0) {
       toast.warning("No se han detectado CE relevantes.");
@@ -276,7 +293,6 @@ if (!res.ok) {
       setCesDetectados(ceDetectados);
     }
   };
-  
 
   const fromDate = lectivo?.start ? new Date(lectivo.start + "T00:00:00") : undefined;
   const toDate   = lectivo?.end   ? new Date(lectivo.end   + "T23:59:59") : undefined;
@@ -284,16 +300,28 @@ if (!res.ok) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-  className="w-[min(95vw,1000px)] sm:max-w-[1000px] max-h-[90vh] overflow-y-auto"
->
+        className="w-[min(95vw,1000px)] sm:max-w-[1000px] max-h-[90vh] overflow-y-auto"
+      >
         <DialogHeader>
-        <DialogTitle className="font-bold">
-  <p className="animate-fadeInUp">¡Crea una nueva actividad</p>
-  <p className="animate-fadeInUp delay-200 text-yellow-300">
-    para {asignaturaNombre}!
-  </p>
-</DialogTitle>
+          <DialogTitle className="font-bold">
+            {/* ——— Título animado con Framer Motion ——— */}
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="space-y-1"
+            >
+              <motion.p variants={itemVariants}>
+                ¡Crea una nueva actividad
+              </motion.p>
 
+              {asignaturaNombreEf && (
+                <motion.p variants={itemVariants} className="text-yellow-300 mt-1">
+                  para {asignaturaNombreEf}!
+                </motion.p>
+              )}
+            </motion.div>
+          </DialogTitle>
         </DialogHeader>
 
         <Separator className="my-3" />
@@ -400,14 +428,14 @@ if (!res.ok) {
           <div>
             <Label className="mb-2">Descripción de la actividad</Label>
             <TiptapEditor
-  valueHtml={descripcionHtml}
-  onChange={(html, plain) => {
-    setDescripcionHtml(html);     // lo que guardaremos en BDD para PDF
-    setDescripcionPlain(plain);   // para análisis CE
-    setDescripcion(html);         // si tu BDD usa campo 'descripcion' (TEXT) guardamos HTML
-  }}
-  className="w-full"
-/>
+              valueHtml={descripcionHtml}
+              onChange={(html, plain) => {
+                setDescripcionHtml(html);     // lo que guardaremos en BDD para PDF
+                setDescripcionPlain(plain);   // para análisis CE
+                setDescripcion(html);         // si tu BDD usa campo 'descripcion' (TEXT) guardamos HTML
+              }}
+              className="w-full"
+            />
           </div>
 
           <div>

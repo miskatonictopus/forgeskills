@@ -142,4 +142,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     borrarFCT: (id: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke("fct-borrar", id),
 
+      exportarPDFDesdeHTML: (html: string, fileName: string) =>
+    ipcRenderer.invoke("pdf:exportFromHTML", { html, fileName }),
+
 });

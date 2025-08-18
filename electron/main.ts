@@ -1381,4 +1381,58 @@ ipcMain.handle("guardarActividad", async (_e, payload) => {
   }
 });
 
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+ipcMain.handle("pdf:exportFromHTML", async (_e, { html, fileName }: { html: string; fileName?: string }) => {
+  if (!html) return { ok: false, error: "HTML vacío" };
+
+  const fullHtml = html.includes("<html")
+    ? html
+    : `<!doctype html><html><head>
+         <meta charset="utf-8"/>
+         <meta name="viewport" content="width=device-width, initial-scale=1"/>
+         <style>
+          html,body{margin:0;padding:0;background:#fff;color:#0a0a0a;font:14px/1.5 -apple-system,Segoe UI,Roboto,Ubuntu,Arial}
+          table, tr, td, th { page-break-inside: avoid; }
+          h1, h2, h3, p { page-break-after: avoid; }
+         </style>
+       </head><body>${html}</body></html>`;
+
+  // 1) Escribe a un temporal para evitar PDFs en blanco con data: URL
+  const tmpFile = path.join(app.getPath("temp"), `skillforge_export_${Date.now()}.html`);
+  fs.writeFileSync(tmpFile, fullHtml, "utf-8");
+
+  const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true } });
+
+  try {
+    // 2) Carga y espera a que pinte
+    await win.loadFile(tmpFile);
+    await delay(120); // pequeño margen para layout/Fonts
+
+    // 3) Imprime
+    const opts: Electron.PrintToPDFOptions = {
+      pageSize: "A4",
+      landscape: false,
+      printBackground: true,
+      margins: { marginType: "default" }, // o: { marginType: "custom", top:0, bottom:0, left:0, right:0 }
+    };
+    const pdfBuffer = await win.webContents.printToPDF(opts);
+
+    // 4) Guardar
+    const { filePath } = await dialog.showSaveDialog({
+      title: "Guardar PDF",
+      defaultPath: path.join(app.getPath("documents"), fileName || "documento.pdf"),
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (!filePath) return { ok: false, error: "Cancelado por el usuario" };
+
+    fs.writeFileSync(filePath, pdfBuffer);
+    return { ok: true, path: filePath };
+  } catch (err: any) {
+    console.error("printToPDF error:", err);
+    return { ok: false, error: String(err?.message || err) };
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
+    fs.unlink(tmpFile, () => {});
+  }
+});

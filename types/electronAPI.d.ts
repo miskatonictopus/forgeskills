@@ -158,6 +158,11 @@ export interface ElectronAPI {
       horariosDeAsignatura: (params: { cursoId: string; asignaturaId: string }) =>
       Promise<Array<{ diaSemana: number; horaInicio: string; horaFin: string }>>;
 
+      exportarPDFDesdeHTML: (
+        html: string,
+        fileName: string
+      ) => Promise<{ ok: boolean; path?: string; error?: string }>;
+
 }
 
 
