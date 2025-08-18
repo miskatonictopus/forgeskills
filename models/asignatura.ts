@@ -20,5 +20,6 @@ export type CE = {
     nombre: string
     descripcion: Descripcion
     RA: RA[]
+    color?: string;
   }
   
