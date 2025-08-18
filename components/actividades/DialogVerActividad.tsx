@@ -81,17 +81,6 @@ export function DialogVerActividad({
 const tieneCambiosSinGuardar = () =>
   fuenteAnalisis === "fresh" && cesDetectados.length > 0;
 
-  const toYmdLocal = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
-  
-  const weekdayFromYmdLocal = (ymd: string) => {
-    const [y, m, d] = ymd.split("-").map(Number);
-    return new Date(y, m - 1, d).getDay(); // 0..6 en zona LOCAL
-  };
   
   const closeWithoutSave = () => {
     setShowUnsaved(false);

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import dynamic from "next/dynamic";
@@ -34,8 +35,10 @@ type Props = {
   cursoId?: string;
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
   asignaturaId?: string;
-  asignaturaNombre?: string;
   fechaInicial?: Date;
+  asignaturaNombre?: string;
+  cursoIdEf?: string;
+  asignaturaIdEf?: string;
 };
 
 const NOMBRE_DIA = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -284,15 +287,13 @@ if (!res.ok) {
   className="w-[min(95vw,1000px)] sm:max-w-[1000px] max-h-[90vh] overflow-y-auto"
 >
         <DialogHeader>
-          <DialogTitle className="font-bold">
-            ¡Crea una nueva actividad
-            {asignaturaNombre && cursoIdEf && asignaturaIdEf && (
-              <>
-                {" "}para<br />
-                <p className="font-bold mt-2 text-yellow-300">{asignaturaNombre}!</p>
-              </>
-            )}
-          </DialogTitle>
+        <DialogTitle className="font-bold">
+  <p className="animate-fadeInUp">¡Crea una nueva actividad</p>
+  <p className="animate-fadeInUp delay-200 text-yellow-300">
+    para {asignaturaNombre}!
+  </p>
+</DialogTitle>
+
         </DialogHeader>
 
         <Separator className="my-3" />
