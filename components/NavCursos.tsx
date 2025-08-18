@@ -3,6 +3,7 @@ import { cursoStore } from "@/store/cursoStore";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Dot } from "@/components/ui/Dot"
 import {
   Folder,
   MoreHorizontal,
@@ -37,6 +38,12 @@ type Props = {
   setCursoAEliminar: (curso: { id: string; nombre: string }) => void;
 };
 
+function colorFromId(id: string) {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360
+  return `hsl(${h} 80% 55%)`
+}
+
 export function NavCursos({ setCursoAEliminar }: Props) {
   const { isMobile } = useSidebar();
   const snap = useSnapshot(cursoStore);
@@ -67,19 +74,37 @@ export function NavCursos({ setCursoAEliminar }: Props) {
                 {/* Lista + botón solo si hay asignaturas */}
                 {tieneAsignaturas && (
                   <>
-                    <ul className="ml-6 mt-1 space-y-0.5">
-                      {asignaturasPorCurso[curso.id].map((asig) => (
-                        <li key={asig.id}>
-                          <Link
-                            href={`/cursos/${curso.id}/asignaturas/${asig.id}`}
-                            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-white transition-colors"
-                          >
-                            <BookOpen className="w-3 h-3" />
-                            <span className="truncate">{asig.id} {asig.nombre}</span>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
+                   <ul className="ml-6 mt-1 space-y-1">
+  {asignaturasPorCurso[curso.id].map((asig) => {
+    const url = `/cursos/${curso.id}/asignaturas/${asig.id}`
+    return (
+      <li key={asig.id} className="space-y-1">
+        {/* Link principal a RA/CE (el de siempre) */}
+        <Link
+          href={url}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white transition-colors"
+        >
+          <Dot color={asig.color ?? "#9ca3af"} />
+          <BookOpen className="w-3 h-3" />
+          <span className="truncate">{asig.id} {asig.nombre}</span>
+        </Link>
+
+        {/* Botón XS secundario al mismo link */}
+        <Button
+          asChild
+          variant="secondary"
+          size="sm"
+          className="h-6 px-2 text-[10px] leading-none rounded-md"
+        >
+          <Link href={url} className="inline-flex items-center gap-1">
+            <BookOpen className="w-3 h-3" />
+            Ver RA / CE
+          </Link>
+        </Button>
+      </li>
+    )
+  })}
+</ul>
 
                     {/* Ver actividades */}
                     <div className="ml-6 mt-2">

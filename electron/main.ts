@@ -534,14 +534,15 @@ ipcMain.handle("asociar-asignaturas-curso", (_event, cursoId: string, asignatura
 
 ipcMain.handle("leer-asignaturas-curso", (_event, cursoId: string) => {
   const stmt = db.prepare(`
-    SELECT a.id, a.nombre
+    SELECT a.id, a.nombre, a.color
     FROM asignaturas a
     JOIN curso_asignatura ca ON a.id = ca.asignatura_id
     WHERE ca.curso_id = ?
-  `);
+  `)
 
-  return stmt.all(cursoId);
-});
+  return stmt.all(cursoId)
+})
+
 
 /* ---------------- IPC: ACTIVIDADES POR ASIGNATURA / CURSO ---------------- */
 

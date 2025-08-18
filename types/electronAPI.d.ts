@@ -163,6 +163,9 @@ export interface ElectronAPI {
         fileName: string
       ) => Promise<{ ok: boolean; path?: string; error?: string }>;
 
+      leerAsignaturasCurso: (cursoId: string) => Promise<{ id: string; nombre: string; color?: string | null }[]>
+
+
 }
 
 
