@@ -100,104 +100,124 @@ export default function TablaNotasCEAlumnos({ alumnos, ra }: Props) {
   };
 
   return (
-    <div className="overflow-auto max-h-[75vh] border rounded-xl shadow">
-      <table className="min-w-max table-auto text-sm">
-        <thead className="bg-muted/50">
-          <tr className="sticky top-0 z-10 bg-muted border-b border-muted">
-            <th className="sticky left-0 bg-muted px-4 py-2 font-medium text-left border-r border-muted">
-              CE / RA / Alumno
-            </th>
-            {alumnos.map((a, index) => (
-              <th
-                key={a.id}
-                className={`px-4 py-2 font-medium text-left whitespace-nowrap ${
-                  index !== 0 ? "border-l border-white/10" : ""
-                }`}
-              >
-                {a.apellidos}, {a.nombre}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {ra.map((raItem) => (
-            <React.Fragment key={`ra-${raItem.codigo}`}>
-              <tr className="bg-muted/10 border-t">
-                <td className="sticky left-0 bg-background font-semibold px-4 py-2 border-r border-muted w-125 whitespace-normal break-words">
-                  {raItem.codigo} – {raItem.descripcion}
-                </td>
-                {alumnos.map((alumno, index) => (
-                <td
-                key={alumno.id}
-                className={`px-2 py-1 ${index !== 0 ? "border-l border-white/10" : ""}`}
-              >
-                <div className="w-full h-full m-[2px]">
-                  <div
-                    className="w-full h-full rounded bg-white text-center text-2xl font-bold text-black shadow-sm"
-                  >
-                    {notasRA[raItem.codigo]?.[alumno.id] || "-"}
-                  </div>
-                </div>
-              </td>
-              
-               
-                ))}
-              </tr>
-              {raItem.CE.map((ce) => (
-                <tr key={ce.codigo} className="border-t">
-                  <td className="sticky left-0 bg-background px-4 py-2 text-muted-foreground border-r border-muted w-72 whitespace-normal break-words">
-                    {ce.codigo} – {ce.descripcion}
-                  </td>
-                  {alumnos.map((alumno, index) => {
-                    const notasParciales = notas[ce.codigo]?.[alumno.id] || [];
-                    return (
-                      <td
-                        key={alumno.id}
-                        className={`px-2 py-1 ${
-                          index !== 0 ? "border-l border-white/10" : ""
-                        }`}
-                      >
-                        <div className="flex items-center gap-1">
-                          <div className="flex gap-1">
-                            {notasParciales.map((nota, i) => (
-                              <input
-                                key={i}
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                max="10"
-                                value={nota}
-                                className="w-10 text-sm text-center border rounded"
-                                onChange={(e) =>
-                                  handleNotaParcialChange(
-                                    ce.codigo,
-                                    alumno.id,
-                                    i,
-                                    e.target.value.replace(",", ".")
-                                  )
-                                }
-                              />
-                            ))}
-                          </div>
-                          <input
-                            type="number"
-                            value={mediaNotasCE(ce.codigo, alumno.id).toFixed(1)}
-                            className={`w-10 text-sm text-center border rounded bg-muted cursor-not-allowed ${getNotaColor(
-                              mediaNotasCE(ce.codigo, alumno.id)
-                            )}`}
-                            readOnly
-                            tabIndex={-1}
-                          />
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
+    <div className="space-y-4">
+      {/* ===== Resumen RA ===== */}
+      <div className="overflow-x-auto">
+        <table className="min-w-max table-auto text-sm border rounded-xl overflow-hidden">
+          <thead className="bg-muted/50">
+            <tr>
+              {ra.map((raItem, index) => (
+                <th
+                  key={raItem.codigo}
+                  className="px-4 py-2 text-center font-medium border-l first:border-l-0 border-muted"
+                >
+                  {`RA${index + 1}`}
+                </th>
               ))}
-            </React.Fragment>
-          ))}
-        </tbody>
-      </table>
+            </tr>
+          </thead>
+        </table>
+      </div>
+
+      {/* ===== Tabla CE × Alumnos ===== */}
+      <div className="overflow-auto max-h-[75vh] border rounded-xl shadow">
+        <table className="min-w-max table-auto text-sm">
+          <thead className="bg-muted/50">
+            <tr className="sticky top-0 z-10 bg-muted border-b border-muted">
+              <th className="sticky text-xs left-0 bg-muted px-4 py-2 font-bold text-left border-r border-muted">
+                CE / RA / Alumno
+              </th>
+              {alumnos.map((a, index) => (
+                <th
+                  key={a.id}
+                  className={`px-4 py-2 font-medium text-xs text-left whitespace-nowrap ${
+                    index !== 0 ? "border-l border-white/10" : ""
+                  }`}
+                >
+                  {a.apellidos}, {a.nombre}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {ra.map((raItem) => (
+              <React.Fragment key={`ra-${raItem.codigo}`}>
+                {/* Fila de RA con medias */}
+                <tr className="bg-muted/10 border-t">
+                  <td className="sticky left-0 bg-background font-semibold px-4 py-2 border-r border-muted w-125 whitespace-normal break-words">
+                    {raItem.codigo} – {raItem.descripcion}
+                  </td>
+                  {alumnos.map((alumno, index) => (
+                    <td
+                      key={alumno.id}
+                      className={`px-2 py-1 ${index !== 0 ? "border-l border-white/10" : ""}`}
+                    >
+                      <div className="w-full h-full m-[2px]">
+                        <div className="w-full h-full rounded bg-white text-center text-2xl font-bold text-black shadow-sm">
+                          {notasRA[raItem.codigo]?.[alumno.id] || "-"}
+                        </div>
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+
+                {/* Filas de CE */}
+                {raItem.CE.map((ce) => (
+                  <tr key={ce.codigo} className="border-t">
+                    <td className="sticky left-0 bg-background px-4 py-2 text-muted-foreground text-xs border-r border-muted w-72 whitespace-normal break-words">
+                      {ce.codigo} – {ce.descripcion}
+                    </td>
+                    {alumnos.map((alumno, index) => {
+                      const notasParciales = notas[ce.codigo]?.[alumno.id] || [];
+                      return (
+                        <td
+                          key={alumno.id}
+                          className={`px-2 py-1 ${
+                            index !== 0 ? "border-l border-white/10" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-1">
+                            <div className="flex gap-1">
+                              {notasParciales.map((nota, i) => (
+                                <input
+                                  key={i}
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="10"
+                                  value={nota}
+                                  className="w-10 text-sm text-center border rounded"
+                                  onChange={(e) =>
+                                    handleNotaParcialChange(
+                                      ce.codigo,
+                                      alumno.id,
+                                      i,
+                                      e.target.value.replace(",", ".")
+                                    )
+                                  }
+                                />
+                              ))}
+                            </div>
+                            <input
+                              type="number"
+                              value={mediaNotasCE(ce.codigo, alumno.id).toFixed(1)}
+                              className={`w-10 text-sm text-center border rounded bg-muted cursor-not-allowed ${getNotaColor(
+                                mediaNotasCE(ce.codigo, alumno.id)
+                              )}`}
+                              readOnly
+                              tabIndex={-1}
+                            />
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { useSnapshot } from "valtio"
 import { cursoStore } from "@/store/cursoStore"
 import TablaNotasCEAlumnos from "@/components/TablaNotasCEAlumnos"
+import { Dot } from "@/components/ui/Dot"
 
 // Tipos
 
@@ -85,30 +86,39 @@ export default function AsignaturaPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-3xl text-white font-bold">
-        {curso.acronimo.toUpperCase()}
-        {curso.nivel}
+      <h1 className="text-4xl text-white font-bold flex items-center gap-2">
+  {/* circulito con el color */}
+  
+
+  {/* acrónimo y nivel */}
+  
+
+  {/* id de la asignatura */}
+  <span className="text-4xl font-bold tracking-tight">
+    {curso.acronimo.toUpperCase()}{curso.nivel}
+  </span>
+</h1>
+
+      <h1 className="text-3xl font-bold tracking-tight">
+      <Dot color={asignatura.color ?? "#9ca3af"} className="w-5 h-5" /> {asignatura.id} {asignatura.nombre}
       </h1>
 
-      <h1 className="text-3xl font-light font-notojp tracking-tight">
-        {asignatura.nombre}
-      </h1>
-
-      {asignatura.descripcion && (
+      {/* {asignatura.descripcion && (
         <p className="text-muted-foreground text-sm max-w-prose leading-relaxed">
           {asignatura.descripcion}
         </p>
-      )}
+      )} */}
 
       {asignatura.ra?.length > 0 && alumnos.length === 0 && (
         <p className="text-sm text-muted-foreground">Cargando alumnos…</p>
       )}
 
       {asignatura.ra?.length > 0 && alumnos.length > 0 && (
-        <div className="mt-10">
+        <div className="mt-3">
           <h2 className="text-lg font-semibold mb-4">
             Notas por Criterio de Evaluación
           </h2>
+          
           <TablaNotasCEAlumnos alumnos={alumnos} ra={asignatura.ra} />
         </div>
       )}

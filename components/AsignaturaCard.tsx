@@ -264,11 +264,11 @@ export function AsignaturaCard(props: AsignaturaCardProps) {
           {horarios.length > 0 ? (
             <>
               {horarios.map((h, i) => (
-                <div key={`${h.dia}-${h.horaInicio}-${i}`} className="flex items-center gap-2 group text-emerald-200">
+                <div key={`${h.dia}-${h.horaInicio}-${i}`} className="flex items-center gap-2 group text-white">
                   <button
                     onClick={() => onOpenHorario(asignatura.id)}
                     aria-label="Editar horario"
-                    className="text-emerald-200 hover:text-emerald-400 transition-colors"
+                    className="text-white hover:text-white transition-colors"
                   >
                     <SquarePen className="w-3.5 h-3.5" />
                   </button>
@@ -284,7 +284,7 @@ export function AsignaturaCard(props: AsignaturaCardProps) {
                   </span>
                 </div>
               ))}
-              <div className="text-xl font-bold text-emerald-300">{totalHoras.toFixed(1)} h</div>
+              <div className="text-xl font-bold text-white">{totalHoras.toFixed(1)} h</div>
             </>
           ) : (
             <div className="text-red-200 text-xs">

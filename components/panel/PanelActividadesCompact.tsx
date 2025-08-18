@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Dot } from "@/components/ui/Dot"
 import { useSnapshot } from "valtio";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import { actividadesPorCurso, cargarActividades } from "@/store/actividadesPorCurso";
@@ -74,8 +75,8 @@ export function PanelActividadesCompact({ cursos }: { cursos: Curso[] }) {
               className="rounded-lg border border-zinc-800 bg-background/60 p-3"
             >
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-sm font-semibold text-white">
-                  {curso.nombre ?? curso.id}
+                <div className="text-xl font-bold text-white">
+                  {curso.id} {curso.nombre}
                 </div>
                 <Badge variant="secondary">{actividades.length} actividades</Badge>
               </div>
@@ -85,12 +86,15 @@ export function PanelActividadesCompact({ cursos }: { cursos: Curso[] }) {
               ) : (
                 <Tabs defaultValue={defaultTab} className="w-full">
                   <TabsList className="w-full justify-start overflow-x-auto">
-                    {asignaturas.map((asig) => (
-                      <TabsTrigger key={asig.id} value={asig.id} className="text-xs">
-                        {asig.nombre}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
+  {asignaturas.map((asig) => (
+    <TabsTrigger key={asig.id} value={asig.id} className="text-xs">
+      <span className="flex items-center gap-2">
+        <Dot color={asig.color ?? "#9ca3af"} className="w-2.5 h-2.5" />
+        {asig.nombre}
+      </span>
+    </TabsTrigger>
+  ))}
+</TabsList>
 
                   {asignaturas.map((asig) => {
                     const all = (byAsig[asig.id] || []).sort(
