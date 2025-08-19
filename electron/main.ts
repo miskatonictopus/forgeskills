@@ -376,45 +376,45 @@ ipcMain.handle("leer-asignaturas", () => {
   })) satisfies Asignatura[];
 });
 
-ipcMain.handle("leer-asignatura", (_event, asignaturaId: string) => {
-  const stmt = db.prepare(`SELECT * FROM asignaturas WHERE id = ?`);
-  const row = stmt.get(asignaturaId);
-  const typedRow = row as {
+ipcMain.handle("leer-asignaturas-curso", (_event, cursoId: string) => {
+  if (!cursoId) return [];
+
+  const rows = db.prepare(
+    `SELECT
+       a.id,
+       a.nombre,
+       a.creditos,
+       a.descripcion,
+       a.RA,
+       a.color
+     FROM asignaturas a
+     JOIN curso_asignatura ca ON ca.asignatura_id = a.id
+     WHERE ca.curso_id = ?
+     ORDER BY a.nombre COLLATE NOCASE`
+  ).all(cursoId) as Array<{
     id: string;
     nombre: string;
-    descripcion: string;
-    creditos: string;
-    color: string;
-    RA: string;
+    creditos: string | null;
+    descripcion: string | null;
+    RA: string | null;
+    color: string | null;
+  }>;
+
+  const safeParse = (s: string | null) => {
+    if (!s) return null;
+    try { return JSON.parse(s); } catch { return null; }
   };
 
-  if (!row) return null;
-
-  const asignatura = {
-    id: typedRow.id,
-    nombre: typedRow.nombre,
-    descripcion: typedRow.descripcion,
-    creditos: typedRow.creditos,
-    color: typedRow.color,
-    ra: [] as any[],
-  };
-
-  try {
-    if (typeof typedRow.RA === "string") {
-      const rawRA = JSON.parse(typedRow.RA);
-      asignatura.ra = rawRA.map((ra: any) => ({
-        ...ra,
-        ce: ra.CE,
-      }));
-    }
-  } catch (err) {
-    console.error("Error al parsear RA:", err);
-    asignatura.ra = [];
-  }
-
-  console.log("🚀 Asignatura enviada al frontend:", asignatura);
-  return asignatura;
+  return (rows ?? []).map((row) => ({
+    id: row.id,
+    nombre: row.nombre,
+    creditos: row.creditos ?? null,
+    descripcion: safeParse(row.descripcion),
+    RA: safeParse(row.RA) ?? [],
+    color: row.color ?? null,
+  }));
 });
+
 
 /* --------------------------- IPC handlers: ALUMNOS -------------------------- */
 
@@ -451,7 +451,12 @@ ipcMain.handle("guardar-horario", (_e, payload) => {
   const cursoId = String(payload.cursoId ?? "").trim();
   const asignaturaId = String(payload.asignaturaId ?? "").trim();
   const diaRaw = String(payload.dia ?? "").trim().toLowerCase();
-  const dia = diaRaw === "miercoles" ? "miércoles" : diaRaw === "sabado" ? "sábado" : diaRaw;
+  const dia =
+    diaRaw === "miercoles"
+      ? "miércoles"
+      : diaRaw === "sabado"
+      ? "sábado"
+      : diaRaw;
   const horaInicio = String(payload.horaInicio ?? "").trim();
   const horaFin = String(payload.horaFin ?? "").trim();
 
@@ -463,10 +468,12 @@ ipcMain.handle("guardar-horario", (_e, payload) => {
   if (!horaFin) faltan.push("horaFin");
   if (faltan.length) throw new Error(`Faltan campos (${faltan.join(", ")})`);
 
+  // 👇 Añadimos created_at en el insert
   const insert = db.prepare(`
-    INSERT INTO horarios (curso_id, asignatura_id, dia, hora_inicio, hora_fin)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO horarios (curso_id, asignatura_id, dia, hora_inicio, hora_fin, created_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
   `);
+
   const info = insert.run(cursoId, asignaturaId, dia, horaInicio, horaFin);
 
   return db
@@ -477,7 +484,8 @@ ipcMain.handle("guardar-horario", (_e, payload) => {
            asignatura_id AS asignaturaId,
            dia,
            hora_inicio   AS horaInicio,
-           hora_fin      AS horaFin
+           hora_fin      AS horaFin,
+           created_at    AS createdAt   -- 👈 devolvemos también la marca temporal
     FROM horarios WHERE id = ?
   `
     )
@@ -530,33 +538,7 @@ ipcMain.handle("asociar-asignaturas-curso", (_event, cursoId: string, asignatura
   return true;
 });
 
-/* ---------------- IPC: LEER ASIGNATURAS DE UN CURSO ---------------- */
-
-ipcMain.handle("leer-asignaturas-curso", (_event, cursoId: string) => {
-  const stmt = db.prepare(`
-    SELECT a.id, a.nombre, a.color
-    FROM asignaturas a
-    JOIN curso_asignatura ca ON a.id = ca.asignatura_id
-    WHERE ca.curso_id = ?
-  `)
-
-  return stmt.all(cursoId)
-})
-
-
 /* ---------------- IPC: ACTIVIDADES POR ASIGNATURA / CURSO ---------------- */
-
-type ActividadCruda = {
-  id: string;
-  nombre: string;
-  fecha: string;
-  curso_id: string;
-  asignatura_id: string;
-  descripcion?: string;
-  estado?: string | null;
-  analisis_fecha?: string | null;
-  umbral_aplicado?: number | null;
-};
 
 ipcMain.handle("actividades-de-curso", (_event, cursoId: string) => {
   const stmt = db.prepare(`
@@ -579,8 +561,8 @@ ipcMain.handle("actividades-de-curso", (_event, cursoId: string) => {
       a.descripcion,
       a.umbral_aplicado,
       a.analisis_fecha,
-      a.programada_para,       -- NUEVO
-      a.programada_fin,        -- NUEVO
+      a.programada_para,
+      a.programada_fin,
       COALESCE(e.estado, a.estado) AS estado_derivado
     FROM actividades a
     LEFT JOIN estados e ON e.actividad_id = a.id
@@ -612,10 +594,12 @@ ipcMain.handle("actividades-de-curso", (_event, cursoId: string) => {
     estado: a.estado_derivado ?? "borrador",
     analisisFecha: a.analisis_fecha ?? null,
     umbralAplicado: a.umbral_aplicado ?? null,
-    programadaPara: a.programada_para ?? null,
-    programadaFin: a.programada_fin ?? null,
+    // 👇 mantenemos snake_case para que el front las reciba igual
+    programada_para: a.programada_para ?? null,
+    programada_fin:  a.programada_fin  ?? null,
   }));
 });
+
 
 
 /* -------------------- IPC: RA/CE y análisis de actividades ------------------- */
@@ -1206,41 +1190,50 @@ ipcMain.handle(
   "actividad:programar",
   (
     _e,
-    payload: { actividadId: string; startISO: string; duracionMin: number }
+    payload: {
+      actividadId: string;
+      startISO?: string;  // compat
+      startMs?: number;   // recomendado
+      duracionMin: number;
+    }
   ) => {
     try {
-      const { actividadId, startISO, duracionMin } = payload || {};
-      if (!actividadId || !startISO) {
+      const { actividadId, startISO, startMs, duracionMin } = payload || {};
+      if (!actividadId || (!startISO && typeof startMs !== "number")) {
         return { success: false, error: "Parámetros incompletos" };
       }
 
-      // 1) Datos mínimos de la actividad (tipado explícito)
+      // 0) Helpers
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const toLocalISODate = (d: Date) =>
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const hhmmToHHMMSS = (hhmm: string) => {
+        const [h, m] = hhmm.split(":").map(Number);
+        return `${pad(h)}:${pad(m)}:00`;
+      };
+
+      // 1) Base date (local) a partir de startMs (preferente) o startISO (compat)
+      const base = typeof startMs === "number"
+        ? new Date(startMs)
+        : new Date(String(startISO).replace(" ", "T"));
+
+      // 2) Datos mínimos de la actividad
       const act = db
         .prepare(
           `SELECT curso_id, asignatura_id
            FROM actividades
            WHERE id = ?`
         )
-        .get(actividadId) as ActMin | undefined;
+        .get(actividadId) as { curso_id: string; asignatura_id: string } | undefined;
 
       if (!act) return { success: false, error: "Actividad no encontrada" };
       const { curso_id, asignatura_id } = act;
 
-      // 2) Día de la semana a partir del startISO (normalizamos)
-      const fecha = new Date(String(startISO).replace(" ", "T"));
-      const dias = [
-        "domingo",
-        "lunes",
-        "martes",
-        "miércoles",
-        "jueves",
-        "viernes",
-        "sábado",
-      ];
-      const diaSemana = dias[fecha.getDay()];
+      // 3) Día de la semana (local)
+      const dias = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+      const diaSemana = dias[base.getDay()];
 
-      // 3) Buscar el horario de esa asignatura en ese curso y día
-      //    Alias a camelCase para que el objeto tenga .horaInicio y .horaFin
+      // 4) Horario del día
       const horario = db
         .prepare(
           `SELECT hora_inicio AS horaInicio,
@@ -1252,7 +1245,7 @@ ipcMain.handle(
            ORDER BY hora_inicio ASC
            LIMIT 1`
         )
-        .get(curso_id, asignatura_id, diaSemana) as HorarioRow | undefined;
+        .get(curso_id, asignatura_id, diaSemana) as { horaInicio: string; horaFin: string } | undefined;
 
       if (!horario) {
         return {
@@ -1261,25 +1254,22 @@ ipcMain.handle(
         };
       }
 
-      // 4) Construir los timestamps a guardar (mismo día de startISO)
-      const ymd = String(startISO).slice(0, 10); // YYYY-MM-DD
-      const programada_para = `${ymd}T${horario.horaInicio}`;
-      const programada_fin = `${ymd}T${horario.horaFin}`;
-
-      // (opcional) validar que la duración solicitada no excede el bloque
+      // 5) Validación de duración frente al bloque de clase
       const toMin = (hhmm: string) => {
         const [h, m] = hhmm.split(":").map(Number);
         return h * 60 + m;
       };
       const maxMin = toMin(horario.horaFin) - toMin(horario.horaInicio);
       if (duracionMin > 0 && duracionMin > maxMin) {
-        return {
-          success: false,
-          error: "La duración excede el bloque de clase",
-        };
+        return { success: false, error: "La duración excede el bloque de clase" };
       }
 
-      // 5) Guardar en actividad + historial
+      // 6) Construcción de timestamps locales (sin 'Z', con segundos)
+      const ymd = toLocalISODate(base); // YYYY-MM-DD
+      const programada_para = `${ymd}T${hhmmToHHMMSS(horario.horaInicio)}`;
+      const programada_fin  = `${ymd}T${hhmmToHHMMSS(horario.horaFin)}`;
+
+      // 7) Guardar
       db.prepare(
         `UPDATE actividades
          SET estado = 'programada',
@@ -1302,6 +1292,7 @@ ipcMain.handle(
     }
   }
 );
+
 
 
 ipcMain.handle("actividad:desprogramar", (_e, payload: { actividadId: string }) => {

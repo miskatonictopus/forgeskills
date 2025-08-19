@@ -22,6 +22,11 @@ import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import type { Festivo, Presencialidad, FCTTramo } from "@/types/electronAPI";
 
 /* ---------- utils ---------- */
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const toLocalISO = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  
 const ymdLocal = (d: Date) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -61,16 +66,24 @@ const expandirHorariosEnRango = (
 ): Evento[] => {
   const out: Evento[] = [];
   const cursor = new Date(start);
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+
   while (cursor <= end) {
     const dow = cursor.getDay();
     horarios.forEach((h) => {
       if (dow === h.diaSemana && !esDiaFestivo(cursor, festivos)) {
-        const fecha = ymdLocal(cursor);
+        const fecha = ymdLocal(cursor); // YYYY-MM-DD
+
+        // normalizamos HH:mm → HH:mm:ss
+        const hi = h.horaInicio.length === 5 ? `${h.horaInicio}:00` : h.horaInicio;
+        const hf = h.horaFin.length === 5 ? `${h.horaFin}:00` : h.horaFin;
+
         out.push({
           id: `horario-${cursoId}-${asigId}-${fecha}-${h.horaInicio}`,
           title: titulo,
-          start: `${fecha}T${h.horaInicio}:00`,
-          end: `${fecha}T${h.horaFin}:00`,
+          start: `${fecha}T${hi}`,  // ✅ siempre YYYY-MM-DDTHH:mm:ss
+          end:   `${fecha}T${hf}`,
           classNames: ["horario-event"],
           backgroundColor: "rgba(120,160,255,0.28)",
           editable: false,
@@ -81,6 +94,7 @@ const expandirHorariosEnRango = (
   }
   return out;
 };
+
 
 /** Expandir TRAMOS (presencialidad/FCT) a background events */
 const expandirTramosBG = (
@@ -249,12 +263,43 @@ export default function CalendarioGlobalPage() {
             const acts = await window.electronAPI.actividadesDeCurso(c.id);
             return (acts || [])
               .filter((a: any) => a.estado === "programada")
-              .map((a: any) => ({
-                id: a.id,
-                title: `${a.nombre} · ${c.nombre}`,
-                start: `${a.fecha}T${a.horaInicio ? a.horaInicio + ":00" : "08:00:00"}`,
-                end: a.horaFin ? `${a.fecha}T${a.horaFin}:00` : undefined,
-              })) as Evento[];
+              .map((a: any) => {
+                // fuentes posibles
+                const startFromDb: string | undefined = a.programada_para;  // "YYYY-MM-DDTHH:mm:ss"
+                const endFromDb:   string | undefined = a.programada_fin;
+              
+                // fallback (compat actividades antiguas)
+                let start = startFromDb;
+                let end   = endFromDb;
+              
+                if (!start) {
+                  if (a.start_ms) {
+                    start = toLocalISO(new Date(a.start_ms));
+                  } else if (a.fecha && a.horaInicio) {
+                    start = `${a.fecha}T${a.horaInicio}:00`;
+                  } else if (a.fecha) {
+                    // último recurso para no perder el evento en pantalla
+                    start = `${a.fecha}T08:00:00`;
+                  }
+                }
+              
+                if (!end) {
+                  if (a.end_ms) {
+                    end = toLocalISO(new Date(a.end_ms));
+                  } else if (a.fecha && a.horaFin) {
+                    end = `${a.fecha}T${a.horaFin}:00`;
+                  }
+                }
+              
+                return {
+                  id: a.id,
+                  title: `${a.nombre} · ${c.nombre}`,
+                  start,
+                  end,
+                  allDay: false,
+                  extendedProps: { estado: a.estado },
+                } as Evento;
+              })
           })
         );
         let actividades = actividadesPorCurso.flat();
