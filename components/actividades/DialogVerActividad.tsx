@@ -5,7 +5,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose,
 } from "@/components/ui/dialog";
 import { CalendarDays, Bot, X, Loader2, ArrowUp } from "lucide-react";
-import { Actividad } from "@/store/actividadesPorCurso";
+import { Actividad, cargarActividades } from "@/store/actividadesPorCurso";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import DOMPurify from "isomorphic-dompurify";
+import { useDefensorDeHorarios } from "@/components/horarios/useDefensorDeHorarios";
 
 /* ---------------------- helpers ---------------------- */
 const normCE = (s?: string) =>
@@ -93,9 +94,11 @@ export function DialogVerActividad({
   const [showTop, setShowTop] = useState(false);
   const [showUnsaved, setShowUnsaved] = useState(false);
 
+  // Hook del defensor de horarios -> abre el dialog y nos da el portal
+  const { openDefensorDeHorarios, dialog: defensorDialog } = useDefensorDeHorarios();
+
   // catálogo CE: codigo(normalizado) -> descripcion
   const [ceDescByCode, setCeDescByCode] = useState<Record<string, string>>({});
-
   const getCeText = (r: any) => {
     const byField = (r?.descripcion || r?.texto || "").trim();
     if (byField) return byField;
@@ -108,6 +111,12 @@ export function DialogVerActividad({
   const closeWithoutSave = () => { setShowUnsaved(false); onOpenChange(false); };
   const saveAndClose = async () => { await handleGuardarAnalisis(); setShowUnsaved(false); onOpenChange(false); };
 
+  // obliga a confirmar cierre si hay cambios sin guardar
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && tieneCambiosSinGuardar()) { setShowUnsaved(true); return; }
+    onOpenChange(nextOpen);
+  };
+
   // scroll
   useEffect(() => {
     if (!open) return;
@@ -119,7 +128,7 @@ export function DialogVerActividad({
     return () => el.removeEventListener("scroll", onScroll);
   }, [open]);
 
-  // snapshot
+  // snapshot análisis guardado…
   useEffect(() => {
     if (!open || !actividad) {
       setFuenteAnalisis("none"); setAnalizadaFecha(null); setAnalizadaLocal(false); setCesDetectados([]); return;
@@ -128,12 +137,11 @@ export function DialogVerActividad({
     const currentId = actividad.id;
     (async () => {
       try {
-        const res = await window.electronAPI.leerAnalisisActividad(currentId);
+        const res = await (window.electronAPI as any).leerAnalisisActividad(currentId);
         const hayCE = Array.isArray(res?.ces) && res.ces.length > 0;
         if (cancelled || actividad.id !== currentId) return;
         if (hayCE) {
           setUmbral(res.umbral ?? 0);
-          // normaliza códigos por si acaso
           setCesDetectados((res.ces as CEDetectado[]).map(c => ({ ...c, codigo: normCE(c.codigo) })));
           setAnalizadaFecha(res.fecha ?? null);
           setFuenteAnalisis("snapshot");
@@ -141,59 +149,136 @@ export function DialogVerActividad({
         } else {
           setFuenteAnalisis("none"); setAnalizadaFecha(null); setAnalizadaLocal(false); setCesDetectados([]);
         }
-      } catch (e) {
+      } catch {
         if (cancelled) return;
-        console.error(e);
         setFuenteAnalisis("none"); setAnalizadaFecha(null); setAnalizadaLocal(false); setCesDetectados([]);
       }
     })();
     return () => { cancelled = true; };
   }, [open, actividad]);
 
-  // catálogo RA→CE (misma fuente que otras pantallas)
+  // catálogo RA→CE
   useEffect(() => {
     (async () => {
       if (!open || !actividad?.asignaturaId) return;
       try {
         const api = window.electronAPI as any;
         let lista: Array<{ codigo: string; descripcion: string }> = [];
-
         if (api?.leerRADeAsignatura) {
           const ra = await api.leerRADeAsignatura(actividad.asignaturaId);
           lista = (Array.isArray(ra) ? ra : [])
             .flatMap((r: any) => r?.CE || r?.ce || [])
             .filter((x: any) => x?.codigo)
-            .map((x: any) => ({
-              codigo: normCE(String(x.codigo)),
-              descripcion: String(x.descripcion ?? x.texto ?? x.description ?? ""),
-            }));
-        } else if (api?.getCEsDeAsignatura) {
-          const raw = await api.getCEsDeAsignatura(actividad.asignaturaId);
-          lista = (Array.isArray(raw) ? raw : [])
-            .filter((x: any) => x?.codigo)
-            .map((x: any) => ({
-              codigo: normCE(String(x.codigo)),
-              descripcion: String(x.descripcion ?? x.texto ?? x.description ?? ""),
-            }));
-        } else if (api?.leerCECatalogo) {
-          const raw = await api.leerCECatalogo(actividad.asignaturaId);
-          lista = (Array.isArray(raw) ? raw : [])
-            .filter((x: any) => x?.codigo)
-            .map((x: any) => ({
-              codigo: normCE(String(x.codigo)),
-              descripcion: String(x.descripcion ?? x.texto ?? x.description ?? ""),
-            }));
+            .map((x: any) => ({ codigo: normCE(String(x.codigo)), descripcion: String(x.descripcion ?? x.texto ?? "") }));
         }
-
         const map: Record<string, string> = {};
         for (const it of lista) map[it.codigo] = it.descripcion;
         setCeDescByCode(map);
-      } catch (e) {
-        console.warn("No se pudo cargar RA→CE:", e);
-        setCeDescByCode({});
-      }
+      } catch { setCeDescByCode({}); }
     })();
   }, [open, actividad?.asignaturaId]);
+
+  // analizar con backend
+  const handleAnalizar = async () => {
+    if (!actividad?.descripcion) { toast.error("La actividad no tiene descripción."); return; }
+    try {
+      setLoading(true);
+      setCesDetectados([]);
+      const ceDetectados = (await (window.electronAPI as any).analizarDescripcion(actividad.id)) as CEDetectado[];
+      if (!ceDetectados || ceDetectados.length === 0) {
+        toast.warning("No se han detectado CE relevantes.");
+      } else {
+        setCesDetectados(ceDetectados.map(c => ({ ...c, codigo: normCE(c.codigo) })));
+        setFuenteAnalisis("fresh");
+        setAnalizadaLocal(true);
+        toast.success("CE detectados con éxito.");
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            ceAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+      }
+    } catch (err) {
+      toast.error("Error al analizar la descripción."); console.error(err);
+    } finally { setLoading(false); }
+  };
+
+  // guardar análisis (usa el handler existente en tu main: "actividad.guardar-analisis")
+  const handleGuardarAnalisis = async () => {
+    if (!actividad) return;
+    try {
+      const cesParaGuardar = cesDetectados
+        .filter((ce) => ce.puntuacion * 100 >= umbral)
+        .map(({ codigo, puntuacion, reason, evidencias }) => ({
+          codigo,
+          puntuacion,
+          reason,
+          evidencias,
+          descripcion: ceDescByCode[normCE(codigo)] || "",
+        }));
+
+      const res = await (window.electronAPI as any).invoke("actividad.guardar-analisis", {
+        actividadId: actividad.id,
+        umbral,
+        ces: cesParaGuardar,
+      });
+
+      if (res?.ok) {
+        const now = new Date().toISOString();
+        setFuenteAnalisis("snapshot"); setAnalizadaFecha(now); setAnalizadaLocal(true);
+        toast.success("Análisis guardado.");
+        window.dispatchEvent(new CustomEvent("actividad:analizada", { detail: { actividadId: actividad.id } }));
+      } else {
+        toast.error("No se pudo guardar el análisis.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al guardar el análisis.");
+    }
+  };
+
+  const localISO = (d: Date) => {
+    const tzoffset = d.getTimezoneOffset() * 60000; // offset en ms
+    return new Date(d.getTime() - tzoffset).toISOString().slice(0, 16);
+  };
+
+  // programar actividad con el defensor + backend "actividad:programar"
+  const handleProgramar = async () => {
+    if (!actividad) return;
+    const cursoId = String((actividad as any).cursoId || (actividad as any).curso_id || "");
+    const asignaturaId = String((actividad as any).asignaturaId || (actividad as any).asignatura_id || "");
+    if (!cursoId || !asignaturaId) {
+      toast.error("Faltan curso o asignatura en la actividad."); return;
+    }
+    const duracionMin = Number((actividad as any).duracionMin || 60);
+
+    const slot = await openDefensorDeHorarios({
+      cursoId,
+      asignaturaId,
+      duracionMin,
+      stepMinutes: 15,
+      initial: new Date(),
+    });
+    if (!slot) return;
+
+    const start = new Date(slot.startISO);
+const startISO = localISO(start);
+
+const res = await window.electronAPI.actividadProgramar({
+  actividadId: actividad.id,
+  startISO,
+  duracionMin,
+});
+    
+
+    if (res?.success) {
+      toast.success("Actividad programada");
+      await cargarActividades(cursoId);
+      onOpenChange(false);
+    } else {
+      toast.error(res?.error ?? "No se pudo programar la actividad.");
+    }
+  };
 
   // derivados
   const cesFiltrados = useMemo(
@@ -232,128 +317,37 @@ export function DialogVerActividad({
   const visiblesCE = cesFiltrados.length;
   const pctCE = totalCE ? Math.round((visiblesCE / totalCE) * 100) : 0;
 
-  // acciones
-  const handleAnalizar = async () => {
-    if (!actividad?.descripcion) { toast.error("La actividad no tiene descripción."); return; }
-    try {
-      setLoading(true);
-      setCesDetectados([]);
-      const ceDetectados = (await (window.electronAPI as any).analizarDescripcion(actividad.id)) as CEDetectado[];
-      if (!ceDetectados || ceDetectados.length === 0) {
-        toast.warning("No se han detectado CE relevantes.");
-      } else {
-        setCesDetectados(ceDetectados.map(c => ({ ...c, codigo: normCE(c.codigo) })));
-        setFuenteAnalisis("fresh");
-        setAnalizadaLocal(true);
-        toast.success("CE detectados con éxito.");
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            ceAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-          });
-        });
-      }
-    } catch (err) {
-      toast.error("Error al analizar la descripción."); console.error(err);
-    } finally { setLoading(false); }
-  };
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && tieneCambiosSinGuardar()) { setShowUnsaved(true); return; }
-    onOpenChange(nextOpen);
-  };
-
-  const blockCloseIfUnsaved = (e: Event) => {
-    if (tieneCambiosSinGuardar()) { e.preventDefault(); setShowUnsaved(true); }
-  };
-
-  const badgeFor = (r: CEDetectado) =>
-    r.reason === "high_sim" ? <Badge variant="secondary">Alta similitud</Badge>
-    : r.reason === "lang_rule" ? <Badge variant="secondary">Lenguajes</Badge>
-    : <Badge>Con evidencias</Badge>;
-
-  const makeWhy = (r: CEDetectado) => {
-    const pct = `${(r.puntuacion * 100).toFixed(1)}%`;
-    let base =
-      r.reason === "high_sim"
-        ? `Coincidencia semántica alta (${pct}) entre la descripción y el criterio.`
-        : r.reason === "lang_rule"
-        ? `Menciones claras a lenguajes/tecnologías del cliente que vinculan con el criterio (${pct}).`
-        : `Alineación de acción y objetos del criterio detectada en el enunciado (${pct}).`;
-    if (r.evidencias?.length) {
-      const muestras = r.evidencias.slice(0, 2).map((e) => `“${e}”`).join("  ·  ");
-      base += ` Evidencias: ${muestras}.`;
-    }
-    return base;
-  };
-
-  const handleGuardarAnalisis = async () => {
-    if (!actividad) return;
-    try {
-      const cesParaGuardar = cesDetectados
-        .filter((ce) => ce.puntuacion * 100 >= umbral)
-        .map(({ codigo, puntuacion, reason, evidencias }) => ({
-          codigo,
-          puntuacion,
-          reason,
-          evidencias,
-          descripcion: ceDescByCode[normCE(codigo)] || "",
-        }));
-
-      const res = await (window.electronAPI as any).guardarAnalisisActividad(
-        actividad.id, umbral, cesParaGuardar
-      );
-
-      if (res?.ok) {
-        const now = new Date().toISOString();
-        setFuenteAnalisis("snapshot"); setAnalizadaFecha(now);
-        toast.success("Análisis guardado.");
-        window.dispatchEvent(new CustomEvent("actividad:analizada", { detail: { actividadId: actividad.id } }));
-      } else {
-        toast.error("No se pudo guardar el análisis.");
-      }
-    } catch (e) { console.error(e); toast.error("Error al guardar el análisis."); }
-  };
-
   if (!actividad) return null;
   const estadoBackend = (actividad as any)?.estado ?? "borrador";
   const mostrarAnalizada = analizadaLocal || estadoBackend === "analizada";
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-        ref={contentRef}
-        onEscapeKeyDown={blockCloseIfUnsaved}
-        onPointerDownOutside={blockCloseIfUnsaved}
-        className="w-[95vw] max-w-[95vw] sm:max-w-[1100px] lg:max-w-[1200px] max-h-[90vh] overflow-y-auto p-0 [&_[aria-label='Close']]:hidden"
-      >
-        <div className="relative">
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
+          ref={contentRef}
+          className="w-[95vw] max-w-[95vw] sm:max-w-[1100px] lg:max-w-[1200px] max-h-[90vh] overflow-y-auto p-0"
+        >
           {/* HEADER */}
-          <div className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/65">
+          <div className="sticky top-0 z-50 border-b bg-background/85 backdrop-blur">
             <div className="relative px-6 pt-3 pb-4 pr-12">
               <DialogClose asChild>
-                <button aria-label="Cerrar" className="absolute right-3 top-3 z-[999] rounded-md p-2 hover:bg-muted focus:outline-none">
+                <button aria-label="Cerrar" className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted">
                   <X className="w-4 h-4" />
                 </button>
               </DialogClose>
 
-              <p className="text-xs font-medium text-muted-foreground tracking-wide uppercase">Actividad</p>
-
               <DialogHeader className="flex flex-row items-center gap-6">
-                <DialogTitle className="text-3xl lowercase">{actividad.nombre}</DialogTitle>
+                <DialogTitle className="text-3xl">{actividad.nombre}</DialogTitle>
                 <div className="flex items-center gap-2 text-sm">
                   <CalendarDays className="w-4 h-4" />
                   <span>{new Date(actividad.fecha).toLocaleDateString("es-ES")}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2">
                   <strong>Asignatura:</strong>
                   <span className="uppercase">{asignaturaNombre || actividad.asignaturaId}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {mostrarAnalizada && <Badge variant="secondary" className="gap-1">Analizada</Badge>}
-                  {mostrarAnalizada && analizadaFecha && (
-                    <span className="text-xs text-muted-foreground">{new Date(analizadaFecha).toLocaleString("es-ES")}</span>
-                  )}
-                </div>
+                {mostrarAnalizada && <Badge variant="secondary">Analizada</Badge>}
               </DialogHeader>
             </div>
           </div>
@@ -409,7 +403,21 @@ export function DialogVerActividad({
 
                   <TableBody>
                     {cesFiltrados.map((ce) => {
-                      const why = makeWhy(ce);
+                      const why = (() => {
+                        const pct = `${(ce.puntuacion * 100).toFixed(1)}%`;
+                        let base =
+                          ce.reason === "high_sim"
+                            ? `Coincidencia semántica alta (${pct}) entre la descripción y el criterio.`
+                            : ce.reason === "lang_rule"
+                            ? `Menciones claras a lenguajes/tecnologías del cliente que vinculan con el criterio (${pct}).`
+                            : `Alineación de acción y objetos del criterio detectada en el enunciado (${pct}).`;
+                        if (ce.evidencias?.length) {
+                          const muestras = ce.evidencias.slice(0, 2).map((e) => `“${e}”`).join("  ·  ");
+                          base += ` Evidencias: ${muestras}.`;
+                        }
+                        return base;
+                      })();
+
                       const expanded = !!expandJusti[ce.codigo];
                       const isLong = why.length > 220;
 
@@ -440,7 +448,11 @@ export function DialogVerActividad({
                             </div>
                           </TableCell>
 
-                          <TableCell>{badgeFor(ce)}</TableCell>
+                          <TableCell>
+                            {ce.reason === "high_sim" ? <Badge variant="secondary">Alta similitud</Badge>
+                              : ce.reason === "lang_rule" ? <Badge variant="secondary">Lenguajes</Badge>
+                              : <Badge>Con evidencias</Badge>}
+                          </TableCell>
 
                           <TableCell>
                             <div className={cn("text-xs whitespace-pre-wrap break-words", !expanded && "line-clamp-3")} style={{ overflowWrap: "anywhere" }}>
@@ -474,72 +486,71 @@ export function DialogVerActividad({
             )}
           </div>
 
-          {/* FOOTER */}
-          <div className="sticky bottom-0 z-50 border-t border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/65">
-            <div className="px-6 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="text-xs text-muted-foreground">Mostrar:</label>
-                <select className="h-8 rounded-md border bg-background px-2 text-xs"
-                        value={filtroRazon} onChange={(e) => setFiltroRazon(e.target.value as any)}>
-                  <option value="all">Todos</option>
-                  <option value="evidence">Con evidencias</option>
-                  <option value="high_sim">Alta similitud</option>
-                  <option value="lang_rule">Lenguajes</option>
-                </select>
+          {/* FOOTER acciones */}
+          <div className="sticky bottom-0 z-50 border-t bg-background/85 backdrop-blur px-6 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* filtros/umbral/pdfs */}
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-xs text-muted-foreground">Mostrar:</label>
+              <select className="h-8 rounded-md border bg-background px-2 text-xs"
+                      value={filtroRazon} onChange={(e) => setFiltroRazon(e.target.value as any)}>
+                <option value="all">Todos</option>
+                <option value="evidence">Con evidencias</option>
+                <option value="high_sim">Alta similitud</option>
+                <option value="lang_rule">Lenguajes</option>
+              </select>
 
-                <label className="text-xs text-muted-foreground ml-2">Umbral:</label>
-                <input type="range" min={0} max={100} step={1} value={umbral}
-                       onChange={(e) => setUmbral(Number(e.target.value))} className="w-40" />
-                <span className="text-xs tabular-nums">{umbral}%</span>
+              <label className="text-xs text-muted-foreground ml-2">Umbral:</label>
+              <input type="range" min={0} max={100} step={1} value={umbral}
+                     onChange={(e) => setUmbral(Number(e.target.value))} className="w-40" />
+              <span className="text-xs tabular-nums">{umbral}%</span>
 
-                {totalCE > 0 && (
-                  <Badge variant="secondary" className="ml-3">
-                    CE <span className="tabular-nums ml-1">{visiblesCE}</span>
-                    <span className="mx-1 text-muted-foreground">/</span>
-                    <span className="tabular-nums">{totalCE}</span>
-                    <span className="mx-1 text-muted-foreground">·</span>
-                    <span className="tabular-nums">{pctCE}%</span>
-                  </Badge>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <ExportarPDFButton
-                  data={pdfData as any}
-                  headerTitle="Informe de actividad"
-                  fileName={suggestedFileName}
-                  html={pdfData?.html}
-                  disabled={!pdfData}
-                />
-
-                <Button variant="outline" size="sm" onClick={() => {
-                  setUmbral(0); setFiltroRazon("all"); setCesDetectados([]);
-                  setFuenteAnalisis("none"); setAnalizadaLocal(false);
-                }}>
-                  Limpiar
-                </Button>
-
-                {cesDetectados.length > 0 && fuenteAnalisis !== "snapshot" && (
-                  <Button size="sm" onClick={handleGuardarAnalisis} disabled={loading}>
-                    Guardar análisis
-                  </Button>
-                )}
-
-                {mostrarAnalizada ? (
-                  <Button size="sm" variant="secondary" onClick={handleAnalizar} disabled={loading}
-                          title={fuenteAnalisis === "snapshot" ? "Ver análisis guardado (ya cargado)" : "Re-analizar"}>
-                    {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
-                    {loading ? "Analizando..." : "Re-analizar"}
-                  </Button>
-                ) : (
-                  <Button size="sm" onClick={handleAnalizar} disabled={loading}>
-                    {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
-                    {loading ? "Analizando..." : "Analizar descripción"}
-                  </Button>
-                )}
-              </div>
+              {totalCE > 0 && (
+                <Badge variant="secondary" className="ml-3">
+                  CE <span className="tabular-nums ml-1">{visiblesCE}</span>
+                  <span className="mx-1 text-muted-foreground">/</span>
+                  <span className="tabular-nums">{totalCE}</span>
+                  <span className="mx-1 text-muted-foreground">·</span>
+                  <span className="tabular-nums">{pctCE}%</span>
+                </Badge>
+              )}
             </div>
-            <div className="h-[env(safe-area-inset-bottom)]" />
+
+            <div className="flex items-center gap-2">
+              <ExportarPDFButton
+                data={pdfData as any}
+                headerTitle="Informe de actividad"
+                fileName={suggestedFileName}
+                html={pdfData?.html}
+                disabled={!pdfData}
+              />
+
+              <Button variant="outline" size="sm" onClick={() => {
+                setUmbral(0); setFiltroRazon("all"); setCesDetectados([]);
+                setFuenteAnalisis("none"); setAnalizadaLocal(false);
+              }}>
+                Limpiar
+              </Button>
+
+              {cesDetectados.length > 0 && fuenteAnalisis !== "snapshot" && (
+                <Button size="sm" onClick={handleGuardarAnalisis} disabled={loading}>
+                  Guardar análisis
+                </Button>
+              )}
+
+              {analizadaLocal || (actividad as any)?.estado === "analizada" ? (
+                <Button size="sm" variant="secondary" onClick={handleAnalizar} disabled={loading}>
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
+                  {loading ? "Analizando..." : "Re-analizar"}
+                </Button>
+              ) : (
+                <Button size="sm" onClick={handleAnalizar} disabled={loading}>
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bot className="w-4 h-4 mr-2" />}
+                  {loading ? "Analizando..." : "Analizar descripción"}
+                </Button>
+              )}
+
+              <Button onClick={handleProgramar}>Programar actividad</Button>
+            </div>
           </div>
 
           {/* OVERLAY */}
@@ -559,25 +570,11 @@ export function DialogVerActividad({
               </div>
             </div>
           )}
-        </div>
-      </DialogContent>
+        </DialogContent>
+      </Dialog>
 
-      {/* Diálogo guardar antes de salir */}
-      <AlertDialog open={showUnsaved} onOpenChange={setShowUnsaved}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Guardar antes de salir?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Hay un análisis reciente sin guardar. Puedes guardarlo para actualizar el estado de la actividad a <strong>Analizada</strong>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <Button variant="outline" onClick={closeWithoutSave}>Salir sin guardar</Button>
-            <AlertDialogAction onClick={saveAndClose}>Guardar y salir</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Dialog>
+      {/* Portal del Defensor de Horarios */}
+      {defensorDialog}
+    </>
   );
 }

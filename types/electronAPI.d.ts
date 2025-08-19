@@ -39,6 +39,38 @@ export type Presencialidad = {
   horaFin: string;     // "HH:MM"
 };
 
+type ActividadProgramarPayload = {
+  actividadId: string;
+  startISO: string;      // "YYYY-MM-DD HH:mm"
+  duracionMin: number;   // múltiplos de 60 (según tu main)
+};
+
+type ActividadProgramarResult = {
+  success: boolean;
+  startISO?: string;
+  endISO?: string;
+  error?: string;
+};
+
+type AnalisisActividadSnapshot = {
+  umbral: number;
+  fecha: string | null;
+  ces: Array<{
+    codigo: string;
+    puntuacion: number;
+    reason?: "evidence" | "high_sim" | "lang_rule";
+    evidencias?: string[];
+  }>;
+};
+
+type HorarioNormalizado = {
+  diaSemana: number;       // 0..6 (getDay)
+  horaInicio: string;      // "HH:MM"
+  horaFin: string;         // "HH:MM"
+};
+
+type LectivoRange = { start?: string; end?: string } | null;
+
 export type Festivo = { id: string; start: string; end: string | null; title: string };
 export type FestivoCreate = { start: string; end?: string | null; title: string };
 
@@ -165,7 +197,11 @@ export interface ElectronAPI {
 
       leerAsignaturasCurso: (cursoId: string) => Promise<{ id: string; nombre: string; color?: string | null }[]>
 
+      leerAnalisisActividad(actividadId: string): Promise<AnalisisActividadSnapshot>;
+  actividadProgramar(payload: ActividadProgramarPayload): Promise<ActividadProgramarResult>;
 
+  horariosDeAsignatura(cursoId: string, asignaturaId: string): Promise<HorarioNormalizado[]>;
+  leerRangoLectivo(): Promise<LectivoRange>;
 }
 
 

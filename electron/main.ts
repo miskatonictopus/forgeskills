@@ -1106,7 +1106,33 @@ ipcMain.handle(
       // Comprobar que la hora cae dentro de un bloque de horario
       const dia = weekdayEsFromISO(startISO);
       const hhmm = hhmmFromISO(startISO);
+      const raw = startISO?.trim();
+let dt: Date | null = null;
 
+if (raw) {
+  try {
+    // Normaliza: si viene con espacio en lugar de "T"
+    const norm = raw.includes(" ") ? raw.replace(" ", "T") : raw;
+    dt = new Date(norm);
+
+    if (isNaN(dt.getTime())) {
+      console.warn("[Programar] ❌ Fecha inválida tras normalizar:", norm);
+      dt = null;
+    }
+  } catch (e) {
+    console.error("[Programar] Error construyendo Date:", e);
+    dt = null;
+  }
+}
+
+console.log("[Programar] startISO crudo:", raw);
+if (dt) {
+  console.log("[Programar] JS date:", dt.toString(),
+              "→ getDay:", dt.getDay(),
+              "→ HH:mm:", dt.getHours().toString().padStart(2,"0")+":"+dt.getMinutes().toString().padStart(2,"0"));
+} else {
+  console.log("[Programar] No se pudo parsear la fecha");
+}
       const bloque = qHorarioBloque.get(
         act.curso_id,
         act.asignatura_id,
@@ -1167,6 +1193,13 @@ ipcMain.handle("actividad:bloques-dia", (_e, payload: { actividadId: string; dat
   }
 });
 
+type HorarioRow = {
+  horaInicio: string;
+  horaFin: string;
+};
+
+type ActMin = { curso_id: string; asignatura_id: string };
+
 
 
 ipcMain.handle(
@@ -1176,100 +1209,100 @@ ipcMain.handle(
     payload: { actividadId: string; startISO: string; duracionMin: number }
   ) => {
     try {
-      // 1) Desestructurar al inicio
       const { actividadId, startISO, duracionMin } = payload || {};
-      if (!actividadId || !startISO || !duracionMin) {
+      if (!actividadId || !startISO) {
         return { success: false, error: "Parámetros incompletos" };
       }
-      if (duracionMin <= 0 || duracionMin % 60 !== 0) {
-        return { success: false, error: "Duración inválida (múltiplos de 60)" };
-      }
 
-      // 2) Validaciones de fecha
-      const ymd = startISO.slice(0, 10); // YYYY-MM-DD
-      if (ymd < hoyYYYYMMDD()) {
-        return { success: false, error: "No puedes programar en fechas pasadas" };
-      }
-      if (!lectivoContains(ymd)) {
-        return {
-          success: false,
-          error: "La fecha está fuera del periodo lectivo",
-        };
-      }
+      // 1) Datos mínimos de la actividad (tipado explícito)
+      const act = db
+        .prepare(
+          `SELECT curso_id, asignatura_id
+           FROM actividades
+           WHERE id = ?`
+        )
+        .get(actividadId) as ActMin | undefined;
 
-      // 3) Buscar actividad
-      const act = qGetActividadMin.get(actividadId) as
-        | { id: string; curso_id: string; asignatura_id: string }
-        | undefined;
       if (!act) return { success: false, error: "Actividad no encontrada" };
+      const { curso_id, asignatura_id } = act;
 
-      // 4) Festivos
-      if (qEsFestivo.get(startISO)) {
-        return { success: false, error: "No se puede programar en un día festivo" };
-      }
+      // 2) Día de la semana a partir del startISO (normalizamos)
+      const fecha = new Date(String(startISO).replace(" ", "T"));
+      const dias = [
+        "domingo",
+        "lunes",
+        "martes",
+        "miércoles",
+        "jueves",
+        "viernes",
+        "sábado",
+      ];
+      const diaSemana = dias[fecha.getDay()];
 
-      // 5) Horario de la asignatura
-      const dia = weekdayEsFromISO(startISO);
-      const hhmmStart = hhmmFromISO(startISO);
+      // 3) Buscar el horario de esa asignatura en ese curso y día
+      //    Alias a camelCase para que el objeto tenga .horaInicio y .horaFin
+      const horario = db
+        .prepare(
+          `SELECT hora_inicio AS horaInicio,
+                  hora_fin    AS horaFin
+           FROM horarios
+           WHERE curso_id = ?
+             AND asignatura_id = ?
+             AND lower(dia) = lower(?)
+           ORDER BY hora_inicio ASC
+           LIMIT 1`
+        )
+        .get(curso_id, asignatura_id, diaSemana) as HorarioRow | undefined;
 
-      const bloque = qHorarioBloque.get(
-        act.curso_id,
-        act.asignatura_id,
-        dia,
-        hhmmStart,
-        hhmmStart
-      ) as { hora_inicio: string; hora_fin: string } | undefined;
-
-      if (!bloque) {
+      if (!horario) {
         return {
           success: false,
-          error: "Fuera del horario de la asignatura para ese curso",
+          error: `No hay horario definido para ${asignatura_id} en ${diaSemana}`,
         };
       }
 
-      // 6) Duración vs bloque
-      const maxMin = diffMin(hhmmStart, bloque.hora_fin);
-      if (duracionMin > maxMin) {
-        return { success: false, error: "La duración excede el bloque de clase" };
+      // 4) Construir los timestamps a guardar (mismo día de startISO)
+      const ymd = String(startISO).slice(0, 10); // YYYY-MM-DD
+      const programada_para = `${ymd}T${horario.horaInicio}`;
+      const programada_fin = `${ymd}T${horario.horaFin}`;
+
+      // (opcional) validar que la duración solicitada no excede el bloque
+      const toMin = (hhmm: string) => {
+        const [h, m] = hhmm.split(":").map(Number);
+        return h * 60 + m;
+      };
+      const maxMin = toMin(horario.horaFin) - toMin(horario.horaInicio);
+      if (duracionMin > 0 && duracionMin > maxMin) {
+        return {
+          success: false,
+          error: "La duración excede el bloque de clase",
+        };
       }
 
-      // 7) Solapes
-      const endISO = addMinutesSameDay(startISO, duracionMin);
-      const fechaSolo = startISO.slice(0, 10);
+      // 5) Guardar en actividad + historial
+      db.prepare(
+        `UPDATE actividades
+         SET estado = 'programada',
+             programada_para = ?,
+             programada_fin  = ?,
+             fecha           = ?
+         WHERE id = ?`
+      ).run(programada_para, programada_fin, ymd, actividadId);
 
-      if (qSolapeProgramadas.get(act.curso_id, startISO, endISO)) {
-        return { success: false, error: "Solapa con otra actividad programada" };
-      }
+      db.prepare(
+        `INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha, meta)
+         VALUES (?, ?, 'programada', datetime('now'),
+                 json_object('duracionMin', ?, 'autohorario', 1))`
+      ).run(crypto.randomUUID(), actividadId, duracionMin ?? null);
 
-      // 8) Transacción DB
-      const tx = db.transaction(() => {
-        db.prepare(
-          `
-          UPDATE actividades
-          SET estado = 'programada',
-              programada_para = ?,
-              programada_fin  = ?,
-              fecha = ?
-          WHERE id = ?
-        `
-        ).run(startISO, endISO, fechaSolo, actividadId);
-
-        db.prepare(
-          `
-          INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha, meta)
-          VALUES (?, ?, 'programada', datetime('now'), json_object('duracionMin', ?))
-        `
-        ).run(crypto.randomUUID(), actividadId, duracionMin);
-      });
-      tx();
-
-      return { success: true, startISO, endISO };
-    } catch (err) {
-      console.error("Error al programar actividad:", err);
+      return { success: true, startISO: programada_para, endISO: programada_fin };
+    } catch (err: any) {
+      console.error("actividad:programar error:", err);
       return { success: false, error: "Error interno" };
     }
   }
 );
+
 
 ipcMain.handle("actividad:desprogramar", (_e, payload: { actividadId: string }) => {
   const { actividadId } = payload || {};

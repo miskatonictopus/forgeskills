@@ -68,6 +68,15 @@ const parseISODate = (iso: string) => new Date(`${iso}T00:00:00`);
 const parseISOEndDay = (iso: string) => new Date(`${iso}T23:59:59`);
 const between = (start: Date, d: Date, end: Date) => start <= d && d <= end;
 
+const isDateOnly = (s?: string) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+const isMidnight = (start?: string | Date) => {
+  if (!start) return false;
+  if (typeof start === "string") return /T00:00(:00)?$/.test(start);
+  try {
+    return start.getHours() === 0 && start.getMinutes() === 0 && start.getSeconds() === 0;
+  } catch { return false; }
+};
+
 /* ===================== Componente ===================== */
 export default function Calendario({
   events = [],
@@ -127,6 +136,37 @@ export default function Calendario({
     [setPermitidos, dentroDeRango]
   );
 
+  // 🔧 Sanea eventos para evitar el “08:00 fantasma”
+  const sanitizedEvents = React.useMemo<FCEvent[]>(() => {
+    const base = (events ?? [])
+      .filter((e) => !!e?.start)
+      .map((e) => {
+        const estado = (e as any)?.extendedProps?.estado;
+        if (estado === "programada") return e; // ya tiene hora real
+
+        // Si llega "YYYY-MM-DD" o medianoche → pásalo a allDay (y con allDaySlot=false no se ve)
+        if (typeof e.start === "string") {
+          if (isDateOnly(e.start) || isMidnight(e.start)) return { ...e, allDay: true };
+        } else if (isMidnight(e.start)) {
+          return { ...e, allDay: true };
+        }
+        return e;
+      });
+
+    // Festivos como background (opcional)
+    const festivosBg: FCEvent[] = (festivos ?? []).map((f, idx) => ({
+      id: `festivo-${idx}`,
+      title: "",
+      start: f.start,
+      end: f.end,
+      display: "background",
+      classNames: ["festivo-background"],
+      backgroundColor: "rgba(80,200,120,0.20)",
+    }));
+
+    return [...base, ...festivosBg];
+  }, [events, festivos]);
+
   return (
     <FullCalendar
       plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
@@ -157,19 +197,33 @@ export default function Calendario({
       eventDurationEditable
       selectAllow={selectAllow}
       eventAllow={eventAllow}
-      events={events as any} // ⬅️ PASAMOS TAL CUAL (incluye display/backgroundColor/classNames)
 
-      /* ⬇️ Forzamos visibilidad de background events (presencialidades/festivos/FCT) */
+      // ⬇️ Usamos los eventos saneados
+      events={sanitizedEvents as any}
+
+      // ⬇️ Refuerzo: si algo se cuela sin pasar por arriba, lo transformamos aquí también
+      eventDataTransform={(raw: any) => {
+        const e = { ...raw };
+        const estado = e.extendedProps?.estado;
+        if (estado !== "programada") {
+          const s = typeof e.start === "string" ? e.start : undefined;
+          if (isDateOnly(s) || isMidnight(e.start)) {
+            e.allDay = true;         // se oculta en timeGrid por allDaySlot=false
+            e.end = e.start;         // evita ensanches
+          }
+        }
+        return e;
+      }}
+
+      /* ⬇️ Colores de background (presencialidades/festivos/FCT) */
       eventClassNames={(arg) => arg.event.classNames}
       eventDidMount={(info) => {
         if (info.event.display === "background") {
-          // 1) usa el color del evento si viene definido
           let color =
             (info.event as any).backgroundColor ||
             (info.event as any)._def?.ui?.backgroundColor ||
             "";
 
-          // 2) si no viene, decide por clase
           if (!color && info.event.classNames?.includes("presencial-bg")) {
             color = "rgba(120,160,255,0.28)";
           }
@@ -177,10 +231,8 @@ export default function Calendario({
             color = "rgba(80,200,120,0.20)";
           }
           if (!color && info.event.classNames?.includes("fct-bg")) {
-            color = "rgba(200,120,255,0.26)"; // ⬅️ NUEVO: FCT
+            color = "rgba(200,120,255,0.26)";
           }
-
-          // 3) fallback general
           if (!color) color = "rgba(180,180,180,0.18)";
 
           const el = info.el as HTMLElement;
@@ -210,11 +262,7 @@ export default function Calendario({
           info.revert();
           return;
         }
-        onEventMove?.({
-          id: info.event.id,
-          start,
-          end: info.event.end ?? undefined,
-        });
+        onEventMove?.({ id: info.event.id, start, end: info.event.end ?? undefined });
       }}
       eventResize={(info) => {
         const start = info.event.start!;
@@ -223,11 +271,7 @@ export default function Calendario({
           info.revert();
           return;
         }
-        onEventResize?.({
-          id: info.event.id,
-          start,
-          end: info.event.end ?? undefined,
-        });
+        onEventResize?.({ id: info.event.id, start, end: info.event.end ?? undefined });
       }}
     />
   );

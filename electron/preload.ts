@@ -112,6 +112,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
     borrarActividad: (actividadId: string) =>
     ipcRenderer.invoke("borrar-actividad", actividadId),
 
+    actividadProgramar: (payload: { actividadId: string; startISO: string; duracionMin: number }) =>
+    ipcRenderer.invoke("actividad:programar", payload),
+
     getHorariosAsignatura: (cursoId: string, asignaturaId: string) =>
     ipcRenderer.invoke("horarios-de-asignatura", { cursoId, asignaturaId }),
 
