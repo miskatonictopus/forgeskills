@@ -1,8 +1,7 @@
-// components/panel/PanelActividadesCompact.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Dot } from "@/components/ui/Dot"
+import { Dot } from "@/components/ui/Dot";
 import { useSnapshot } from "valtio";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import { actividadesPorCurso, cargarActividades } from "@/store/actividadesPorCurso";
@@ -21,22 +20,29 @@ type Actividad = {
   cursoId: string;
   asignaturaId: string;
   descripcion?: string;
-  estado?: "borrador" | "analizada" | "enviada" | "pendiente" | "evaluada";
+  estado?: "borrador" | "analizada" | "programada" | "pendiente_evaluar" | "evaluada" | "cerrada";
   analisisFecha?: string | null;
 };
 
 function EstadoDot({ estado }: { estado?: string }) {
   const map: Record<string, string> = {
     analizada: "bg-emerald-500",
-    enviada: "bg-sky-500",
-    pendiente: "bg-amber-500",
+    programada: "bg-sky-500",
+    pendiente_evaluar: "bg-amber-500",
     evaluada: "bg-violet-500",
     borrador: "bg-zinc-500",
+    cerrada: "bg-fuchsia-500",
   };
-  return <span className={cn("inline-block h-2 w-2 rounded-full", map[estado ?? "borrador"])}/>;
+  return <span className={cn("inline-block h-2 w-2 rounded-full", map[estado ?? "borrador"])} />;
 }
 
-export function PanelActividadesCompact({ cursos }: { cursos: Curso[] }) {
+type Props = {
+  cursos: Curso[];
+  filtroEstado?: string; // "todos" | ...
+  onCountsUpdate?: (counts: Record<string, number>) => void;
+};
+
+export function PanelActividadesCompact({ cursos, filtroEstado = "todos", onCountsUpdate }: Props) {
   const asigSnap = useSnapshot(asignaturasPorCurso);
   const actsSnap = useSnapshot(actividadesPorCurso);
 
@@ -49,36 +55,55 @@ export function PanelActividadesCompact({ cursos }: { cursos: Curso[] }) {
   const [pageBy, setPageBy] = useState<Record<string, number>>({});
   const pageSize = 4;
   const keyFor = (cursoId: string, asigId: string) => `${cursoId}::${asigId}`;
+  const setPage = (k: string, n: number) => setPageBy((s) => ({ ...s, [k]: Math.max(0, n) }));
 
-  const setPage = (k: string, n: number) =>
-    setPageBy((s) => ({ ...s, [k]: Math.max(0, n) }));
-
+  // cargar actividades al montar / cambiar cursos
   useEffect(() => {
     for (const c of cursos) cargarActividades(c.id);
   }, [cursos]);
+
+  // ---- Cálculo de conteos (memoizado) + notificación al padre ----
+  const counts = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const c of cursos) {
+      const acts = (actsSnap[c.id] || []) as Actividad[];
+      for (const a of acts) {
+        const k = String(a?.estado ?? "").toLowerCase();
+        acc[k] = (acc[k] ?? 0) + 1;
+      }
+    }
+    acc["todos"] = cursos.reduce((sum, c) => sum + ((actsSnap[c.id] || []).length), 0);
+    return acc;
+  }, [actsSnap, cursos]);
+
+  useEffect(() => {
+    if (onCountsUpdate) onCountsUpdate(counts);
+  }, [counts, onCountsUpdate]);
 
   return (
     <>
       <div className="flex flex-col gap-4">
         {cursos.map((curso) => {
           const asignaturas = asigSnap[curso.id] || [];
-          const actividades: Actividad[] = (actsSnap[curso.id] || []) as any;
+          // actividades del curso, con filtro de estado si procede
+          const actividadesCurso = ((actsSnap[curso.id] || []) as Actividad[]).filter((a) =>
+            filtroEstado === "todos"
+              ? true
+              : String(a?.estado ?? "").toLowerCase() === filtroEstado
+          );
 
           const byAsig: Record<string, Actividad[]> = {};
-          for (const a of actividades) (byAsig[a.asignaturaId] ||= []).push(a);
+          for (const a of actividadesCurso) (byAsig[a.asignaturaId] ||= []).push(a);
 
           const defaultTab = asignaturas[0]?.id ?? "none";
 
           return (
-            <div
-              key={curso.id}
-              className="rounded-lg border border-zinc-800 bg-background/60 p-3"
-            >
+            <div key={curso.id} className="rounded-lg border border-zinc-800 bg-background/60 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-xl font-bold text-white">
                   {curso.id} {curso.nombre}
                 </div>
-                <Badge variant="secondary">{actividades.length} actividades</Badge>
+                <Badge variant="secondary">{actividadesCurso.length} actividades</Badge>
               </div>
 
               {asignaturas.length === 0 ? (
@@ -86,15 +111,15 @@ export function PanelActividadesCompact({ cursos }: { cursos: Curso[] }) {
               ) : (
                 <Tabs defaultValue={defaultTab} className="w-full">
                   <TabsList className="w-full justify-start overflow-x-auto">
-  {asignaturas.map((asig) => (
-    <TabsTrigger key={asig.id} value={asig.id} className="text-xs">
-      <span className="flex items-center gap-2">
-        <Dot color={asig.color ?? "#9ca3af"} className="w-2.5 h-2.5" />
-        {asig.nombre}
-      </span>
-    </TabsTrigger>
-  ))}
-</TabsList>
+                    {asignaturas.map((asig) => (
+                      <TabsTrigger key={asig.id} value={asig.id} className="text-xs">
+                        <span className="flex items-center gap-2">
+                          <Dot color={asig.color ?? "#9ca3af"} className="w-2.5 h-2.5" />
+                          {asig.nombre}
+                        </span>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
 
                   {asignaturas.map((asig) => {
                     const all = (byAsig[asig.id] || []).sort(
@@ -110,9 +135,7 @@ export function PanelActividadesCompact({ cursos }: { cursos: Curso[] }) {
                     return (
                       <TabsContent key={asig.id} value={asig.id} className="mt-3">
                         {all.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">
-                            Sin actividades para esta asignatura.
-                          </p>
+                          <p className="text-xs text-muted-foreground">Sin actividades para esta asignatura.</p>
                         ) : (
                           <>
                             <ul className="flex flex-col gap-2">
@@ -127,10 +150,7 @@ export function PanelActividadesCompact({ cursos }: { cursos: Curso[] }) {
                                         {a.nombre}
                                       </div>
                                       {a.descripcion ? (
-                                        <div
-                                          className="text-xs text-muted-foreground line-clamp-1"
-                                          title={a.descripcion}
-                                        >
+                                        <div className="text-xs text-muted-foreground line-clamp-1" title={a.descripcion}>
                                           {a.descripcion}
                                         </div>
                                       ) : null}
@@ -143,7 +163,9 @@ export function PanelActividadesCompact({ cursos }: { cursos: Curso[] }) {
                                   <div className="mt-2 flex items-center justify-between">
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                       <EstadoDot estado={a.estado} />
-                                      <span className="capitalize">{a.estado ?? "borrador"}</span>
+                                      <span className="capitalize">
+                                        {(a.estado ?? "borrador").replaceAll("_", " ")}
+                                      </span>
                                     </div>
 
                                     <Button
@@ -166,8 +188,7 @@ export function PanelActividadesCompact({ cursos }: { cursos: Curso[] }) {
                             {/* Controles de página */}
                             <div className="mt-3 flex items-center justify-between">
                               <span className="text-xs text-muted-foreground">
-                                {start + 1}–{Math.min(start + pageSize, all.length)}{" "}
-                                de {all.length}
+                                {start + 1}–{Math.min(start + pageSize, all.length)} de {all.length}
                               </span>
                               <div className="flex gap-2">
                                 <Button
@@ -202,12 +223,7 @@ export function PanelActividadesCompact({ cursos }: { cursos: Curso[] }) {
         })}
       </div>
 
-      <DialogVerActividad
-        open={open}
-        onOpenChange={setOpen}
-        actividad={sel as any}
-        asignaturaNombre={asigNombreSel}
-      />
+      <DialogVerActividad open={open} onOpenChange={setOpen} actividad={sel as any} asignaturaNombre={asigNombreSel} />
     </>
   );
 }
