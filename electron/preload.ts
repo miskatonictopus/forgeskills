@@ -102,8 +102,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("guardar-pdf", arrayBuffer, nombre),
   extraerTextoPDF: (ruta: string) => ipcRenderer.invoke("extraer-texto-pdf", ruta),
 
+  forzarRevisionEstados: () => ipcRenderer.invoke("cron.forzar-revision-estados"),
+  listarActividadesPorAsignatura: (cursoId: string, asignaturaId: string) =>
+  ipcRenderer.invoke("actividades.listar-por-asignatura", { cursoId, asignaturaId }),
   guardarInformePDF: (data: Uint8Array, sugerido: string) =>
     ipcRenderer.invoke("guardar-informe-pdf", data, sugerido),
+onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
+    const h = (_e: unknown, p: {count:number}) => cb(p);
+    ipcRenderer.on("actividades.actualizadas", h);
+    return () => ipcRenderer.removeListener("actividades.actualizadas", h);
+  },
 
   guardarAnalisisActividad: (actividadId: string, umbral: number, ces: any[]) =>
     ipcRenderer.invoke("actividad.guardar-analisis", { actividadId, umbral, ces }),

@@ -382,21 +382,30 @@ export default function Page() {
 
             {/* Tabs de estado */}
             <Tabs value={filtroEstado} onValueChange={(v) => setFiltroEstado(v as EstadoFiltro)} className="mb-3">
-              <TabsList className="flex flex-wrap gap-1 overflow-x-auto">
-                {ESTADOS.map((estado) => (
-                  <TabsTrigger key={estado} value={estado} className="flex items-center gap-1 text-xs">
-                    {estado === "todos"
-                      ? "Todos"
-                      : estado === "pendiente_evaluar"
-                      ? "Pendiente de evaluar"
-                      : estado.charAt(0).toUpperCase() + estado.slice(1).replaceAll("_", " ")}
-                    <Badge variant="secondary" className="ml-1">
-                      {countsPorEstado[estado] ?? 0}
-                    </Badge>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+  {/* Fila 1 */}
+  <TabsList className="w-full justify-start gap-1">
+    {(["todos","borrador","analizada","programada"] as EstadoFiltro[]).map((estado) => (
+      <TabsTrigger key={estado} value={estado} className="flex items-center gap-1 text-xs">
+        {estado === "todos"
+          ? "Todos"
+          : estado.charAt(0).toUpperCase() + estado.slice(1).replaceAll("_", " ")}
+        <Badge variant="secondary" className="ml-1">{countsPorEstado[estado] ?? 0}</Badge>
+      </TabsTrigger>
+    ))}
+  </TabsList>
+
+  {/* Fila 2 */}
+  <div className="mt-2">
+    <TabsList className="w-full justify-start gap-1">
+      {(["pendiente_evaluar","evaluada","cerrada"] as EstadoFiltro[]).map((estado) => (
+        <TabsTrigger key={estado} value={estado} className="flex items-center gap-1 text-xs">
+          {estado === "pendiente_evaluar" ? "Pendiente de evaluar" : estado.charAt(0).toUpperCase() + estado.slice(1)}
+          <Badge variant="secondary" className="ml-1">{countsPorEstado[estado] ?? 0}</Badge>
+        </TabsTrigger>
+      ))}
+    </TabsList>
+  </div>
+</Tabs>
 
             <Separator className="mb-3 bg-zinc-800" />
 
@@ -407,7 +416,6 @@ export default function Page() {
                 </div>
               ) : (
                 <div className="h-full overflow-y-auto">
-                  {/* 👉 El hijo calcula los conteos y devuelve por callback */}
                   <PanelActividadesCompact
                     cursos={cursosParaPanel}
                     filtroEstado={filtroEstado}

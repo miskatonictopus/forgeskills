@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogVerActividad } from "@/components/actividades/DialogVerActividad";
+import { toast } from "sonner";
 
 type Curso = { id: string; nombre?: string };
 
@@ -20,6 +21,16 @@ type Actividad = {
   cursoId: string;
   asignaturaId: string;
   descripcion?: string;
+  // 👇 añadimos estados reales y canon para UI
+  estado?:
+    | "borrador"
+    | "analizada"
+    | "programada"
+    | "pendiente_evaluar"
+    | "evaluada"
+    | "cerrada"
+    | "enviada"
+    | "pendiente"; // compat antiguo
   estadoCanon?: string;
 };
 
@@ -54,17 +65,32 @@ export function PanelActividadesCompact({ cursos, filtroEstado = "todos", onCoun
   const keyFor = (cursoId: string, asigId: string) => `${cursoId}::${asigId}`;
   const setPage = (k: string, n: number) => setPageBy((s) => ({ ...s, [k]: Math.max(0, n) }));
 
+  // Cargar actividades de todos los cursos al montar/lista cambia
   useEffect(() => {
-    for (const c of cursos) cargarActividades(c.id);
+    (async () => {
+      for (const c of cursos) await cargarActividades(c.id);
+    })();
   }, [cursos]);
 
-  // ---- Conteos ----
+  // 🔔 Auto-refresh cuando el cron actualiza estados
+  useEffect(() => {
+    const off = window.electronAPI.onActividadesActualizadas?.(async ({ count }) => {
+      if (count > 0) {
+        for (const c of cursos) await cargarActividades(c.id);
+        toast.success(`${count} actividad(es) pasaron a Pendiente de evaluar`);
+      }
+    });
+    return () => off?.();
+  }, [cursos]);
+
+  // ---- Conteos (prioriza estado real de DB) ----
   const counts = useMemo(() => {
     const acc: Record<string, number> = {};
     for (const c of cursos) {
       const acts = (actsSnap[c.id] || []) as Actividad[];
       for (const a of acts) {
-        const ev = a.estadoCanon ?? estadoUI(a as any);
+        // prioridad: estado (BDD) → estadoCanon → estado derivado
+        const ev = (a as any).estado ?? a.estadoCanon ?? estadoUI(a as any);
         acc[ev] = (acc[ev] ?? 0) + 1;
       }
     }
@@ -73,16 +99,33 @@ export function PanelActividadesCompact({ cursos, filtroEstado = "todos", onCoun
   }, [actsSnap, cursos]);
 
   useEffect(() => {
-    if (onCountsUpdate) onCountsUpdate(counts);
+    onCountsUpdate?.(counts);
   }, [counts, onCountsUpdate]);
+
+  // Forzar revisión + refresh (botón)
+  const revisarAhora = async () => {
+    const n = await window.electronAPI.forzarRevisionEstados?.();
+    for (const c of cursos) await cargarActividades(c.id);
+    if (typeof n === "number") {
+      toast.success(`${n} actividad(es) actualizadas`);
+    }
+  };
 
   return (
     <>
+      <div className="mb-2 flex items-center justify-end">
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={revisarAhora}>
+          Revisar estados
+        </Button>
+      </div>
+
       <div className="flex flex-col gap-4">
         {cursos.map((curso) => {
           const asignaturas = asigSnap[curso.id] || [];
+
+          // Filtrado por estado (prioriza estado real de DB)
           const actividadesCurso = ((actsSnap[curso.id] || []) as Actividad[]).filter((a) => {
-            const ev = a.estadoCanon ?? estadoUI(a as any);
+            const ev = (a as any).estado ?? a.estadoCanon ?? estadoUI(a as any);
             return filtroEstado === "todos" ? true : ev === filtroEstado;
           });
 
@@ -134,7 +177,8 @@ export function PanelActividadesCompact({ cursos, filtroEstado = "todos", onCoun
                           <>
                             <ul className="flex flex-col gap-2">
                               {items.map((a) => {
-                                const ev = a.estadoCanon ?? estadoUI(a as any);
+                                // prioridad: estado (BDD) → canon → derivado
+                                const ev = (a as any).estado ?? a.estadoCanon ?? estadoUI(a as any);
                                 return (
                                   <li
                                     key={a.id}

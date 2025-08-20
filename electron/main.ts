@@ -1,5 +1,6 @@
 /* main.ts */
 
+import { inicializarCron } from "./cron";
 import * as dotenv from "dotenv";
 dotenv.config();
 console.log("🔑 API KEY:", process.env.OPENAI_API_KEY);
@@ -196,6 +197,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
+inicializarCron(app.isPackaged);
 /* ------------------------------ Helpers ------------------------------ */
 
 function getEstadoActividad(id: string): string | null {
@@ -1425,3 +1427,22 @@ ipcMain.handle("pdf:exportFromHTML", async (_e, { html, fileName }: { html: stri
     fs.unlink(tmpFile, () => {});
   }
 });
+
+ipcMain.handle(
+  "actividades.listar-por-asignatura",
+  (_e, { cursoId, asignaturaId }: { cursoId: string; asignaturaId: string }) => {
+    return db.prepare(`
+      SELECT
+        id,
+        nombre,
+        fecha,
+        estado,
+        curso_id      AS cursoId,
+        asignatura_id AS asignaturaId,
+        analisis_fecha AS analisisFecha
+      FROM actividades
+      WHERE curso_id = ? AND asignatura_id = ?
+      ORDER BY date(fecha) DESC, time(fecha) DESC
+    `).all(cursoId, asignaturaId);
+  }
+);

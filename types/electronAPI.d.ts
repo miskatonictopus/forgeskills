@@ -80,7 +80,7 @@ export interface ElectronAPI {
   leerCursos: () => Promise<Curso[]>;
   guardarCurso: (curso: Curso) => Promise<void>;
   borrarCurso: (id: string) => Promise<void>;
-
+  forzarRevisionEstados: () => Promise<number>;
   // Asignaturas
   leerAsignaturas: () => Promise<Asignatura[]>;
   leerAsignatura: (id: string) => Promise<any>;
@@ -88,7 +88,9 @@ export interface ElectronAPI {
   actualizarColorAsignatura: (id: string, color: string) => Promise<void>;
   asociarAsignaturasACurso: (cursoId: string, asignaturaIds: string[]) => Promise<void>;
   asignaturasDeCurso: (cursoId: string) => Promise<{ id: string; nombre: string }[]>;
-
+  onActividadesActualizadas: (
+    callback: (payload: { count: number }) => void
+  ) => () => void;
   // Alumnos
   leerAlumnos: () => Promise<Alumno[]>;
   leerAlumnosPorCurso: (cursoId: string) => Promise<Alumno[]>;
@@ -124,6 +126,7 @@ export interface ElectronAPI {
   // Actividades
   guardarActividad(payload: GuardarActividadPayload): Promise<GuardarActividadResult>;
   actividadesDeCurso: (cursoId: string) => Promise<Actividad[]>;
+  listarActividadesPorAsignatura: (cursoId: string, asignaturaId: string) => Promise<any[]>;
   listarActividadesGlobal: () => Promise<Array<{
     id: string;
     nombre: string;

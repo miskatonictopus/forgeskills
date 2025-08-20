@@ -59,7 +59,7 @@ type Actividad = {
   cursoId: string;
   asignaturaId: string;
   descripcion?: string;
-  estado?: "borrador" | "analizada" | "enviada" | "pendiente" | "evaluada";
+  estado?: "borrador" | "analizada" | "programada" | "pendiente_evaluar" | "evaluada" | "cerrada";
   analisisFecha?: string | null;
   umbralAplicado?: number | null;
 
@@ -251,7 +251,7 @@ export default function ActividadesCursoPage() {
                         <TableBody>
                           {actividadesAsignatura.map((a) => {
                             // 👇 estado canónico desde store
-                            const ev = a.estadoCanon ?? estadoUI(a as any);
+                            const ev = (a.estado as any) ?? a.estadoCanon ?? estadoUI(a as any);
                             const permitido = puedeBorrar(a.estado); // tu regla original
 
                             return (
