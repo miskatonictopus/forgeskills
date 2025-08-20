@@ -384,7 +384,7 @@ export default function Page() {
             <Tabs value={filtroEstado} onValueChange={(v) => setFiltroEstado(v as EstadoFiltro)} className="mb-3">
               <TabsList className="flex flex-wrap gap-1 overflow-x-auto">
                 {ESTADOS.map((estado) => (
-                  <TabsTrigger key={estado} value={estado} className="flex items-center gap-1">
+                  <TabsTrigger key={estado} value={estado} className="flex items-center gap-1 text-xs">
                     {estado === "todos"
                       ? "Todos"
                       : estado === "pendiente_evaluar"
@@ -403,7 +403,7 @@ export default function Page() {
             <div className="flex-1 overflow-hidden">
               {snap.cursos.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                  No hay cursos. tendríamos que colocarlo en el mismo div que pone Mis Actividades.
+
                 </div>
               ) : (
                 <div className="h-full overflow-y-auto">

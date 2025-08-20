@@ -46,6 +46,7 @@ type ActividadProgramarPayload = {
 };
 
 type ActividadProgramarResult = {
+  ok: boolean;
   success: boolean;
   startISO?: string;
   endISO?: string;
@@ -171,7 +172,6 @@ export interface ElectronAPI {
 
  // Lectivo
  leerRangoLectivo: () => Promise<{ start?: string; end?: string }>;
- guardarRangoLectivo: (r: { start: string; end: string }) => Promise<void>;
 
  // Festivos
  listarFestivos: () => Promise<Festivo[]>;

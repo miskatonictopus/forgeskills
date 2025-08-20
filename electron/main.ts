@@ -356,6 +356,34 @@ ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
   }
 });
 
+ipcMain.handle("leer-asignatura", (_evt, asignaturaId: string) => {
+  const row = db.prepare(
+    "SELECT * FROM asignaturas WHERE id = ?"
+  ).get(asignaturaId) as
+    | {
+        id: string;
+        nombre: string;
+        creditos: string;
+        descripcion: string;
+        RA?: string;   // puede venir como JSON string
+        color?: string;
+      }
+    | undefined;
+
+  if (!row) return null;
+
+  // Si RA viene como string JSON, lo parseamos
+  let ra: any[] = [];
+  try {
+    const raw = (row as any).RA ?? (row as any).ra;
+    ra = raw ? JSON.parse(raw) : [];
+  } catch {
+    ra = [];
+  }
+
+  return { ...row, ra }; // normalizamos a `ra`
+});
+
 ipcMain.handle("leer-asignaturas", () => {
   const rows = db.prepare("SELECT * FROM asignaturas").all() as {
     id: string;
@@ -1184,114 +1212,50 @@ type HorarioRow = {
 
 type ActMin = { curso_id: string; asignatura_id: string };
 
+type ActividadProgramarPayload = {
+  actividadId: string;
+  startISO: string;     // ISO 8601
+  duracionMin: number;  // minutos
+};
+
+type ActividadProgramarResult = {
+  ok: boolean;
+  actividadId: string;
+  startISO: string;
+  endISO: string;
+  error?: string;
+};
 
 
 ipcMain.handle(
   "actividad:programar",
-  (
-    _e,
-    payload: {
-      actividadId: string;
-      startISO?: string;  // compat
-      startMs?: number;   // recomendado
-      duracionMin: number;
-    }
-  ) => {
-    try {
-      const { actividadId, startISO, startMs, duracionMin } = payload || {};
-      if (!actividadId || (!startISO && typeof startMs !== "number")) {
-        return { success: false, error: "Parámetros incompletos" };
+  (_e, { actividadId, startISO, duracionMin }: ActividadProgramarPayload): ActividadProgramarResult => {
+    const toIsoNoMs = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
+    const start = new Date(startISO);
+    const endISO = toIsoNoMs(new Date(start.getTime() + duracionMin * 60_000));
+
+    db.transaction(() => {
+      db.prepare(`UPDATE actividades
+                  SET estado='programada', programada_para=?, programada_fin=?
+                  WHERE id=?`).run(startISO, endISO, actividadId);
+
+      const last = db.prepare(
+        `SELECT estado FROM actividad_estado_historial
+         WHERE actividad_id=? ORDER BY rowid DESC LIMIT 1`
+      ).get(actividadId) as { estado?: string } | undefined;
+
+      if (!last || last.estado?.toLowerCase() !== "programada") {
+        db.prepare(
+          `INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha)
+           VALUES (lower(hex(randomblob(16))), ?, 'programada', datetime('now'))`
+        ).run(actividadId);
       }
+    })();
 
-      // 0) Helpers
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const toLocalISODate = (d: Date) =>
-        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      const hhmmToHHMMSS = (hhmm: string) => {
-        const [h, m] = hhmm.split(":").map(Number);
-        return `${pad(h)}:${pad(m)}:00`;
-      };
-
-      // 1) Base date (local) a partir de startMs (preferente) o startISO (compat)
-      const base = typeof startMs === "number"
-        ? new Date(startMs)
-        : new Date(String(startISO).replace(" ", "T"));
-
-      // 2) Datos mínimos de la actividad
-      const act = db
-        .prepare(
-          `SELECT curso_id, asignatura_id
-           FROM actividades
-           WHERE id = ?`
-        )
-        .get(actividadId) as { curso_id: string; asignatura_id: string } | undefined;
-
-      if (!act) return { success: false, error: "Actividad no encontrada" };
-      const { curso_id, asignatura_id } = act;
-
-      // 3) Día de la semana (local)
-      const dias = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
-      const diaSemana = dias[base.getDay()];
-
-      // 4) Horario del día
-      const horario = db
-        .prepare(
-          `SELECT hora_inicio AS horaInicio,
-                  hora_fin    AS horaFin
-           FROM horarios
-           WHERE curso_id = ?
-             AND asignatura_id = ?
-             AND lower(dia) = lower(?)
-           ORDER BY hora_inicio ASC
-           LIMIT 1`
-        )
-        .get(curso_id, asignatura_id, diaSemana) as { horaInicio: string; horaFin: string } | undefined;
-
-      if (!horario) {
-        return {
-          success: false,
-          error: `No hay horario definido para ${asignatura_id} en ${diaSemana}`,
-        };
-      }
-
-      // 5) Validación de duración frente al bloque de clase
-      const toMin = (hhmm: string) => {
-        const [h, m] = hhmm.split(":").map(Number);
-        return h * 60 + m;
-      };
-      const maxMin = toMin(horario.horaFin) - toMin(horario.horaInicio);
-      if (duracionMin > 0 && duracionMin > maxMin) {
-        return { success: false, error: "La duración excede el bloque de clase" };
-      }
-
-      // 6) Construcción de timestamps locales (sin 'Z', con segundos)
-      const ymd = toLocalISODate(base); // YYYY-MM-DD
-      const programada_para = `${ymd}T${hhmmToHHMMSS(horario.horaInicio)}`;
-      const programada_fin  = `${ymd}T${hhmmToHHMMSS(horario.horaFin)}`;
-
-      // 7) Guardar
-      db.prepare(
-        `UPDATE actividades
-         SET estado = 'programada',
-             programada_para = ?,
-             programada_fin  = ?,
-             fecha           = ?
-         WHERE id = ?`
-      ).run(programada_para, programada_fin, ymd, actividadId);
-
-      db.prepare(
-        `INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha, meta)
-         VALUES (?, ?, 'programada', datetime('now'),
-                 json_object('duracionMin', ?, 'autohorario', 1))`
-      ).run(crypto.randomUUID(), actividadId, duracionMin ?? null);
-
-      return { success: true, startISO: programada_para, endISO: programada_fin };
-    } catch (err: any) {
-      console.error("actividad:programar error:", err);
-      return { success: false, error: "Error interno" };
-    }
+    return { ok: true, actividadId, startISO, endISO };
   }
 );
+
 
 
 

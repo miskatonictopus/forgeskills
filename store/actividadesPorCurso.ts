@@ -2,24 +2,44 @@
 import { proxy } from "valtio";
 
 /* ===== Tipos ===== */
+// Lo que puede venir de la DB
+export type EstadoDB =
+  | "borrador"
+  | "analizada"
+  | "programada"
+  | "enviada"
+  | "pendiente"
+  | "evaluada";
+
+// Estados unificados para UI
+export type EstadoUI =
+  | "borrador"
+  | "analizada"
+  | "programada"
+  | "pendiente_evaluar"
+  | "evaluada"
+  | "cerrada";
+
 export type Actividad = {
   id: string;
   nombre: string;
-  fecha: string;           // "YYYY-MM-DD"
+  fecha: string; // "YYYY-MM-DD"
   cursoId: string;
   asignaturaId: string;
   descripcion?: string;
 
-  estado?: "borrador" | "analizada" | "programada" | "enviada" | "pendiente" | "evaluada";
+  estado?: EstadoDB;
   analisisFecha?: string | null;
   umbralAplicado?: number | null;
 
-  // ⬇️ vienen del backend (main.ipc "actividades-de-curso")
+  // pueden venir en snake_case desde backend
   programadaPara?: string | null; // "YYYY-MM-DD HH:mm" o "YYYY-MM-DDTHH:mm"
   programadaFin?: string | null;  // idem
+
+  // solo en memoria (UI)
+  estadoCanon?: EstadoUI;
 };
 
-/** Estructura para FullCalendar (suficiente para nuestros usos) */
 export type FCEvent = {
   id: string;
   title: string;
@@ -32,42 +52,58 @@ export type FCEvent = {
 };
 
 type ActividadesPorCurso = Record<string, Actividad[]>;
-
 export const actividadesPorCurso = proxy<ActividadesPorCurso>({});
 
 /* ===== Helpers ===== */
+
+const MAPA_DB_A_UI: Record<string, EstadoUI> = {
+  borrador: "borrador",
+  analizada: "analizada",
+  programada: "programada",
+  enviada: "pendiente_evaluar",
+  pendiente: "pendiente_evaluar",
+  evaluada: "evaluada",
+};
+
+/** Estado visible para UI (sin tocar BDD) */
+export function estadoUI(a: Actividad): EstadoUI {
+  // si hay horario, gana "programada"
+  if (a.programadaPara) return "programada";
+  const raw = (a.estado ?? "borrador").toLowerCase();
+  return MAPA_DB_A_UI[raw] ?? "borrador";
+}
 
 /** "YYYY-MM-DD HH:mm" -> "YYYY-MM-DDTHH:mm" (sin tocar zona horaria) */
 const asLocalDateTime = (s?: string | null) =>
   !s ? undefined : s.includes(" ") ? s.replace(" ", "T") : s;
 
-  export function mapActividadesToFC(acts: Actividad[]): FCEvent[] {
-    return acts
-      .map((a) => {
-        const start = asLocalDateTime(a.programadaPara);
-        const end   = asLocalDateTime(a.programadaFin);
-  
-        if (!start) return null; // ⬅️ evitamos actividades sin horario
-  
-        return {
-          id: a.id,
-          title: a.nombre,
-          start,
-          end,
-          allDay: false,
-          classNames: [a.estado === "programada" ? "evt-programada" : "evt-borrador"],
-          extendedProps: {
-            cursoId: a.cursoId,
-            asignaturaId: a.asignaturaId,
-            estado: a.estado,
-          },
-        } as FCEvent;
-      })
-      .filter((e): e is FCEvent => e !== null); // ⬅️ aquí limpias los null
-  }
-  
+/** Calendario */
+export function mapActividadesToFC(acts: Actividad[]): FCEvent[] {
+  return acts
+    .map((a) => {
+      const start = asLocalDateTime(a.programadaPara);
+      const end = asLocalDateTime(a.programadaFin);
+      if (!start) return null; // evitamos actividades sin horario
 
-/** Selector listo para el calendario */
+      const ev = a.estadoCanon ?? estadoUI(a);
+
+      return {
+        id: a.id,
+        title: a.nombre,
+        start,
+        end,
+        allDay: false,
+        classNames: [ev === "programada" ? "evt-programada" : "evt-borrador"],
+        extendedProps: {
+          cursoId: a.cursoId,
+          asignaturaId: a.asignaturaId,
+          estado: ev,
+        },
+      } as FCEvent;
+    })
+    .filter((e): e is FCEvent => e !== null);
+}
+
 export function eventosDeCurso(cursoId: string): FCEvent[] {
   const acts = actividadesPorCurso[cursoId] ?? [];
   return mapActividadesToFC(acts);
@@ -75,15 +111,52 @@ export function eventosDeCurso(cursoId: string): FCEvent[] {
 
 /* ===== Carga / Mutaciones ===== */
 
+/** Carga desde IPC normalizando snake_case → camelCase y calculando estadoCanon */
 export async function cargarActividades(cursoId: string) {
-  // Esta API ya devuelve programadaPara / programadaFin desde main.ts
   const actividades = await window.electronAPI.actividadesDeCurso(cursoId);
-  actividadesPorCurso[cursoId] = actividades;
+
+  actividadesPorCurso[cursoId] = (actividades as any[]).map((raw) => {
+    // compat backend: programada_para / programada_fin
+    const act: Actividad = {
+      ...raw,
+      programadaPara: raw.programadaPara ?? raw.programada_para ?? null,
+      programadaFin: raw.programadaFin ?? raw.programada_fin ?? null,
+    };
+
+    return {
+      ...act,
+      estadoCanon: estadoUI(act),
+    };
+  });
 }
 
 export function añadirActividad(cursoId: string, actividad: Actividad) {
   if (!actividadesPorCurso[cursoId]) {
     actividadesPorCurso[cursoId] = [];
   }
-  actividadesPorCurso[cursoId].push(actividad);
+  actividadesPorCurso[cursoId].push({
+    ...actividad,
+    estadoCanon: estadoUI(actividad),
+  });
+}
+
+/** (Opcional) Mutación optimista tras programar por IPC */
+export function setProgramadaEnMemoria(
+  cursoId: string,
+  actividadId: string,
+  startISO: string,
+  endISO?: string | null
+) {
+  const list = actividadesPorCurso[cursoId] || [];
+  const i = list.findIndex((a) => a.id === actividadId);
+  if (i >= 0) {
+    const a = list[i];
+    list[i] = {
+      ...a,
+      programadaPara: startISO,
+      programadaFin: endISO ?? a.programadaFin ?? null,
+      estadoCanon: "programada",
+    };
+    actividadesPorCurso[cursoId] = [...list]; // trigger reactividad
+  }
 }

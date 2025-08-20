@@ -65,6 +65,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // 🕒 Horarios
   guardarHorario: (data: GuardarHorarioIn) =>
     ipcRenderer.invoke("guardar-horario", data),
+  
+    
 
   leerHorarios: (asignaturaId: string, cursoId?: string) =>
     ipcRenderer.invoke("leer-horarios", asignaturaId, cursoId),

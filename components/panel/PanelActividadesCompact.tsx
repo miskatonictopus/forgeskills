@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Dot } from "@/components/ui/Dot";
 import { useSnapshot } from "valtio";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
-import { actividadesPorCurso, cargarActividades } from "@/store/actividadesPorCurso";
+import { actividadesPorCurso, cargarActividades, estadoUI } from "@/store/actividadesPorCurso";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -20,8 +20,7 @@ type Actividad = {
   cursoId: string;
   asignaturaId: string;
   descripcion?: string;
-  estado?: "borrador" | "analizada" | "programada" | "pendiente_evaluar" | "evaluada" | "cerrada";
-  analisisFecha?: string | null;
+  estadoCanon?: string;
 };
 
 function EstadoDot({ estado }: { estado?: string }) {
@@ -38,7 +37,7 @@ function EstadoDot({ estado }: { estado?: string }) {
 
 type Props = {
   cursos: Curso[];
-  filtroEstado?: string; // "todos" | ...
+  filtroEstado?: string;
   onCountsUpdate?: (counts: Record<string, number>) => void;
 };
 
@@ -46,30 +45,27 @@ export function PanelActividadesCompact({ cursos, filtroEstado = "todos", onCoun
   const asigSnap = useSnapshot(asignaturasPorCurso);
   const actsSnap = useSnapshot(actividadesPorCurso);
 
-  // diálogo ver
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState<Actividad | null>(null);
   const [asigNombreSel, setAsigNombreSel] = useState<string | undefined>();
 
-  // paginación por (curso, asignatura)
   const [pageBy, setPageBy] = useState<Record<string, number>>({});
   const pageSize = 4;
   const keyFor = (cursoId: string, asigId: string) => `${cursoId}::${asigId}`;
   const setPage = (k: string, n: number) => setPageBy((s) => ({ ...s, [k]: Math.max(0, n) }));
 
-  // cargar actividades al montar / cambiar cursos
   useEffect(() => {
     for (const c of cursos) cargarActividades(c.id);
   }, [cursos]);
 
-  // ---- Cálculo de conteos (memoizado) + notificación al padre ----
+  // ---- Conteos ----
   const counts = useMemo(() => {
     const acc: Record<string, number> = {};
     for (const c of cursos) {
       const acts = (actsSnap[c.id] || []) as Actividad[];
       for (const a of acts) {
-        const k = String(a?.estado ?? "").toLowerCase();
-        acc[k] = (acc[k] ?? 0) + 1;
+        const ev = a.estadoCanon ?? estadoUI(a as any);
+        acc[ev] = (acc[ev] ?? 0) + 1;
       }
     }
     acc["todos"] = cursos.reduce((sum, c) => sum + ((actsSnap[c.id] || []).length), 0);
@@ -85,12 +81,10 @@ export function PanelActividadesCompact({ cursos, filtroEstado = "todos", onCoun
       <div className="flex flex-col gap-4">
         {cursos.map((curso) => {
           const asignaturas = asigSnap[curso.id] || [];
-          // actividades del curso, con filtro de estado si procede
-          const actividadesCurso = ((actsSnap[curso.id] || []) as Actividad[]).filter((a) =>
-            filtroEstado === "todos"
-              ? true
-              : String(a?.estado ?? "").toLowerCase() === filtroEstado
-          );
+          const actividadesCurso = ((actsSnap[curso.id] || []) as Actividad[]).filter((a) => {
+            const ev = a.estadoCanon ?? estadoUI(a as any);
+            return filtroEstado === "todos" ? true : ev === filtroEstado;
+          });
 
           const byAsig: Record<string, Actividad[]> = {};
           for (const a of actividadesCurso) (byAsig[a.asignaturaId] ||= []).push(a);
@@ -139,53 +133,56 @@ export function PanelActividadesCompact({ cursos, filtroEstado = "todos", onCoun
                         ) : (
                           <>
                             <ul className="flex flex-col gap-2">
-                              {items.map((a) => (
-                                <li
-                                  key={a.id}
-                                  className="rounded-md border border-zinc-800 p-3 hover:bg-zinc-900/40 transition-colors"
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-medium truncate" title={a.nombre}>
-                                        {a.nombre}
-                                      </div>
-                                      {a.descripcion ? (
-                                        <div className="text-xs text-muted-foreground line-clamp-1" title={a.descripcion}>
-                                          {a.descripcion}
+                              {items.map((a) => {
+                                const ev = a.estadoCanon ?? estadoUI(a as any);
+                                return (
+                                  <li
+                                    key={a.id}
+                                    className="rounded-md border border-zinc-800 p-3 hover:bg-zinc-900/40 transition-colors"
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <div className="text-sm font-medium truncate" title={a.nombre}>
+                                          {a.nombre}
                                         </div>
-                                      ) : null}
+                                        {a.descripcion ? (
+                                          <div
+                                            className="text-xs text-muted-foreground line-clamp-1"
+                                            title={a.descripcion}
+                                          >
+                                            {a.descripcion}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                      <div className="text-[11px] tabular-nums text-zinc-400">
+                                        {new Date(a.fecha).toLocaleDateString("es-ES")}
+                                      </div>
                                     </div>
-                                    <div className="text-[11px] tabular-nums text-zinc-400">
-                                      {new Date(a.fecha).toLocaleDateString("es-ES")}
-                                    </div>
-                                  </div>
 
-                                  <div className="mt-2 flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                      <EstadoDot estado={a.estado} />
-                                      <span className="capitalize">
-                                        {(a.estado ?? "borrador").replaceAll("_", " ")}
-                                      </span>
-                                    </div>
+                                    <div className="mt-2 flex items-center justify-between">
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <EstadoDot estado={ev} />
+                                        <span className="capitalize">{ev.replaceAll("_", " ")}</span>
+                                      </div>
 
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 px-2 text-xs"
-                                      onClick={() => {
-                                        setSel(a);
-                                        setAsigNombreSel(asig.nombre);
-                                        setOpen(true);
-                                      }}
-                                    >
-                                      Ver
-                                    </Button>
-                                  </div>
-                                </li>
-                              ))}
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => {
+                                          setSel(a);
+                                          setAsigNombreSel(asig.nombre);
+                                          setOpen(true);
+                                        }}
+                                      >
+                                        Ver
+                                      </Button>
+                                    </div>
+                                  </li>
+                                );
+                              })}
                             </ul>
 
-                            {/* Controles de página */}
                             <div className="mt-3 flex items-center justify-between">
                               <span className="text-xs text-muted-foreground">
                                 {start + 1}–{Math.min(start + pageSize, all.length)} de {all.length}
@@ -223,7 +220,12 @@ export function PanelActividadesCompact({ cursos, filtroEstado = "todos", onCoun
         })}
       </div>
 
-      <DialogVerActividad open={open} onOpenChange={setOpen} actividad={sel as any} asignaturaNombre={asigNombreSel} />
+      <DialogVerActividad
+        open={open}
+        onOpenChange={setOpen}
+        actividad={sel as any}
+        asignaturaNombre={asigNombreSel}
+      />
     </>
   );
 }
