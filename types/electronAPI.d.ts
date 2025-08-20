@@ -95,7 +95,16 @@ export interface ElectronAPI {
   leerAlumnos: () => Promise<Alumno[]>;
   leerAlumnosPorCurso: (cursoId: string) => Promise<Alumno[]>;
   guardarAlumno: (alumno: AlumnoEntrada) => Promise<void>;
-
+  obtenerAlumnosPorCurso: (cursoId: string) => Promise<
+  { id: string; nombre: string; apellidos: string }[]
+>;
+alumnosPorCurso: (
+  cursoId: string
+) => Promise<{ id: string; nombre: string; apellidos: string }[]>;
+evaluarActividad: (
+  actividadId: string,
+  notas: { alumnoId: string; nota: number }[]
+) => Promise<{ ok: boolean }>;
   // Horarios
   leerHorarios(asignaturaId: string, cursoId?: string): Promise<Array<{
     id: number | string;

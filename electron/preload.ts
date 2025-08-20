@@ -61,7 +61,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   leerAlumnos: () => ipcRenderer.invoke("leer-alumnos"),
   leerAlumnosPorCurso: (cursoId: string) =>
     ipcRenderer.invoke("leer-alumnos-por-curso", cursoId),
-
+    alumnosPorCurso: (cursoId: string) =>
+    ipcRenderer.invoke("alumnos.por-curso", { cursoId }),
   // 🕒 Horarios
   guardarHorario: (data: GuardarHorarioIn) =>
     ipcRenderer.invoke("guardar-horario", data),
@@ -112,7 +113,12 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
     ipcRenderer.on("actividades.actualizadas", h);
     return () => ipcRenderer.removeListener("actividades.actualizadas", h);
   },
-
+  obtenerAlumnosPorCurso: (cursoId: string) =>
+  ipcRenderer.invoke("alumnos.por-curso", { cursoId }),
+  evaluarActividad: (actividadId: string, notas: { alumnoId: string; nota: number }[]) =>
+    ipcRenderer.invoke("actividad.evaluar", { actividadId, notas }),
+    getAlumnosActividad: (actividadId: string) =>
+    ipcRenderer.invoke("actividad.alumnos", { actividadId }),
   guardarAnalisisActividad: (actividadId: string, umbral: number, ces: any[]) =>
     ipcRenderer.invoke("actividad.guardar-analisis", { actividadId, umbral, ces }),
   

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import { alumnosStore, cargarAlumnosCurso, getAlumnosDeCurso } from "@/store/alumnosStore";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose,
 } from "@/components/ui/dialog";
@@ -9,6 +10,8 @@ import { Actividad, cargarActividades, estadoUI } from "@/store/actividadesPorCu
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import EvaluarActividad from "@/components/evaluar/EvaluarActividad";
+import { useSnapshot } from "valtio";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ExportarPDFButton } from "@/components/ExportarPDFButton";
@@ -120,7 +123,12 @@ export function DialogVerActividad({
 }: Props) {
   const [cesDetectados, setCesDetectados] = useState<CEDetectado[]>([]);
   const [loading, setLoading] = useState(false);
-
+  const [evalOpen, setEvalOpen] = useState(false);
+  useEffect(() => {
+    if (actividad?.cursoId) {
+      cargarAlumnosCurso(actividad.cursoId);
+    }
+  }, [actividad?.cursoId]);
   const [fuenteAnalisis, setFuenteAnalisis] =
     useState<"snapshot" | "fresh" | "none">("none");
   const [analizadaFecha, setAnalizadaFecha] = useState<string | null>(null);
@@ -650,8 +658,19 @@ export function DialogVerActividad({
                     {loading ? "Analizando..." : "Analizar descripción"}
                   </Button>
                 )}
+                {actividad.estado === "pendiente_evaluar" && (
+  <Button onClick={() => setEvalOpen(true)}>Evaluar</Button>
+)}
 
+<EvaluarActividad
+  open={evalOpen}
+  onOpenChange={setEvalOpen}
+  actividadId={actividad.id}
+  cursoId={actividad.cursoId}
+  alumnos={alumnosStore.porCurso[actividad.cursoId] ?? []}
+/>
                 <Button onClick={handleProgramar}>Programar actividad</Button>
+                
               </div>
             </div>
 

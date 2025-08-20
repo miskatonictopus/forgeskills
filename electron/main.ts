@@ -1,43 +1,84 @@
-/* main.ts */
-
-import { inicializarCron } from "./cron";
+/* ============================================================================
+ * IMPORTS (únicos)
+ * ==========================================================================*/
 import * as dotenv from "dotenv";
 dotenv.config();
-console.log("🔑 API KEY:", process.env.OPENAI_API_KEY);
-import { v4 as uuid } from "uuid"; 
+
 import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import * as path from "path";
-import { db, initDB } from "./database";
+import * as fs from "fs";
+import Database from "better-sqlite3";
+
+import { execSync } from "child_process";
+import { writeFile } from "node:fs/promises";
+import * as crypto from "crypto";
+import { inicializarCron } from "./cron";
+import { v4 as uuid, v4 as uuidv4 } from "uuid"; // si solo usas uno, deja uno
+import { initDB } from "./database";
 import type { Asignatura } from "../models/asignatura";
 import { analizarDescripcionActividad } from "../src/lib/analizarDescripcionActividad";
 import { analizarTextoPlano } from "../src/lib/analizarTextoPlano";
 import { extraerTextoConMutool } from "../src/lib/extraerTextoMutool";
-import { execSync } from "child_process";
-import fs from "fs";
-import { writeFile } from "node:fs/promises";
-import * as crypto from "crypto";
-import { randomUUID } from "crypto";
-import { v4 as uuidv4 } from "uuid";
 
-db.pragma("foreign_keys = ON");
+/* (opcional) si usas randomUUID explícito */
+const { randomUUID } = crypto;
 
-/* ----------------------------- Utils generales ----------------------------- */
+/* ============================================================================
+ * LOG INICIAL
+ * ==========================================================================*/
+console.log("🔑 API KEY:", process.env.OPENAI_API_KEY);
 
-function extraerTextoPDF(path: string): string {
-  try {
-    const output = execSync(`mutool draw -F text -o - "${path}"`, {
-      encoding: "utf-8",
-    });
-    return output.trim();
-  } catch (error) {
-    console.error("❌ Error al extraer texto con mutool:", error);
-    return "";
-  }
+/* ============================================================================
+ * Inicializar base de datos (robusto dev/prod)
+ * ==========================================================================*/
+function resolveDbPath() {
+  // En dev: repo/data/db.sqlite ; En prod: resources/data/db.sqlite
+  const devPath  = path.join(process.cwd(), "data", "db.sqlite");
+  const prodPath = path.join(process.resourcesPath, "data", "db.sqlite");
+  return app.isPackaged ? prodPath : devPath;
 }
 
+const dbPath = resolveDbPath();
+fs.mkdirSync(path.dirname(dbPath), { recursive: true }); // asegúrate de que existe /data
+console.log("📂 DB path:", dbPath, "| exists:", fs.existsSync(dbPath));
+
+const db = new Database(dbPath);
+db.pragma("foreign_keys = ON");
+(globalThis as any).db = db;
+
+// tu init como lo tenías (usa el db global)
 initDB();
 
+// sanity log de tablas al arrancar
+try {
+  const tables = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY 1`)
+    .all()
+    .map((t: any) => t.name);
+  console.log("🧾 Tablas detectadas:", tables);
+} catch (e) {
+  console.error("❌ Error listando tablas:", e);
+}
+
+/* ============================================================================
+ * IPC de diagnóstico (opcional, útil para depurar rutas/tablas desde el front)
+ * ==========================================================================*/
+ipcMain.handle("debug.dbinfo", () => {
+  const info = {
+    dbPath,
+    exists: fs.existsSync(dbPath),
+    tables: [] as string[],
+  };
+  try {
+    info.tables = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY 1`)
+      .all()
+      .map((t: any) => t.name);
+  } catch {}
+  return info;
+});
 /* ------------------------------- Migraciones -------------------------------- */
+// aquí pondrías cualquier migración extra que quieras aplicar
 
 function colExists(table: string, col: string) {
   const rows = db.prepare(`PRAGMA table_info(${table})`).all() as any[];
@@ -391,8 +432,8 @@ ipcMain.handle("leer-asignaturas", () => {
     id: string;
     nombre: string;
     creditos: string;
-    descripcion: string;
-    RA: string;
+    descripcion: string; // texto plano
+    RA: string;          // JSON string
     color: string;
   }[];
 
@@ -400,10 +441,10 @@ ipcMain.handle("leer-asignaturas", () => {
     id: row.id,
     nombre: row.nombre,
     creditos: row.creditos,
-    descripcion: JSON.parse(row.descripcion),
-    RA: JSON.parse(row.RA),
+    descripcion: row.descripcion,   // ← texto plano, NO JSON.parse
+    RA: JSON.parse(row.RA),         // ← JSON real con RA y CE
     color: row.color,
-  })) satisfies Asignatura[];
+  }));
 });
 
 ipcMain.handle("leer-asignaturas-curso", (_event, cursoId: string) => {
@@ -665,7 +706,15 @@ ipcMain.handle("analizar-descripcion-desde-texto", async (_event, texto: string,
 });
 
 ipcMain.handle("extraer-texto-pdf", async (_event, filePath: string) => {
-  return extraerTextoPDF(filePath);
+  app.whenReady().then(() => {
+    createWindow();
+    // Arranca tareas programadas; pásale si está empaquetado si lo necesitas
+    try {
+      inicializarCron?.(app.isPackaged);
+    } catch (e) {
+      console.error("Cron no pudo inicializarse:", e);
+    }
+  });
 });
 
 /* --------------------------- Archivos PDF (guardar) ------------------------- */
@@ -1446,3 +1495,125 @@ ipcMain.handle(
     `).all(cursoId, asignaturaId);
   }
 );
+
+ipcMain.handle(
+  "actividad.evaluar",
+  (_e, { actividadId, notas }: { actividadId: string; notas: { alumnoId: string; nota: number }[] }) => {
+    const db = (globalThis as any).db as Database.Database;
+
+    const tx = db.transaction(() => {
+      // 1) Guardar notas “globales” de la actividad
+      const upsertActividadNota = db.prepare(`
+        INSERT INTO actividad_nota (actividad_id, alumno_id, nota)
+        VALUES (@actividadId, @alumnoId, @nota)
+        ON CONFLICT(actividad_id, alumno_id) DO UPDATE SET nota=excluded.nota
+      `);
+
+      for (const n of notas) {
+        upsertActividadNota.run({
+          actividadId,
+          alumnoId: n.alumnoId,
+          nota: n.nota,
+        });
+      }
+
+      // 2) CE implicados en esta actividad
+      const ceRows = db
+        .prepare(`SELECT ce_codigo FROM actividad_ce WHERE actividad_id = ?`)
+        .all(actividadId) as { ce_codigo: string }[];
+      const ceCodes = ceRows.map((r) => r.ce_codigo);
+
+      // 3) Propagar a cada CE (misma nota)
+      const getAsignaturaId = db
+        .prepare(`SELECT asignatura_id FROM actividades WHERE id = ?`)
+        .get(actividadId) as { asignatura_id: string };
+      const asignaturaId = getAsignaturaId.asignatura_id;
+
+      const upsertNotaCE = db.prepare(`
+        INSERT INTO nota_ce (alumno_id, asignatura_id, ce_codigo, nota)
+        VALUES (@alumnoId, @asignaturaId, @ce, @nota)
+        ON CONFLICT(alumno_id, asignatura_id, ce_codigo) DO UPDATE SET nota=excluded.nota
+      `);
+
+      for (const { alumnoId, nota } of notas) {
+        for (const ce of ceCodes) {
+          upsertNotaCE.run({ alumnoId, asignaturaId, ce, nota });
+        }
+      }
+
+      // 4) Marcar actividad como evaluada
+      db.prepare(
+        `UPDATE actividades SET estado = 'evaluada', evaluada_fecha = datetime('now') WHERE id = ?`
+      ).run(actividadId);
+    });
+
+    tx();
+    return { ok: true };
+  }
+);
+
+
+ipcMain.handle(
+  "alumnos.por-curso",
+  (_e, { cursoId }: { cursoId: string }) => {
+    const db = (globalThis as any).db as Database.Database;
+
+    // ¿Existe la tabla curso_alumno?
+    const hasCursoAlumno = !!db
+      .prepare(
+        `SELECT 1 FROM sqlite_master WHERE type='table' AND name='curso_alumno'`
+      )
+      .get();
+
+    if (hasCursoAlumno) {
+      // Versión normalizada (si algún día usas curso_alumno)
+      return db
+        .prepare(
+          `SELECT a.id, a.nombre, a.apellidos
+           FROM curso_alumno ca
+           JOIN alumnos a ON a.id = ca.alumno_id
+           WHERE ca.curso_id = ?
+           ORDER BY a.apellidos COLLATE NOCASE, a.nombre COLLATE NOCASE`
+        )
+        .all(cursoId);
+    }
+
+    // Versión actual (campo curso en alumnos)
+    return db
+      .prepare(
+        `SELECT id, nombre, apellidos
+         FROM alumnos
+         WHERE curso = ?
+         ORDER BY apellidos COLLATE NOCASE, nombre COLLATE NOCASE`
+      )
+      .all(cursoId);
+  }
+);
+
+ipcMain.handle("actividad.alumnos", (_e, { actividadId }: { actividadId: string }) => {
+  const db = (globalThis as any).db as Database.Database;
+
+  // 1) Buscar curso de la actividad
+  const act = db
+    .prepare(`SELECT curso_id FROM actividades WHERE id = ?`)
+    .get(actividadId) as { curso_id: string } | undefined;
+
+  if (!act) {
+    console.error("❌ Actividad no encontrada:", actividadId);
+    return [];
+  }
+
+  // 2) Buscar alumnos del curso (si usas tabla normalizada curso_alumno, usa el JOIN)
+  const alumnos = db
+    .prepare(
+      `SELECT a.id, a.nombre, a.apellidos
+       FROM curso_alumno ca
+       JOIN alumnos a ON a.id = ca.alumno_id
+       WHERE ca.curso_id = ?
+       ORDER BY a.apellidos COLLATE NOCASE, a.nombre COLLATE NOCASE`
+    )
+    .all(act.curso_id);
+
+  return alumnos;
+});
+
