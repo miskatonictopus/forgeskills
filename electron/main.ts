@@ -1496,61 +1496,30 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle(
-  "actividad.evaluar",
-  (_e, { actividadId, notas }: { actividadId: string; notas: { alumnoId: string; nota: number }[] }) => {
-    const db = (globalThis as any).db as Database.Database;
+ipcMain.handle("actividad.evaluar", (_e, { actividadId, notas }) => {
+  const insertStmt = db.prepare(`
+    INSERT INTO actividad_nota (actividad_id, alumno_id, nota)
+    VALUES (?, ?, ?)
+    ON CONFLICT(actividad_id, alumno_id)
+    DO UPDATE SET nota = excluded.nota
+  `);
 
-    const tx = db.transaction(() => {
-      // 1) Guardar notas “globales” de la actividad
-      const upsertActividadNota = db.prepare(`
-        INSERT INTO actividad_nota (actividad_id, alumno_id, nota)
-        VALUES (@actividadId, @alumnoId, @nota)
-        ON CONFLICT(actividad_id, alumno_id) DO UPDATE SET nota=excluded.nota
-      `);
+  const tx = db.transaction((notas) => {
+    for (const { alumnoId, nota } of notas) {
+      insertStmt.run(actividadId, alumnoId, nota);
+    }
+    // 👇 actualizar estado a "evaluada"
+    db.prepare(
+      `UPDATE actividades SET estado = 'evaluada' WHERE id = ?`
+    ).run(actividadId);
+  });
 
-      for (const n of notas) {
-        upsertActividadNota.run({
-          actividadId,
-          alumnoId: n.alumnoId,
-          nota: n.nota,
-        });
-      }
+  tx(notas);
 
-      // 2) CE implicados en esta actividad
-      const ceRows = db
-        .prepare(`SELECT ce_codigo FROM actividad_ce WHERE actividad_id = ?`)
-        .all(actividadId) as { ce_codigo: string }[];
-      const ceCodes = ceRows.map((r) => r.ce_codigo);
+  return { ok: true };
+});
 
-      // 3) Propagar a cada CE (misma nota)
-      const getAsignaturaId = db
-        .prepare(`SELECT asignatura_id FROM actividades WHERE id = ?`)
-        .get(actividadId) as { asignatura_id: string };
-      const asignaturaId = getAsignaturaId.asignatura_id;
 
-      const upsertNotaCE = db.prepare(`
-        INSERT INTO nota_ce (alumno_id, asignatura_id, ce_codigo, nota)
-        VALUES (@alumnoId, @asignaturaId, @ce, @nota)
-        ON CONFLICT(alumno_id, asignatura_id, ce_codigo) DO UPDATE SET nota=excluded.nota
-      `);
-
-      for (const { alumnoId, nota } of notas) {
-        for (const ce of ceCodes) {
-          upsertNotaCE.run({ alumnoId, asignaturaId, ce, nota });
-        }
-      }
-
-      // 4) Marcar actividad como evaluada
-      db.prepare(
-        `UPDATE actividades SET estado = 'evaluada', evaluada_fecha = datetime('now') WHERE id = ?`
-      ).run(actividadId);
-    });
-
-    tx();
-    return { ok: true };
-  }
-);
 
 
 ipcMain.handle(

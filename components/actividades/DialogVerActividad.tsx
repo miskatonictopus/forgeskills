@@ -143,7 +143,19 @@ export function DialogVerActividad({
   const ceAnchorRef = useRef<HTMLDivElement | null>(null);
   const [showTop, setShowTop] = useState(false);
   const [showUnsaved, setShowUnsaved] = useState(false);
-
+  useEffect(() => {
+    const onEvaluada = (ev: any) => {
+      const id = ev?.detail?.actividadId;
+      if (!id || !actividad) return;
+      if (id !== actividad.id) return;
+  
+      const cursoId = String((actividad as any).cursoId ?? (actividad as any).curso_id ?? "");
+      if (cursoId) cargarActividades(cursoId);
+    };
+  
+    window.addEventListener("actividad:evaluada", onEvaluada);
+    return () => window.removeEventListener("actividad:evaluada", onEvaluada);
+  }, [actividad?.id]);
   // Defensor de horarios
   const { openDefensorDeHorarios, dialog: defensorDialog } = useDefensorDeHorarios();
 
