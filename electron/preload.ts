@@ -177,4 +177,10 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
 
     cePorAsignatura: (asignaturaId: string) =>
     ipcRenderer.invoke("catalogo:ce-por-asignatura", asignaturaId),
+
+    leerNotasAsignatura: (asignaturaId: string) =>
+    ipcRenderer.invoke("leer-notas-asignatura", asignaturaId),
+
+    leerNotasDetalleAsignatura: (asignaturaId: string) =>
+    ipcRenderer.invoke("leer-notas-detalle-asignatura", asignaturaId),
 });

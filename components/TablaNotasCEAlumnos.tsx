@@ -1,125 +1,78 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import React from "react";
+import React, { useMemo } from "react";
 
-type Alumno = {
-  id: string;
-  nombre: string;
-  apellidos: string;
-};
+type Alumno = { id: string; nombre: string; apellidos: string };
+type CE = { codigo: string; descripcion: string };
+type RA = { codigo: string; descripcion: string; CE: CE[] };
 
-type CE = {
-  codigo: string;
-  descripcion: string;
-};
-
-type RA = {
-  codigo: string;
-  descripcion: string;
-  CE: CE[];
+type NotaDetallada = {
+  alumno_id: string;
+  ce_codigo: string;
+  actividad_id: string;
+  actividad_fecha?: string | null;
+  actividad_nombre?: string | null;
+  nota: number | null;
 };
 
 type Props = {
   alumnos: Alumno[];
   ra: RA[];
+  notasDetalle: NotaDetallada[]; // 👈 una fila por actividad
 };
 
-function getNotaColor(nota: string | number) {
-  const valor = parseFloat(nota.toString());
-  if (isNaN(valor)) return "text-muted-foreground";
-  if (valor < 5) return "text-red-600 dark:text-red-400";
-  if (valor < 6) return "text-yellow-600 dark:text-yellow-400";
+const normCE = (s: string) => String(s ?? "").trim().toUpperCase();
+
+function getNotaColor(nota: number | null) {
+  if (nota === null || isNaN(nota)) return "text-muted-foreground";
+  if (nota < 5) return "text-red-600 dark:text-red-400";
+  if (nota < 6) return "text-yellow-600 dark:text-yellow-400";
   return "text-green-600 dark:text-green-400";
 }
 
-export default function TablaNotasCEAlumnos({ alumnos, ra }: Props) {
-  const [notas, setNotas] = useState<Record<string, Record<string, string[]>>>({});
-  const [notasRA, setNotasRA] = useState<Record<string, Record<string, string>>>({});
-
-  useEffect(() => {
-    const nuevasNotas: Record<string, Record<string, string[]>> = {};
-    ra.forEach((raItem) => {
-      raItem.CE.forEach((ce) => {
-        if (!nuevasNotas[ce.codigo]) nuevasNotas[ce.codigo] = {};
-        alumnos.forEach((alumno) => {
-          if (!nuevasNotas[ce.codigo][alumno.id]) {
-            nuevasNotas[ce.codigo][alumno.id] = ["", ""];
-          }
-        });
+export default function TablaNotasCEAlumnos({ alumnos, ra, notasDetalle = [] }: Props) {
+  // Index: (alumnoId|CE) -> array de notas por actividad (ordenadas por fecha)
+  const idx = useMemo(() => {
+    const m = new Map<string, NotaDetallada[]>();
+    for (const n of notasDetalle) {
+      const key = `${n.alumno_id}::${normCE(n.ce_codigo)}`;
+      const arr = m.get(key) ?? [];
+      arr.push(n);
+      m.set(key, arr);
+    }
+    // ordenar por fecha asc (las sin fecha al final)
+    for (const [k, arr] of m) {
+      arr.sort((a, b) => {
+        const ta = a.actividad_fecha ? Date.parse(a.actividad_fecha) : Number.MAX_SAFE_INTEGER;
+        const tb = b.actividad_fecha ? Date.parse(b.actividad_fecha) : Number.MAX_SAFE_INTEGER;
+        return ta - tb;
       });
+      m.set(k, arr);
+    }
+    return m;
+  }, [notasDetalle]);
+
+  // Dedupe CE por RA (por si vinieran repetidos)
+  const raDedup = useMemo(() => {
+    return ra.map((raItem) => {
+      const seen = new Set<string>();
+      const CEunicos: CE[] = [];
+      for (const ce of raItem.CE || []) {
+        const code = normCE(ce.codigo);
+        if (code && !seen.has(code)) {
+          seen.add(code);
+          CEunicos.push({ codigo: code, descripcion: ce.descripcion });
+        }
+      }
+      return { ...raItem, CE: CEunicos, codigo: String(raItem.codigo).trim() };
     });
-    setNotas(nuevasNotas);
-  }, [ra, alumnos]);
+  }, [ra]);
 
-  useEffect(() => {
-    const nuevasNotasRA: Record<string, Record<string, string>> = {};
-    ra.forEach((raItem) => {
-      nuevasNotasRA[raItem.codigo] = {};
-      alumnos.forEach((alumno) => {
-        const mediasCE = raItem.CE.map((ce) =>
-          mediaNotasCE(ce.codigo, alumno.id)
-        ).filter((n) => !isNaN(n));
-        const media =
-          mediasCE.length > 0
-            ? (mediasCE.reduce((a, b) => a + b, 0) / mediasCE.length).toFixed(1)
-            : "";
-        nuevasNotasRA[raItem.codigo][alumno.id] = media;
-      });
-    });
-    setNotasRA(nuevasNotasRA);
-  }, [notas, ra, alumnos]);
-
-  const handleNotaParcialChange = (
-    ceCodigo: string,
-    alumnoId: string,
-    index: number,
-    valor: string
-  ) => {
-    setNotas((prev) => {
-      const prevNotas = [...(prev[ceCodigo]?.[alumnoId] || [])];
-      prevNotas[index] = valor;
-      return {
-        ...prev,
-        [ceCodigo]: {
-          ...prev[ceCodigo],
-          [alumnoId]: prevNotas,
-        },
-      };
-    });
-  };
-
-  const mediaNotasCE = (ceCodigo: string, alumnoId: string): number => {
-    const notasParciales = notas[ceCodigo]?.[alumnoId] || [];
-
-    const valores = notasParciales
-      .map((n) => parseFloat(n.replace(",", ".")))
-      .filter((n) => !isNaN(n));
-    if (valores.length === 0) return 0;
-    return valores.reduce((a, b) => a + b, 0) / valores.length;
-  };
+  const notasDe = (alumnoId: string, ceCodigo: string) =>
+    idx.get(`${alumnoId}::${normCE(ceCodigo)}`) ?? [];
 
   return (
     <div className="space-y-4">
-      {/* ===== Resumen RA ===== */}
-      <div className="overflow-x-auto">
-        <table className="min-w-max table-auto text-sm border rounded-xl overflow-hidden">
-          <thead className="bg-muted/50">
-            <tr>
-              {ra.map((raItem, index) => (
-                <th
-                  key={raItem.codigo}
-                  className="px-4 py-2 text-center font-medium border-l first:border-l-0 border-muted"
-                >
-                  {`RA${index + 1}`}
-                </th>
-              ))}
-            </tr>
-          </thead>
-        </table>
-      </div>
-
-      {/* ===== Tabla CE × Alumnos ===== */}
       <div className="overflow-auto max-h-[75vh] border rounded-xl shadow">
         <table className="min-w-max table-auto text-sm">
           <thead className="bg-muted/50">
@@ -127,11 +80,11 @@ export default function TablaNotasCEAlumnos({ alumnos, ra }: Props) {
               <th className="sticky text-xs left-0 bg-muted px-4 py-2 font-bold text-left border-r border-muted">
                 CE / RA / Alumno
               </th>
-              {alumnos.map((a, index) => (
+              {alumnos.map((a, i) => (
                 <th
-                  key={a.id}
+                  key={`hdr-${a.id}`}
                   className={`px-4 py-2 font-medium text-xs text-left whitespace-nowrap ${
-                    index !== 0 ? "border-l border-white/10" : ""
+                    i !== 0 ? "border-l border-white/10" : ""
                   }`}
                 >
                   {a.apellidos}, {a.nombre}
@@ -139,75 +92,61 @@ export default function TablaNotasCEAlumnos({ alumnos, ra }: Props) {
               ))}
             </tr>
           </thead>
+
           <tbody>
-            {ra.map((raItem) => (
-              <React.Fragment key={`ra-${raItem.codigo}`}>
-                {/* Fila de RA con medias */}
+            {raDedup.map((raItem) => (
+              <React.Fragment key={`RA-${raItem.codigo}`}>
+                {/* Encabezado del RA */}
                 <tr className="bg-muted/10 border-t">
-                  <td className="sticky left-0 bg-background font-semibold px-4 py-2 border-r border-muted w-125 whitespace-normal break-words">
+                  <td
+                    colSpan={alumnos.length + 1}
+                    className="sticky left-0 bg-background font-semibold px-4 py-2 border-r border-muted whitespace-normal break-words"
+                  >
                     {raItem.codigo} – {raItem.descripcion}
                   </td>
-                  {alumnos.map((alumno, index) => (
-                    <td
-                      key={alumno.id}
-                      className={`px-2 py-1 ${index !== 0 ? "border-l border-white/10" : ""}`}
-                    >
-                      <div className="w-full h-full m-[2px]">
-                        <div className="w-full h-full rounded bg-white text-center text-2xl font-bold text-black shadow-sm">
-                          {notasRA[raItem.codigo]?.[alumno.id] || "-"}
-                        </div>
-                      </div>
-                    </td>
-                  ))}
                 </tr>
 
                 {/* Filas de CE */}
                 {raItem.CE.map((ce) => (
-                  <tr key={ce.codigo} className="border-t">
+                  <tr key={`row-${raItem.codigo}-${ce.codigo}`} className="border-t">
                     <td className="sticky left-0 bg-background px-4 py-2 text-muted-foreground text-xs border-r border-muted w-72 whitespace-normal break-words">
                       {ce.codigo} – {ce.descripcion}
                     </td>
+
                     {alumnos.map((alumno, index) => {
-                      const notasParciales = notas[ce.codigo]?.[alumno.id] || [];
+                      const arr = notasDe(alumno.id, ce.codigo);
                       return (
                         <td
-                          key={alumno.id}
-                          className={`px-2 py-1 ${
+                          key={`cell-${alumno.id}-${ce.codigo}`}
+                          className={`px-2 py-1 align-top ${
                             index !== 0 ? "border-l border-white/10" : ""
                           }`}
                         >
-                          <div className="flex items-center gap-1">
-                            <div className="flex gap-1">
-                              {notasParciales.map((nota, i) => (
-                                <input
-                                  key={i}
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  max="10"
-                                  value={nota}
-                                  className="w-10 text-sm text-center border rounded"
-                                  onChange={(e) =>
-                                    handleNotaParcialChange(
-                                      ce.codigo,
-                                      alumno.id,
-                                      i,
-                                      e.target.value.replace(",", ".")
-                                    )
-                                  }
-                                />
-                              ))}
+                          {arr.length === 0 ? (
+                            <div className="w-10 text-sm text-center text-muted-foreground">-</div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {arr.map((n) => {
+                                const fecha =
+                                  n.actividad_fecha &&
+                                  !isNaN(Date.parse(n.actividad_fecha))
+                                    ? new Date(n.actividad_fecha).toLocaleDateString("es-ES")
+                                    : "";
+                                const titulo = n.actividad_nombre || "";
+                                return (
+                                  <span
+                                    key={`pill-${n.actividad_id}-${alumno.id}-${ce.codigo}`}
+                                    title={titulo ? `${titulo}${fecha ? ` · ${fecha}` : ""}` : fecha}
+                                    className={`px-2 py-0.5 rounded text-xs font-semibold border ${getNotaColor(
+                                      n.nota
+                                    )} border-white/10`}
+                                  >
+                                    {n.nota !== null ? Number(n.nota).toFixed(1) : "-"}
+                                  </span>
+                                );
+                              })}
                             </div>
-                            <input
-                              type="number"
-                              value={mediaNotasCE(ce.codigo, alumno.id).toFixed(1)}
-                              className={`w-10 text-sm text-center border rounded bg-muted cursor-not-allowed ${getNotaColor(
-                                mediaNotasCE(ce.codigo, alumno.id)
-                              )}`}
-                              readOnly
-                              tabIndex={-1}
-                            />
-                          </div>
+                          )}
                         </td>
                       );
                     })}

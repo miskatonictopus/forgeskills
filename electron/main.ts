@@ -1884,4 +1884,44 @@ ipcMain.handle("catalogo:ce-por-asignatura", (_e, asignaturaId: string) => {
   return stmt.all(asignaturaId);
 });
 
+ipcMain.handle("leer-notas-asignatura", (_e, asignaturaId: string) => {
+  const stmt = db.prepare(`
+    SELECT ra.codigo      AS ra_codigo,
+           ce.codigo      AS ce_codigo,
+           ce.descripcion AS ce_desc,
+           a.id           AS alumno_id,
+           a.nombre       AS alumno_nombre,
+           a.apellidos    AS alumno_apellidos,
+           n.nota,
+           n.actividad_id   -- 👈 añadimos esto
+    FROM ra
+    JOIN ce ON ce.ra_id = ra.id
+    CROSS JOIN alumnos a
+    LEFT JOIN nota_ce n
+      ON n.alumno_id = a.id
+     AND n.asignatura_id = ra.asignatura_id
+     AND n.ce_codigo = ce.codigo
+    WHERE ra.asignatura_id = ?
+    ORDER BY ra.codigo, ce.codigo, a.apellidos
+  `);
+  return stmt.all(asignaturaId);
+});
+
+ipcMain.handle("leer-notas-detalle-asignatura", (_e, asignaturaId: string) => {
+  const stmt = db.prepare(`
+    SELECT
+      ac.alumno_id,
+      ac.ce_codigo,
+      ac.actividad_id,
+      ac.nota,
+      act.fecha   AS actividad_fecha,
+      act.nombre  AS actividad_nombre
+    FROM alumno_ce ac
+    JOIN actividades act
+      ON act.id = ac.actividad_id
+    WHERE act.asignatura_id = ?
+    ORDER BY ac.alumno_id, ac.ce_codigo, act.fecha
+  `);
+  return stmt.all(asignaturaId);
+});
 
