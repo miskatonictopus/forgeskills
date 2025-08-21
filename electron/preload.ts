@@ -171,4 +171,10 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
 
     guardarNotasActividad: (actividadId: string, notas: { alumnoId: string; nota: number }[]) =>
     ipcRenderer.invoke("actividad:guardar-notas", { actividadId, notas }),
+
+    guardarAsignaturaEImportarRAyCE: (asignaturaId: string, raList: any[]) =>
+    ipcRenderer.invoke("asignatura:guardar-e-importar-ra-ce", { asignaturaId, raList }),
+
+    cePorAsignatura: (asignaturaId: string) =>
+    ipcRenderer.invoke("catalogo:ce-por-asignatura", asignaturaId),
 });

@@ -116,6 +116,8 @@ type Props = {
   asignaturaNombre?: string;
 };
 
+type CEOficial = { ceCodigo: string; descripcion: string; raCodigo: string };
+
 type CEDetectado = {
   codigo: string;
   descripcion?: string;
@@ -130,6 +132,9 @@ export function DialogVerActividad({
   const [cesDetectados, setCesDetectados] = useState<CEDetectado[]>([]);
   const [loading, setLoading] = useState(false);
   const [evalOpen, setEvalOpen] = useState(false);
+  const raOf = (ceCode: string) => raByCe.get(normCE(ceCode)) ?? "RA?";
+  const keyFor = (ceCode: string, idx: number) => `${raOf(ceCode)}-${normCE(ceCode)}-${idx}`;
+  const labelFor = (ceCode: string) => `${raOf(ceCode)} · ${normCE(ceCode)}`;
   useEffect(() => {
     if (actividad?.cursoId) {
       cargarAlumnosCurso(actividad.cursoId);
@@ -166,6 +171,7 @@ export function DialogVerActividad({
   const { openDefensorDeHorarios, dialog: defensorDialog } = useDefensorDeHorarios();
 
   // catálogo CE
+  const [raByCe, setRaByCe] = useState<Map<string, string>>(new Map());
   const [ceDescByCode, setCeDescByCode] = useState<Record<string, string>>({});
   const getCeText = (r: any) => {
     const byField = (r?.descripcion || r?.texto || "").trim();
@@ -225,23 +231,43 @@ export function DialogVerActividad({
   }, [open, actividad]);
 
   // catálogo RA→CE
+
   useEffect(() => {
     (async () => {
       if (!open || !actividad?.asignaturaId) return;
       try {
-        const api = window.electronAPI as any;
-        let lista: Array<{ codigo: string; descripcion: string }> = [];
-        if (api?.leerRADeAsignatura) {
-          const ra = await api.leerRADeAsignatura(actividad.asignaturaId);
-          lista = (Array.isArray(ra) ? ra : [])
-            .flatMap((r: any) => r?.CE || r?.ce || [])
-            .filter((x: any) => x?.codigo)
-            .map((x: any) => ({ codigo: normCE(String(x.codigo)), descripcion: String(x.descripcion ?? x.texto ?? "") }));
+        const api = (window as any).electronAPI;
+  
+        // Preferimos la versión oficial desde SQLite (ra/ce importados)
+        let oficiales: CEOficial[] = [];
+        if (api?.cePorAsignatura) {
+          oficiales = await api.cePorAsignatura(actividad.asignaturaId);
+        } else if (api?.leerRADeAsignatura) {
+          // Fallback: si aún no tienes el handler, intenta tu método previo
+          const raList = await api.leerRADeAsignatura(actividad.asignaturaId);
+          oficiales = (Array.isArray(raList) ? raList : [])
+            .flatMap((r: any) => (r?.CE || r?.ce || []).map((ce: any) => ({
+              ceCodigo: String(ce.codigo),
+              descripcion: String(ce.descripcion ?? ce.texto ?? ""),
+              raCodigo: String(r.codigo ?? ""),
+            })));
         }
-        const map: Record<string, string> = {};
-        for (const it of lista) map[it.codigo] = it.descripcion;
-        setCeDescByCode(map);
-      } catch { setCeDescByCode({}); }
+  
+        // Normalizamos y construimos mapas
+        const mapRA = new Map<string, string>();
+        const mapDesc: Record<string, string> = {};
+        for (const r of oficiales) {
+          const ceCode = normCE(r.ceCodigo);
+          const raCode = normCE(r.raCodigo);
+          mapRA.set(ceCode, raCode);
+          if (!mapDesc[ceCode]) mapDesc[ceCode] = r.descripcion?.trim() ?? "";
+        }
+        setRaByCe(mapRA);
+        // mantenemos tus descripciones existentes, pero completamos con catálogo oficial
+        setCeDescByCode(prev => ({ ...mapDesc, ...prev }));
+      } catch {
+        setRaByCe(new Map());
+      }
     })();
   }, [open, actividad?.asignaturaId]);
 
@@ -509,87 +535,87 @@ export function DialogVerActividad({
                     </TableHeader>
 
                     <TableBody>
-                      {cesFiltrados.map((ce) => {
-                        const pctTxt = `${(ce.puntuacion * 100).toFixed(1)}%`;
-                        const whyBase =
-                          ce.reason === "high_sim"
-                            ? `Coincidencia semántica alta (${pctTxt}) entre la descripción y el criterio.`
-                            : ce.reason === "lang_rule"
-                            ? `Menciones claras a lenguajes/tecnologías que vinculan con el criterio (${pctTxt}).`
-                            : `Alineación de acción y objetos del criterio detectada en el enunciado (${pctTxt}).`;
-                        const evid = ce.evidencias?.length
-                          ? ` Evidencias: ${ce.evidencias.slice(0, 2).map((e) => `“${e}”`).join("  ·  ")}.`
-                          : "";
-                        const why = `${whyBase}${evid}`;
+  {cesFiltrados.map((ce, idx) => {
+    const rowKey = keyFor(ce.codigo, idx);
+    const pctTxt = `${(ce.puntuacion * 100).toFixed(1)}%`;
 
-                        const expanded = !!expandJusti[ce.codigo];
-                        const isLong = why.length > 220;
+    const whyBase =
+      ce.reason === "high_sim"
+        ? `Coincidencia semántica alta (${pctTxt}) entre la descripción y el criterio.`
+        : ce.reason === "lang_rule"
+        ? `Menciones claras a lenguajes/tecnologías que vinculan con el criterio (${pctTxt}).`
+        : `Alineación de acción y objetos del criterio detectada en el enunciado (${pctTxt}).`;
 
-                        return (
-                          <TableRow key={ce.codigo} className="[&>td]:align-top">
-                            <TableCell className="font-medium">{ce.codigo}</TableCell>
+    const evid = ce.evidencias?.length
+      ? ` Evidencias: ${ce.evidencias.slice(0, 2).map((e) => `“${e}”`).join("  ·  ")}.`
+      : "";
+    const why = `${whyBase}${evid}`;
 
-                            <TableCell className="pr-4">
-                              <p
-                                className="text-sm text-zinc-200 whitespace-pre-wrap break-words leading-snug"
-                                style={{ overflowWrap: "anywhere" }}
-                              >
-                                {getCeText(ce) || "—"}
-                              </p>
-                            </TableCell>
+    const expanded = !!expandJusti[rowKey];
+    const isLong = why.length > 220;
 
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={cn(
-                                    ce.puntuacion > 0.6 ? "text-emerald-400" :
-                                    ce.puntuacion >= 0.5 ? "text-yellow-400" : "text-red-400",
-                                    "font-semibold"
-                                  )}
-                                >
-                                  {(ce.puntuacion * 100).toFixed(1)}%
-                                </span>
-                              </div>
-                              <div className="mt-1 min-w-[140px]">
-                                <Progress className="h-2" value={Math.round(ce.puntuacion * 100)} />
-                              </div>
-                            </TableCell>
+    return (
+      <TableRow key={rowKey} className="[&>td]:align-top">
+        <TableCell className="font-medium">{labelFor(ce.codigo)}</TableCell>
 
-                            <TableCell>
-                              {ce.reason === "high_sim" ? (
-                                <Badge variant="secondary">Alta similitud</Badge>
-                              ) : ce.reason === "lang_rule" ? (
-                                <Badge variant="secondary">Lenguajes</Badge>
-                              ) : (
-                                <Badge>Con evidencias</Badge>
-                              )}
-                            </TableCell>
+        <TableCell className="pr-4">
+          <p
+            className="text-sm text-zinc-200 whitespace-pre-wrap break-words leading-snug"
+            style={{ overflowWrap: "anywhere" }}
+          >
+            {getCeText(ce) || ceDescByCode[normCE(ce.codigo)] || "—"}
+          </p>
+        </TableCell>
 
-                            <TableCell>
-                              <div
-                                className={cn(
-                                  "text-xs whitespace-pre-wrap break-words",
-                                  !expanded && "line-clamp-3"
-                                )}
-                                style={{ overflowWrap: "anywhere" }}
-                              >
-                                {why}
-                              </div>
-                              {isLong && (
-                                <button
-                                  className="mt-1 text-xs underline text-muted-foreground hover:text-foreground"
-                                  onClick={() =>
-                                    setExpandJusti((s) => ({ ...s, [ce.codigo]: !expanded }))
-                                  }
-                                >
-                                  {expanded ? "Ver menos" : "Ver más"}
-                                </button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                ce.puntuacion > 0.6 ? "text-emerald-400" :
+                ce.puntuacion >= 0.5 ? "text-yellow-400" : "text-red-400",
+                "font-semibold"
+              )}
+            >
+              {(ce.puntuacion * 100).toFixed(1)}%
+            </span>
+          </div>
+          <div className="mt-1 min-w-[140px]">
+            <Progress className="h-2" value={Math.round(ce.puntuacion * 100)} />
+          </div>
+        </TableCell>
+
+        <TableCell>
+          {ce.reason === "high_sim" ? (
+            <Badge variant="secondary">Alta similitud</Badge>
+          ) : ce.reason === "lang_rule" ? (
+            <Badge variant="secondary">Lenguajes</Badge>
+          ) : (
+            <Badge>Con evidencias</Badge>
+          )}
+        </TableCell>
+
+        <TableCell>
+          <div
+            className={cn("text-xs whitespace-pre-wrap break-words", !expanded && "line-clamp-3")}
+            style={{ overflowWrap: "anywhere" }}
+          >
+            {why}
+          </div>
+          {isLong && (
+            <button
+              className="mt-1 text-xs underline text-muted-foreground hover:text-foreground"
+              onClick={() =>
+                setExpandJusti((s) => ({ ...s, [rowKey]: !expanded }))
+              }
+            >
+              {expanded ? "Ver menos" : "Ver más"}
+            </button>
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  })}
+</TableBody>
                   </Table>
                 </section>
               )}

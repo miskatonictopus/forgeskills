@@ -375,26 +375,57 @@ ipcMain.handle("actualizar-color-asignatura", (_event, id: string, color: string
   stmt.run(color, id);
 });
 
+
+
+
+function toText(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  try { return JSON.stringify(v); } catch { return String(v); }
+}
+
 ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
   try {
-    const { id, nombre, creditos, descripcion, RA } = asignatura;
-
-    if (!id || !nombre || !creditos || !descripcion || !RA) {
-      throw new Error("Faltan campos en la asignatura.");
-    }
-
-    db.prepare(`
-      INSERT OR REPLACE INTO asignaturas (id, nombre, descripcion, RA)
-      VALUES (@id, @nombre, @descripcion, @RA)
-    `).run({
+    // Admite el objeto remoto directamente
+    const {
       id,
       nombre,
       creditos,
-      descripcion: JSON.stringify(descripcion),
-      RA: JSON.stringify(RA),
-    });
+      descripcion,
+      RA,
+      color,
+    } = asignatura ?? {};
 
-    return { success: true };
+    // Requisitos mínimos
+    if (!id || !nombre) {
+      throw new Error("Faltan campos obligatorios: id y nombre.");
+    }
+
+    // Normalización para columnas TEXT del esquema actual
+    const row = {
+      id: String(id),
+      nombre: String(nombre),
+      creditos: creditos != null ? String(creditos) : "",
+      descripcion: toText(descripcion ?? {}), // en tu DB es TEXT
+      RA: toText(RA ?? []),                   // en tu DB es TEXT
+      color: color ? String(color) : "#4B5563",
+    };
+
+    // UPSERT por id (reemplaza si existe)
+    const stmt = db.prepare(`
+      INSERT INTO asignaturas (id, nombre, creditos, descripcion, RA, color)
+      VALUES (@id, @nombre, @creditos, @descripcion, @RA, @color)
+      ON CONFLICT(id) DO UPDATE SET
+        nombre      = excluded.nombre,
+        creditos    = excluded.creditos,
+        descripcion = excluded.descripcion,
+        RA          = excluded.RA,
+        color       = excluded.color
+    `);
+
+    stmt.run(row);
+
+    return { success: true, id: row.id };
   } catch (error) {
     console.error("❌ Error al guardar asignatura:", error);
     throw error;
@@ -1634,91 +1665,62 @@ ipcMain.handle("actividad.alumnos", (_e, { actividadId }: { actividadId: string 
   return alumnos;
 });
 
-ipcMain.handle(
-  "actividad:evaluar-y-propagar",
-  async (_e, payload: { actividadId: string }) => {
-    const { actividadId } = payload;
-    if (!actividadId) throw new Error("actividadId requerido");
+ipcMain.handle("actividad:evaluar-y-propagar", (_e, { actividadId }) => {
+  if (!actividadId) throw new Error("actividadId requerido");
 
-    // 👇 forzamos el tipo de db a BetterSqlite3.Database sólo para el transaction
-    const tx = (db as BetterSqlite3.Database).transaction((actividadId: string) => {
-      // 1) Datos base
-      const rowAct = db
-        .prepare(
-          `SELECT id, asignatura_id
-             FROM actividades
-            WHERE id = ?`
-        )
-        .get(actividadId) as { id: string; asignatura_id: string } | undefined;
+  const tx = db.transaction((id: string) => {
+    // ... aquí haces tus comprobaciones y el upsert a nota_ce (si lo mantienes)
 
-      if (!rowAct) throw new Error("Actividad no encontrada");
+    // 👇 NUEVO: propaga a alumno_ce
+    const changes = propagarAlumnoCE(id);
+    console.log(`[evaluar] alumno_ce upserts=${changes} para actividad ${id}`);
 
-      const notas = db
-        .prepare(
-          `SELECT alumno_id, nota
-             FROM actividad_nota
-            WHERE actividad_id = ?`
-        )
-        .all(actividadId) as Array<{ alumno_id: string | number; nota: number }>;
+    // Marca evaluada + historial (lo que ya tenías)
+    db.prepare(`
+      UPDATE actividades
+         SET estado = 'evaluada',
+             evaluada_fecha = datetime('now')
+       WHERE id = ?
+    `).run(id);
 
-      if (notas.length === 0) throw new Error("No hay notas guardadas para esta actividad");
+    db.prepare(`
+      INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha)
+      VALUES (lower(hex(randomblob(16))), ?, 'evaluada', datetime('now'))
+    `).run(id);
+  });
 
-      const ces = db
-        .prepare(
-          `SELECT ce_codigo
-             FROM actividad_ce
-            WHERE actividad_id = ?
-              AND incluido = 1`
-        )
-        .all(actividadId) as Array<{ ce_codigo: string }>;
+  tx(actividadId);
+  return { ok: true };
+});
 
-      if (ces.length === 0) throw new Error("La actividad no tiene CE vinculados");
 
-      // 2) UPSERT nota_ce
-      const upsertNotaCE = db.prepare(`
-        INSERT INTO nota_ce (alumno_id, asignatura_id, ce_codigo, nota, updated_at)
-        VALUES (@alumno_id, @asignatura_id, @ce_codigo, @nota, datetime('now'))
-        ON CONFLICT(alumno_id, asignatura_id, ce_codigo)
-        DO UPDATE SET
-          nota = excluded.nota,
-          updated_at = datetime('now')
-      `);
+function propagarAlumnoCE(actividadId: string) {
+  // Upsert masivo: para cada alumno con nota en la actividad × cada CE incluido
+  const info = db.prepare(
+    `
+    INSERT INTO alumno_ce (id, alumno_id, ce_codigo, actividad_id, nota)
+    SELECT
+      lower(hex(randomblob(16)))              AS id,
+      an.alumno_id                            AS alumno_id,
+      ace.ce_codigo                           AS ce_codigo,
+      an.actividad_id                         AS actividad_id,
+      an.nota                                 AS nota
+    FROM actividad_nota an
+    JOIN actividad_ce ace
+      ON ace.actividad_id = an.actividad_id
+     AND ace.incluido = 1
+    WHERE an.actividad_id = ?
+    ON CONFLICT(alumno_id, ce_codigo, actividad_id)
+    DO UPDATE SET
+      nota = excluded.nota
+    `
+  ).run(actividadId);
 
-      for (const n of notas) {
-        const alumnoId =
-          typeof n.alumno_id === "string" ? Number(n.alumno_id) : n.alumno_id;
-        if (Number.isNaN(alumnoId))
-          throw new Error(`alumno_id no numérico: ${String(n.alumno_id)}`);
+  return info.changes ?? 0; // filas insertadas/actualizadas
+}
 
-        for (const ce of ces) {
-          upsertNotaCE.run({
-            alumno_id: alumnoId,
-            asignatura_id: rowAct.asignatura_id,
-            ce_codigo: ce.ce_codigo,
-            nota: n.nota ?? 0,
-          });
-        }
-      }
 
-      // 3) Marca evaluada + historial
-      db.prepare(
-        `UPDATE actividades
-            SET estado = 'evaluada',
-                evaluada_fecha = datetime('now')
-          WHERE id = ?`
-      ).run(actividadId);
-
-      db.prepare(
-        `INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha)
-         VALUES (?, ?, 'evaluada', datetime('now'))`
-      ).run(uuid(), actividadId);
-    });
-
-    tx(actividadId);
-    return { ok: true };
-  }
-);
-
+// Guardar notas de una actividad
 ipcMain.handle(
   "actividad:guardar-notas",
   (_e, payload: { actividadId: string; notas: { alumnoId: string; nota: number }[] }) => {
@@ -1726,7 +1728,7 @@ ipcMain.handle(
     if (!actividadId) throw new Error("actividadId requerido");
     if (!Array.isArray(notas) || notas.length === 0) throw new Error("notas vacío");
 
-    // normaliza y valida
+    // Normalizar y validar notas
     const rows = notas.map((n) => {
       const alumnoId = String(n.alumnoId).trim();
       let nota = Number(n.nota);
@@ -1738,30 +1740,148 @@ ipcMain.handle(
     });
 
     const tx = db.transaction(() => {
-      const upsert = db.prepare(`
-        INSERT INTO actividad_nota (id, actividad_id, alumno_id, nota, created_at, updated_at)
-        VALUES (lower(hex(randomblob(16))), @actividad_id, @alumno_id, @nota, datetime('now'), datetime('now'))
+      /* === 1) Guardar nota global en actividad_nota === */
+      const stmtAct = db.prepare(`
+        INSERT INTO actividad_nota (id, actividad_id, alumno_id, nota, updated_at)
+        VALUES (@id, @actividadId, @alumnoId, @nota, datetime('now'))
         ON CONFLICT(actividad_id, alumno_id)
-        DO UPDATE SET
-          nota = excluded.nota,
-          updated_at = datetime('now')
+        DO UPDATE SET nota = excluded.nota, updated_at = excluded.updated_at
       `);
 
-      let changes = 0;
       for (const r of rows) {
-        const info = upsert.run({
-          actividad_id: actividadId,
-          alumno_id: r.alumnoId,
+        stmtAct.run({
+          id: crypto.randomUUID(),
+          actividadId,
+          alumnoId: r.alumnoId,
           nota: r.nota,
         });
-        changes += info.changes ?? 0;
       }
-      return changes;
+
+      /* === 2) Replicar a alumno_ce (nota global → cada CE de la actividad) === */
+      const stmtAlumnoCE = db.prepare(`
+        INSERT INTO alumno_ce (id, alumno_id, ce_codigo, actividad_id, nota)
+        SELECT
+          lower(hex(randomblob(16))) AS id,
+          an.alumno_id,
+          ac.ce_codigo,
+          an.actividad_id,
+          an.nota
+        FROM actividad_nota an
+        JOIN actividad_ce ac ON ac.actividad_id = an.actividad_id
+        WHERE an.actividad_id = @actividadId
+        ON CONFLICT(alumno_id, ce_codigo, actividad_id)
+        DO UPDATE SET nota = excluded.nota
+      `);
+      stmtAlumnoCE.run({ actividadId });
+
+      /* === 3) Consolidar en nota_ce (alumno × asignatura × CE) === */
+      const stmtNotaCE = db.prepare(`
+        INSERT INTO nota_ce (alumno_id, asignatura_id, ce_codigo, nota, updated_at)
+        SELECT
+          ac.alumno_id,
+          act.asignatura_id,
+          ac.ce_codigo,
+          ac.nota,
+          datetime('now')
+        FROM alumno_ce ac
+        JOIN actividades act ON act.id = ac.actividad_id
+        WHERE ac.actividad_id = @actividadId
+        ON CONFLICT (alumno_id, asignatura_id, ce_codigo)
+        DO UPDATE SET nota = excluded.nota, updated_at = excluded.updated_at
+      `);
+      stmtNotaCE.run({ actividadId });
     });
 
-    const total = tx();
-    return { ok: true, changes: total };
+    tx();
+    return { ok: true, count: rows.length };
   }
 );
+
+
+
+function ensureIndexes() {
+  db.exec(`
+    PRAGMA foreign_keys = ON;
+
+    -- Evita duplicados de RA y CE a nivel "catálogo oficial"
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ra_asig_codigo ON ra(asignatura_id, codigo);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ce_ra_codigo   ON ce(ra_id, codigo);
+  `);
+}
+ensureIndexes();
+
+/* ===== Tipos del JSON remoto que ya traes en el UI ===== */
+type CEJson = { codigo: string; descripcion: string };
+type RAJson = { codigo: string; descripcion: string; CE: CEJson[] };
+
+/** Transacción para importar RA y CE oficiales */
+const importarRaCeTx = db.transaction((asignaturaId: string, raList: RAJson[]) => {
+  const insertRA = db.prepare(`
+    INSERT INTO ra (id, codigo, descripcion, asignatura_id)
+    VALUES (@id, @codigo, @descripcion, @asignatura_id)
+    ON CONFLICT(id) DO UPDATE SET
+      descripcion = excluded.descripcion
+  `);
+
+  const insertCE = db.prepare(`
+    INSERT INTO ce (id, codigo, descripcion, ra_id)
+    VALUES (@id, @codigo, @descripcion, @ra_id)
+    ON CONFLICT(id) DO UPDATE SET
+      descripcion = excluded.descripcion
+  `);
+
+  let raCount = 0, ceCount = 0;
+
+  for (const ra of raList || []) {
+    const raId = `${asignaturaId}:${ra.codigo}`;
+    insertRA.run({
+      id: raId,
+      codigo: ra.codigo,
+      descripcion: ra.descripcion,
+      asignatura_id: asignaturaId,
+    });
+    raCount++;
+
+    for (const ce of ra.CE || []) {
+      const ceId = `${asignaturaId}:${ra.codigo}:${ce.codigo}`;
+      insertCE.run({
+        id: ceId,
+        codigo: ce.codigo,
+        descripcion: ce.descripcion,
+        ra_id: raId,
+      });
+      ceCount++;
+    }
+  }
+
+  return { raCount, ceCount };
+});
+
+/** Handler único que llamas desde el UI tras guardar la asignatura */
+ipcMain.handle(
+  "asignatura:guardar-e-importar-ra-ce",
+  (_e, payload: { asignaturaId: string; raList: RAJson[] }) => {
+    const { asignaturaId, raList } = payload || {};
+    if (!asignaturaId || !Array.isArray(raList)) {
+      throw new Error("asignaturaId y raList son requeridos");
+    }
+    ensureIndexes();
+    const result = importarRaCeTx(asignaturaId, raList);
+    return { ok: true, ...result };
+  }
+);
+
+ipcMain.handle("catalogo:ce-por-asignatura", (_e, asignaturaId: string) => {
+  const stmt = db.prepare(`
+    SELECT ce.codigo  AS ceCodigo,
+           ce.descripcion,
+           ra.codigo  AS raCodigo
+    FROM ce
+    JOIN ra ON ra.id = ce.ra_id
+    WHERE ra.asignatura_id = ?
+    ORDER BY ra.codigo, ce.codigo
+  `);
+  return stmt.all(asignaturaId);
+});
 
 

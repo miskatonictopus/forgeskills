@@ -64,12 +64,36 @@ export default function NuevaAsignatura({ cursoId, onSave }: Props) {
       toast.error("Selecciona una asignatura");
       return;
     }
+  
     try {
-      // Guardar la asignatura
+      // 1) Guardar asignatura
       await window.electronAPI.guardarAsignatura(asignaturaSeleccionada);
       toast.success("Asignatura guardada en la base de datos");
-
-      // Guardar horarios si los hay
+  
+      // 2) Importar RA/CE oficiales a SQLite (idempotente, con UPSERT en main)
+      //    Importamos lo que ya trae el JSON remoto en asignaturaSeleccionada.RA
+      const raList = (asignaturaSeleccionada.RA ?? []).map((ra) => ({
+        codigo: ra.codigo,
+        descripcion: ra.descripcion,
+        CE: (ra.CE ?? []).map((ce) => ({
+          codigo: ce.codigo,
+          descripcion: ce.descripcion,
+        })),
+      }));
+  
+      if (raList.length > 0) {
+        const res = await window.electronAPI.guardarAsignaturaEImportarRAyCE(
+          asignaturaSeleccionada.id,
+          raList
+        );
+        // res: { ok: true, raCount, ceCount }
+        toast.success(`RA/CE importados: RA=${res.raCount}, CE=${res.ceCount}`);
+      } else {
+        // Si por lo que sea el JSON no trae RA, avisamos (no rompemos el flujo)
+        toast.message("Esta asignatura no trae RA/CE en el JSON remoto");
+      }
+  
+      // 3) Guardar horarios si los hay
       if (horarios.length > 0) {
         for (const h of horarios) {
           await window.electronAPI.guardarHorario({
@@ -82,14 +106,13 @@ export default function NuevaAsignatura({ cursoId, onSave }: Props) {
         }
         toast.success("Horarios guardados");
       }
-
-      onSave?.(); // 🔄 dispara el refresco global y cierra el dialog
+  
+      onSave?.(); // 🔄 refresca UI y cierra
     } catch (error) {
-      toast.error("Error al guardar la asignatura");
       console.error(error);
+      toast.error("Error al guardar la asignatura o importar RA/CE");
     }
   };
-
   /* ================== Helpers horarios ================== */
   const addHorario = () => {
     setHorarios([...horarios, { dia: "lunes", horaInicio: "08:00", horaFin: "09:00" }]);

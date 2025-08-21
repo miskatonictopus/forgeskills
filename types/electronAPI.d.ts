@@ -220,6 +220,21 @@ evaluarActividad: (
 
   guardarNotasActividad(actividadId: string, notas: { alumnoId: string; nota: number }[]): Promise<{ ok: true }>;
 
+  guardarAsignaturaEImportarRAyCE: (
+    asignaturaId: string,
+    raList: Array<{
+      codigo: string;
+      descripcion: string;
+      CE: Array<{ codigo: string; descripcion: string }>;
+    }>
+  ) => Promise<{ ok: boolean; raCount: number; ceCount: number }>;
+
+  cePorAsignatura: (
+    asignaturaId: string
+  ) => Promise<
+    Array<{ ceCodigo: string; descripcion: string; raCodigo: string }>
+  >;
+  
 }
 
 
