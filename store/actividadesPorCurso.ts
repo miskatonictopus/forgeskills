@@ -184,9 +184,67 @@ export function setProgramadaEnMemoria(
       ...a,
       programadaPara: startISO,
       programadaFin: endISO ?? a.programadaFin ?? null,
-      // OJO: no pisamos `estado` si viene de DB; aquí solo ajustamos el canónico
       estadoCanon: "programada",
     };
     actividadesPorCurso[cursoId] = [...list]; // trigger reactividad
+  }
+}
+
+export function setAnalizadaEnMemoria(cursoId: string, actividadId: string) {
+  const list = actividadesPorCurso[cursoId] || [];
+  const i = list.findIndex((a) => a.id === actividadId);
+  if (i >= 0) {
+    const a = list[i];
+    list[i] = {
+      ...a,
+      estado: "analizada",
+      estadoCanon: "analizada",
+      analisisFecha: new Date().toISOString(), // opcional
+    };
+    actividadesPorCurso[cursoId] = [...list];
+  }
+}
+
+
+/** Mutación optimista tras evaluar por IPC */
+export function setEvaluadaEnMemoria(cursoId: string, actividadId: string) {
+  const list = actividadesPorCurso[cursoId] || [];
+  const i = list.findIndex((a) => a.id === actividadId);
+  if (i >= 0) {
+    const a = list[i];
+    list[i] = { ...a, estado: "evaluada", estadoCanon: "evaluada" };
+    actividadesPorCurso[cursoId] = [...list];
+  }
+}
+
+
+
+/** Mutación para marcar pendiente_evaluar en memoria */
+export function setPendienteEvaluarEnMemoria(cursoId: string, actividadId: string) {
+  const list = actividadesPorCurso[cursoId] || [];
+  const i = list.findIndex((a) => a.id === actividadId);
+  if (i >= 0) {
+    const a = list[i];
+    list[i] = {
+      ...a,
+      estado: "pendiente_evaluar",
+      estadoCanon: "pendiente_evaluar",
+    };
+    actividadesPorCurso[cursoId] = [...list];
+  }
+}
+
+/** Mutación optimista tras cerrar una actividad */
+export function setCerradaEnMemoria(cursoId: string, actividadId: string) {
+  const list = actividadesPorCurso[cursoId] || [];
+  const i = list.findIndex((a) => a.id === actividadId);
+  if (i >= 0) {
+    const a = list[i];
+    list[i] = {
+      ...a,
+      estado: "cerrada",
+      estadoCanon: "cerrada",
+    };
+    actividadesPorCurso[cursoId] = [...list];
   }
 }

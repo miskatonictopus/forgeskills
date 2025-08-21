@@ -634,7 +634,7 @@ ipcMain.handle("actividades-de-curso", (_event, cursoId: string) => {
       a.analisis_fecha,
       a.programada_para,
       a.programada_fin,
-      COALESCE(e.estado, a.estado) AS estado_derivado
+      COALESCE(a.estado, e.estado) AS estado_derivado  -- 👈 preferimos la columna real
     FROM actividades a
     LEFT JOIN estados e ON e.actividad_id = a.id
     WHERE a.curso_id = ?
@@ -1497,7 +1497,7 @@ ipcMain.handle(
 );
 
 ipcMain.handle("actividad.evaluar", (_e, { actividadId, notas }) => {
-  const insertStmt = db.prepare(`
+  const insertNota = db.prepare(`
     INSERT INTO actividad_nota (actividad_id, alumno_id, nota)
     VALUES (?, ?, ?)
     ON CONFLICT(actividad_id, alumno_id)
@@ -1506,18 +1506,23 @@ ipcMain.handle("actividad.evaluar", (_e, { actividadId, notas }) => {
 
   const tx = db.transaction((notas) => {
     for (const { alumnoId, nota } of notas) {
-      insertStmt.run(actividadId, alumnoId, nota);
+      insertNota.run(actividadId, alumnoId, nota);
     }
-    // 👇 actualizar estado a "evaluada"
-    db.prepare(
-      `UPDATE actividades SET estado = 'evaluada' WHERE id = ?`
-    ).run(actividadId);
+
+    // 1) actualizar estado real
+    db.prepare(`UPDATE actividades SET estado = 'evaluada' WHERE id = ?`).run(actividadId);
+
+    // 2) **historial** (¡nuevo!)
+    db.prepare(`
+      INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha, meta)
+      VALUES (?, ?, 'evaluada', datetime('now'), json_object('accion','evaluar'))
+    `).run(crypto.randomUUID(), actividadId);
   });
 
   tx(notas);
-
   return { ok: true };
 });
+
 
 
 

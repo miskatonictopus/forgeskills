@@ -206,7 +206,7 @@ evaluarActividad: (
         html: string,
         fileName: string
       ) => Promise<{ ok: boolean; path?: string; error?: string }>;
-
+     
       leerAsignaturasCurso: (cursoId: string) => Promise<{ id: string; nombre: string; color?: string | null }[]>
 
       leerAnalisisActividad(actividadId: string): Promise<AnalisisActividadSnapshot>;

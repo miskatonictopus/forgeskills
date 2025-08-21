@@ -14,6 +14,12 @@ import EvaluarActividad from "@/components/evaluar/EvaluarActividad";
 import { useSnapshot } from "valtio";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  setAnalizadaEnMemoria,
+  setEvaluadaEnMemoria,
+  cargarActividadesPorAsignatura,
+} from "@/store/actividadesPorCurso";
+
 import { ExportarPDFButton } from "@/components/ExportarPDFButton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -277,18 +283,29 @@ export function DialogVerActividad({
           evidencias,
           descripcion: ceDescByCode[normCE(codigo)] || "",
         }));
-
-        const res = await window.electronAPI.guardarAnalisisActividad(
-          actividad.id,
-          umbral,
-          cesParaGuardar
-        );
-
+  
+      const res = await window.electronAPI.guardarAnalisisActividad(
+        actividad.id,
+        umbral,
+        cesParaGuardar
+      );
+  
       if (res?.ok) {
+        // ✅ Mutación optimista del store: ya es "analizada" en toda la UI
+        setAnalizadaEnMemoria(actividad.cursoId, actividad.id);
+  
+        // (opcional y recomendable) refrescar desde DB por consistencia:
+        // await cargarActividadesPorAsignatura(actividad.cursoId, actividad.asignaturaId);
+  
         const now = new Date().toISOString();
-        setFuenteAnalisis("snapshot"); setAnalizadaFecha(now); setAnalizadaLocal(true);
+        setFuenteAnalisis("snapshot");
+        setAnalizadaFecha(now);
+        setAnalizadaLocal(true);
+  
         toast.success("Análisis guardado.");
-        window.dispatchEvent(new CustomEvent("actividad:analizada", { detail: { actividadId: actividad.id } }));
+        window.dispatchEvent(
+          new CustomEvent("actividad:analizada", { detail: { actividadId: actividad.id } })
+        );
       } else {
         toast.error("No se pudo guardar el análisis.");
       }

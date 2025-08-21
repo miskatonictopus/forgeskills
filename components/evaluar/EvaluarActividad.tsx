@@ -13,8 +13,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { toast } from "sonner";
-// 👇 para refrescar la lista/estado de actividades del curso
-import { cargarActividades } from "@/store/actividadesPorCurso";
+// 👇 refrescar y mutación optimista
+import { cargarActividades, setEvaluadaEnMemoria } from "@/store/actividadesPorCurso";
 
 type Alumno = { id: string; nombre: string; apellidos: string };
 
@@ -60,30 +60,38 @@ export default function EvaluarActividad({
   };
 
   const handleSave = async () => {
+    if (saving) return; // evita doble submit
     const payload: Nota[] = Object.entries(notas)
       .filter(([, n]) => Number.isFinite(n))
       .map(([alumnoId, nota]) => ({ alumnoId, nota: Number(nota) }));
-  
+
     if (!payload.length) {
       toast.error("No has puesto ninguna nota.");
       return;
     }
-  
+
     try {
-        await (window as any).electronAPI.evaluarActividad(actividadId, payload);
-      
-        // 🔄 refrescar la lista de actividades en memoria
-        await cargarActividades(cursoId);
-      
-        // 🚀 disparar un evento global por si hay otros componentes escuchando
-        window.dispatchEvent(new CustomEvent("actividad:evaluada", { detail: { actividadId } }));
-      
-        toast.success("Actividad evaluada y notas propagadas a los CE.");
-        onOpenChange(false);
-      } catch (e) {
-        console.error(e);
-        toast.error("No se pudo guardar la evaluación.");
-      }
+      setSaving(true);
+
+      await (window as any).electronAPI.evaluarActividad(actividadId, payload);
+
+      // ✅ Mutación optimista: refleja “evaluada” al instante en toda la UI
+      setEvaluadaEnMemoria(cursoId, actividadId);
+
+      // 🔄 Refresca desde DB por consistencia (opcional pero recomendado)
+      await cargarActividades(cursoId);
+
+      // 🚀 Evento global por si hay listeners
+      window.dispatchEvent(new CustomEvent("actividad:evaluada", { detail: { actividadId } }));
+
+      toast.success("Actividad evaluada y notas propagadas a los CE.");
+      onOpenChange(false);
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo guardar la evaluación.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
