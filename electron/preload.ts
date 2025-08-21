@@ -166,4 +166,9 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
       exportarPDFDesdeHTML: (html: string, fileName: string) =>
     ipcRenderer.invoke("pdf:exportFromHTML", { html, fileName }),
 
+    evaluarYPropagarActividad: (actividadId: string) =>
+    ipcRenderer.invoke("actividad:evaluar-y-propagar", { actividadId }),
+
+    guardarNotasActividad: (actividadId: string, notas: { alumnoId: string; nota: number }[]) =>
+    ipcRenderer.invoke("actividad:guardar-notas", { actividadId, notas }),
 });

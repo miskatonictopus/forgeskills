@@ -170,6 +170,7 @@ evaluarActividad: (
     umbral: number,
     ces: { codigo: string; puntuacion: number; reason?: "evidence" | "high_sim" | "lang_rule"; evidencias?: string[] }[]
   ) => Promise<{ ok: boolean }>;
+  
   leerAnalisisActividad: (actividadId: string) => Promise<{ umbral: number; fecha: string | null; ces: CEDetectado[] }>;
 
   // 🆕 Calendario — rango lectivo y festivos (opcionales para no romper si aún no hay IPC)
@@ -214,6 +215,11 @@ evaluarActividad: (
 
   horariosDeAsignatura(cursoId: string, asignaturaId: string): Promise<HorarioNormalizado[]>;
   leerRangoLectivo(): Promise<LectivoRange>;
+
+  evaluarYPropagarActividad: (actividadId: string) => Promise<{ ok: boolean }>;
+
+  guardarNotasActividad(actividadId: string, notas: { alumnoId: string; nota: number }[]): Promise<{ ok: true }>;
+
 }
 
 

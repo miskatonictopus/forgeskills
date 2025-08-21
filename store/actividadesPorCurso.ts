@@ -4,7 +4,6 @@
 import { proxy } from "valtio";
 
 /* ===== Tipos ===== */
-// Lo que puede venir de la DB (mantenemos compat con “enviada/pendiente”)
 export type EstadoDB =
   | "borrador"
   | "analizada"
@@ -15,7 +14,6 @@ export type EstadoDB =
   | "evaluada"
   | "cerrada";
 
-// Estados unificados para UI
 export type EstadoUI =
   | "borrador"
   | "analizada"
@@ -32,13 +30,14 @@ export type Actividad = {
   asignaturaId: string;
   descripcion?: string;
 
-  estado?: EstadoDB;              // ← valor real de BDD
-  analisisFecha?: string | null;
+  estado?: EstadoDB;              // valor real de DB
+  analisisFecha?: string | null;  // mapeo de analisis_fecha
   umbralAplicado?: number | null;
 
-  // pueden venir en snake_case desde backend
   programadaPara?: string | null; // "YYYY-MM-DD HH:mm" o "YYYY-MM-DDTHH:mm"
   programadaFin?: string | null;
+
+  evaluadaFecha?: string | null;  // ✅ nuevo: mapeo de evaluada_fecha
 
   // solo en memoria (UI)
   estadoCanon?: EstadoUI;
@@ -60,37 +59,31 @@ export const actividadesPorCurso = proxy<ActividadesPorCurso>({});
 
 /* ===== Helpers ===== */
 
-// Mapa de estado DB → estado UI
+// Mapa estado DB → estado UI
 const MAPA_DB_A_UI: Record<string, EstadoUI> = {
   borrador: "borrador",
   analizada: "analizada",
   programada: "programada",
-  enviada: "pendiente_evaluar",          // compat
-  pendiente: "pendiente_evaluar",        // compat
+  enviada: "pendiente_evaluar",   // compat
+  pendiente: "pendiente_evaluar", // compat
   pendiente_evaluar: "pendiente_evaluar",
   evaluada: "evaluada",
   cerrada: "cerrada",
 };
 
-/**
- * Estado visible para UI.
- * REGLA: si existe `estado` desde BDD → manda SIEMPRE.
- * Si NO existe `estado`, entonces inferimos por `programadaPara`.
- */
+/** Estado visible en UI */
 export function estadoUI(a: Actividad): EstadoUI {
   const raw = a.estado?.toLowerCase();
   if (raw && MAPA_DB_A_UI[raw]) return MAPA_DB_A_UI[raw];
-
-  // Sólo si no viene `estado` desde DB, inferimos por horario
   if (a.programadaPara) return "programada";
   return "borrador";
 }
 
-/** "YYYY-MM-DD HH:mm" -> "YYYY-MM-DDTHH:mm" (sin tocar zona horaria) */
+/** "YYYY-MM-DD HH:mm" -> "YYYY-MM-DDTHH:mm" */
 const asLocalDateTime = (s?: string | null) =>
   !s ? undefined : s.includes(" ") ? s.replace(" ", "T") : s;
 
-/** Calendario */
+/** Convierte actividades → eventos calendario */
 export function mapActividadesToFC(acts: Actividad[]): FCEvent[] {
   return acts
     .map((a) => {
@@ -122,19 +115,21 @@ export function eventosDeCurso(cursoId: string): FCEvent[] {
 }
 
 /* ===== Normalización ===== */
-
 function normalizaFila(raw: any): Actividad {
   // compat snake_case → camelCase
   const programadaPara = raw.programadaPara ?? raw.programada_para ?? null;
-  const programadaFin = raw.programadaFin ?? raw.programada_fin ?? null;
+  const programadaFin  = raw.programadaFin  ?? raw.programada_fin  ?? null;
+  const analisisFecha  = raw.analisisFecha  ?? raw.analisis_fecha  ?? null; // ✅
+  const evaluadaFecha  = raw.evaluadaFecha  ?? raw.evaluada_fecha  ?? null; // ✅
 
   const act: Actividad = {
     ...raw,
     programadaPara,
     programadaFin,
+    analisisFecha,
+    evaluadaFecha,
   };
 
-  // canon = estado real si existe; si no, derivado
   return {
     ...act,
     estadoCanon: estadoUI(act),
@@ -143,14 +138,14 @@ function normalizaFila(raw: any): Actividad {
 
 /* ===== Carga / Mutaciones ===== */
 
-/** Carga TODAS las actividades del curso (usa tu IPC actual) */
+/** Carga TODAS las actividades del curso */
 export async function cargarActividades(cursoId: string) {
   const filas = await window.electronAPI.actividadesDeCurso(cursoId);
   const normalizadas = (filas as any[]).map(normalizaFila);
   actividadesPorCurso[cursoId] = normalizadas;
 }
 
-/** Carga/refresh SOLO de una asignatura, reemplazando su bloque dentro del curso */
+/** Carga SOLO actividades de una asignatura */
 export async function cargarActividadesPorAsignatura(cursoId: string, asignaturaId: string) {
   const filas = await window.electronAPI.listarActividadesPorAsignatura(cursoId, asignaturaId);
   const normalizadas = (filas as any[]).map(normalizaFila);
@@ -162,14 +157,14 @@ export async function cargarActividadesPorAsignatura(cursoId: string, asignatura
   ];
 }
 
-/** Añadir una actividad nueva al curso (estadoCanon consistente) */
+/** Añadir nueva actividad */
 export function añadirActividad(cursoId: string, actividad: Actividad) {
   const list = actividadesPorCurso[cursoId] || [];
   const act = { ...actividad, estadoCanon: estadoUI(actividad) };
   actividadesPorCurso[cursoId] = [...list, act];
 }
 
-/** Mutación optimista tras programar por IPC */
+/** Mutación optimista tras programar */
 export function setProgramadaEnMemoria(
   cursoId: string,
   actividadId: string,
@@ -186,10 +181,11 @@ export function setProgramadaEnMemoria(
       programadaFin: endISO ?? a.programadaFin ?? null,
       estadoCanon: "programada",
     };
-    actividadesPorCurso[cursoId] = [...list]; // trigger reactividad
+    actividadesPorCurso[cursoId] = [...list];
   }
 }
 
+/** Mutación optimista tras analizar */
 export function setAnalizadaEnMemoria(cursoId: string, actividadId: string) {
   const list = actividadesPorCurso[cursoId] || [];
   const i = list.findIndex((a) => a.id === actividadId);
@@ -199,27 +195,29 @@ export function setAnalizadaEnMemoria(cursoId: string, actividadId: string) {
       ...a,
       estado: "analizada",
       estadoCanon: "analizada",
-      analisisFecha: new Date().toISOString(), // opcional
+      analisisFecha: new Date().toISOString(),
     };
     actividadesPorCurso[cursoId] = [...list];
   }
 }
 
-
-/** Mutación optimista tras evaluar por IPC */
+/** Mutación optimista tras evaluar */
 export function setEvaluadaEnMemoria(cursoId: string, actividadId: string) {
   const list = actividadesPorCurso[cursoId] || [];
   const i = list.findIndex((a) => a.id === actividadId);
   if (i >= 0) {
     const a = list[i];
-    list[i] = { ...a, estado: "evaluada", estadoCanon: "evaluada" };
+    list[i] = {
+      ...a,
+      estado: "evaluada",
+      estadoCanon: "evaluada",
+      evaluadaFecha: new Date().toISOString(), // ✅ camelCase
+    };
     actividadesPorCurso[cursoId] = [...list];
   }
 }
 
-
-
-/** Mutación para marcar pendiente_evaluar en memoria */
+/** Mutación para marcar pendiente_evaluar */
 export function setPendienteEvaluarEnMemoria(cursoId: string, actividadId: string) {
   const list = actividadesPorCurso[cursoId] || [];
   const i = list.findIndex((a) => a.id === actividadId);
@@ -234,7 +232,7 @@ export function setPendienteEvaluarEnMemoria(cursoId: string, actividadId: strin
   }
 }
 
-/** Mutación optimista tras cerrar una actividad */
+/** Mutación tras cerrar */
 export function setCerradaEnMemoria(cursoId: string, actividadId: string) {
   const list = actividadesPorCurso[cursoId] || [];
   const i = list.findIndex((a) => a.id === actividadId);

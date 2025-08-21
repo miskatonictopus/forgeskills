@@ -3,11 +3,11 @@
  * ==========================================================================*/
 import * as dotenv from "dotenv";
 dotenv.config();
-
 import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import * as path from "path";
 import * as fs from "fs";
 import Database from "better-sqlite3";
+import type BetterSqlite3 from "better-sqlite3";
 
 import { execSync } from "child_process";
 import { writeFile } from "node:fs/promises";
@@ -22,6 +22,8 @@ import { extraerTextoConMutool } from "../src/lib/extraerTextoMutool";
 
 /* (opcional) si usas randomUUID explícito */
 const { randomUUID } = crypto;
+
+
 
 /* ============================================================================
  * LOG INICIAL
@@ -238,7 +240,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-inicializarCron(app.isPackaged);
+inicializarCron(db, app.isPackaged);
 /* ------------------------------ Helpers ------------------------------ */
 
 function getEstadoActividad(id: string): string | null {
@@ -710,7 +712,7 @@ ipcMain.handle("extraer-texto-pdf", async (_event, filePath: string) => {
     createWindow();
     // Arranca tareas programadas; pásale si está empaquetado si lo necesitas
     try {
-      inicializarCron?.(app.isPackaged);
+      inicializarCron(db, app.isPackaged);
     } catch (e) {
       console.error("Cron no pudo inicializarse:", e);
     }
@@ -748,52 +750,93 @@ ipcMain.handle("guardar-informe-pdf", async (_e, data: Uint8Array, sugerido: str
 
 /* -------------------- Guardar/leer análisis y su historial ------------------- */
 
-ipcMain.handle("actividad.guardar-analisis", (_e, payload) => {
-  const { actividadId, umbral, ces } = payload;
-  const now = new Date().toISOString();
+ipcMain.handle(
+  "actividad.guardar-analisis",
+  (_e, payload: {
+    actividadId: string;
+    umbral: number;
+    ces: { codigo: string; puntuacion: number; reason?: "evidence" | "high_sim" | "lang_rule"; evidencias?: string[] }[];
+  }) => {
+    const { actividadId, umbral, ces } = payload || {};
+    if (!actividadId) throw new Error("actividadId requerido");
+    if (typeof umbral !== "number") throw new Error("umbral requerido");
+    if (!Array.isArray(ces)) throw new Error("ces debe ser un array");
 
-  const tx = db.transaction(() => {
-    db.prepare(
-      `
-      UPDATE actividades
-      SET estado = 'analizada',
-          umbral_aplicado = ?,
-          analisis_fecha = ?
-      WHERE id = ?
-    `
-    ).run(umbral, now, actividadId);
+    const nowSql = "datetime('now')";
 
-    const upsert = db.prepare(`
-      INSERT INTO actividad_ce (actividad_id, ce_codigo, puntuacion, razon, evidencias, incluido)
-      VALUES (?, ?, ?, ?, ?, 1)
-      ON CONFLICT(actividad_id, ce_codigo) DO UPDATE
-        SET puntuacion=excluded.puntuacion,
-            razon=excluded.razon,
-            evidencias=excluded.evidencias,
-            incluido=1
-    `);
+    const tx = db.transaction(() => {
+      // 1) UPSERT de cada CE recibido
+      const upsert = db.prepare(`
+        INSERT INTO actividad_ce (actividad_id, ce_codigo, puntuacion, razon, evidencias, incluido)
+        VALUES (@actividad_id, @ce_codigo, @puntuacion, @razon, @evidencias, @incluido)
+        ON CONFLICT(actividad_id, ce_codigo) DO UPDATE SET
+          puntuacion = excluded.puntuacion,
+          razon      = excluded.razon,
+          evidencias = excluded.evidencias,
+          incluido   = excluded.incluido
+      `);
 
-    for (const ce of ces) {
-      upsert.run(
-        actividadId,
-        ce.codigo,
-        ce.puntuacion,
-        ce.reason ?? null,
-        ce.evidencias ? JSON.stringify(ce.evidencias) : null
-      );
-    }
+      // normalizamos entrada
+      const codigosRecibidos: string[] = [];
+      for (const ce of ces) {
+        const ce_codigo = String(ce.codigo).trim();
+        if (!ce_codigo) continue;
 
-    db.prepare(
-      `
-      INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha, meta)
-      VALUES (?, ?, 'analizada', ?, ?)
-    `
-    ).run(crypto.randomUUID(), actividadId, now, JSON.stringify({ umbral }));
-  });
+        const puntuacion = Number(ce.puntuacion ?? 0);
+        const incluido = puntuacion >= umbral ? 1 : 0;
+        const razon = ce.reason ?? null; // guardamos tal cual
+        const evidencias = ce.evidencias ? JSON.stringify(ce.evidencias) : null;
 
-  tx();
-  return { ok: true };
-});
+        upsert.run({
+          actividad_id: actividadId,
+          ce_codigo,
+          puntuacion,
+          razon,
+          evidencias,
+          incluido,
+        });
+
+        codigosRecibidos.push(ce_codigo);
+      }
+
+      // 2) Desactivar CE que existían y NO han venido en este análisis
+      if (codigosRecibidos.length > 0) {
+        const placeholders = codigosRecibidos.map(() => "?").join(",");
+        db.prepare(
+          `
+          UPDATE actividad_ce
+             SET incluido = 0
+           WHERE actividad_id = ?
+             AND ce_codigo NOT IN (${placeholders})
+        `
+        ).run(actividadId, ...codigosRecibidos);
+      } else {
+        // Si no ha venido ninguno, desactiva todos los CE de la actividad
+        db.prepare(
+          `UPDATE actividad_ce SET incluido = 0 WHERE actividad_id = ?`
+        ).run(actividadId);
+      }
+
+      // 3) Actualiza actividad (estado + meta)
+      db.prepare(
+        `UPDATE actividades
+            SET estado = 'analizada',
+                analisis_fecha = ${nowSql},
+                umbral_aplicado = ?
+          WHERE id = ?`
+      ).run(umbral, actividadId);
+
+      // 4) Historial de estado
+      db.prepare(
+        `INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha, meta)
+         VALUES (?, ?, 'analizada', ${nowSql}, json_object('umbral', ?))`
+      ).run(uuid(), actividadId, umbral);
+    });
+
+    tx();
+    return { ok: true };
+  }
+);
 
 ipcMain.handle("actividad.leer-analisis", (_e, actividadId: string) => {
   const meta = db
@@ -1590,4 +1633,135 @@ ipcMain.handle("actividad.alumnos", (_e, { actividadId }: { actividadId: string 
 
   return alumnos;
 });
+
+ipcMain.handle(
+  "actividad:evaluar-y-propagar",
+  async (_e, payload: { actividadId: string }) => {
+    const { actividadId } = payload;
+    if (!actividadId) throw new Error("actividadId requerido");
+
+    // 👇 forzamos el tipo de db a BetterSqlite3.Database sólo para el transaction
+    const tx = (db as BetterSqlite3.Database).transaction((actividadId: string) => {
+      // 1) Datos base
+      const rowAct = db
+        .prepare(
+          `SELECT id, asignatura_id
+             FROM actividades
+            WHERE id = ?`
+        )
+        .get(actividadId) as { id: string; asignatura_id: string } | undefined;
+
+      if (!rowAct) throw new Error("Actividad no encontrada");
+
+      const notas = db
+        .prepare(
+          `SELECT alumno_id, nota
+             FROM actividad_nota
+            WHERE actividad_id = ?`
+        )
+        .all(actividadId) as Array<{ alumno_id: string | number; nota: number }>;
+
+      if (notas.length === 0) throw new Error("No hay notas guardadas para esta actividad");
+
+      const ces = db
+        .prepare(
+          `SELECT ce_codigo
+             FROM actividad_ce
+            WHERE actividad_id = ?
+              AND incluido = 1`
+        )
+        .all(actividadId) as Array<{ ce_codigo: string }>;
+
+      if (ces.length === 0) throw new Error("La actividad no tiene CE vinculados");
+
+      // 2) UPSERT nota_ce
+      const upsertNotaCE = db.prepare(`
+        INSERT INTO nota_ce (alumno_id, asignatura_id, ce_codigo, nota, updated_at)
+        VALUES (@alumno_id, @asignatura_id, @ce_codigo, @nota, datetime('now'))
+        ON CONFLICT(alumno_id, asignatura_id, ce_codigo)
+        DO UPDATE SET
+          nota = excluded.nota,
+          updated_at = datetime('now')
+      `);
+
+      for (const n of notas) {
+        const alumnoId =
+          typeof n.alumno_id === "string" ? Number(n.alumno_id) : n.alumno_id;
+        if (Number.isNaN(alumnoId))
+          throw new Error(`alumno_id no numérico: ${String(n.alumno_id)}`);
+
+        for (const ce of ces) {
+          upsertNotaCE.run({
+            alumno_id: alumnoId,
+            asignatura_id: rowAct.asignatura_id,
+            ce_codigo: ce.ce_codigo,
+            nota: n.nota ?? 0,
+          });
+        }
+      }
+
+      // 3) Marca evaluada + historial
+      db.prepare(
+        `UPDATE actividades
+            SET estado = 'evaluada',
+                evaluada_fecha = datetime('now')
+          WHERE id = ?`
+      ).run(actividadId);
+
+      db.prepare(
+        `INSERT INTO actividad_estado_historial (id, actividad_id, estado, fecha)
+         VALUES (?, ?, 'evaluada', datetime('now'))`
+      ).run(uuid(), actividadId);
+    });
+
+    tx(actividadId);
+    return { ok: true };
+  }
+);
+
+ipcMain.handle(
+  "actividad:guardar-notas",
+  (_e, payload: { actividadId: string; notas: { alumnoId: string; nota: number }[] }) => {
+    const { actividadId, notas } = payload;
+    if (!actividadId) throw new Error("actividadId requerido");
+    if (!Array.isArray(notas) || notas.length === 0) throw new Error("notas vacío");
+
+    // normaliza y valida
+    const rows = notas.map((n) => {
+      const alumnoId = String(n.alumnoId).trim();
+      let nota = Number(n.nota);
+      if (!alumnoId) throw new Error("alumnoId vacío");
+      if (Number.isNaN(nota)) nota = 0;
+      if (nota < 0) nota = 0;
+      if (nota > 10) nota = 10;
+      return { alumnoId, nota };
+    });
+
+    const tx = db.transaction(() => {
+      const upsert = db.prepare(`
+        INSERT INTO actividad_nota (id, actividad_id, alumno_id, nota, created_at, updated_at)
+        VALUES (lower(hex(randomblob(16))), @actividad_id, @alumno_id, @nota, datetime('now'), datetime('now'))
+        ON CONFLICT(actividad_id, alumno_id)
+        DO UPDATE SET
+          nota = excluded.nota,
+          updated_at = datetime('now')
+      `);
+
+      let changes = 0;
+      for (const r of rows) {
+        const info = upsert.run({
+          actividad_id: actividadId,
+          alumno_id: r.alumnoId,
+          nota: r.nota,
+        });
+        changes += info.changes ?? 0;
+      }
+      return changes;
+    });
+
+    const total = tx();
+    return { ok: true, changes: total };
+  }
+);
+
 
