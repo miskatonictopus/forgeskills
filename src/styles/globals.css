@@ -19,3 +19,18 @@
 .fc-event-main{
     @apply m-3;
 }
+
+.tiptap.ProseMirror {
+  border: 1px solid #4B5563; /* gris medio */
+  border-radius: 0.5rem;      /* esquinas redondeadas */
+  padding: 1rem;              /* espacio interior */
+  min-height: 200px;          /* altura mínima */
+  background-color: #1f1f1f;  /* opcional, según tu tema */
+  transition: border-color 0.2s ease;
+}
+
+.tiptap.ProseMirror:focus {
+  outline: none;
+  border-color: #3b82f6; /* azul */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4); /* glow */
+}

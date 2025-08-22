@@ -195,15 +195,14 @@ export function DialogCrearActividad({
               animate="show"
               className="space-y-1"
             >
-              <motion.p variants={itemVariants}>¡Crea una nueva actividad</motion.p>
-              {asignaturaNombreEf && (
-                <motion.p
-                  variants={itemVariants}
-                  className="text-yellow-300 mt-1"
-                >
-                  para {asignaturaNombreEf}!
-                </motion.p>
-              )}
+              <div className="flex items-baseline gap-2">
+  <motion.p variants={itemVariants}>Creando Actividad para</motion.p>
+  {asignaturaNombreEf && (
+    <motion.p variants={itemVariants} className="font-bold">
+      {asignaturaNombreEf}
+    </motion.p>
+  )}
+</div>
             </motion.div>
           </DialogTitle>
         </DialogHeader>
@@ -286,65 +285,61 @@ export function DialogCrearActividad({
                 setDescripcionPlain(plain);
                 setDescripcion(html);
               }}
-              className="w-full"
+              className="w-full tiptap ProseMirror border border-zinc-700 rounded-md p-4 min-h-[200px] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
           {/* Archivo */}
-          <div>
-            <Label className="mb-2 flex justify-between items-center w-full">
-              O bien sube un archivo
-              <span className="text-xs text-neutral-500">
-                archivos permitidos:<br />PDF / Pages / Word / txt
-              </span>
-            </Label>
-            <div className="flex items-center gap-2 mt-2">
-              <input
-                id="archivo"
-                type="file"
-                accept=".pdf,.doc,.docx,.pages,.txt"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const arrayBuffer = await file.arrayBuffer();
-                  const ruta = await window.electronAPI.guardarPDF(arrayBuffer, file.name);
-                  if (!ruta) {
-                    toast.error("No se pudo guardar el archivo.");
-                    return;
-                  }
-                  setArchivo(file);
-                  handleExtraerTexto(ruta);
-                }}
-                disabled={loading}
-              />
-              <label
-                htmlFor="archivo"
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-muted rounded cursor-pointer hover:bg-muted/80"
-              >
-                <FileUp className="w-4 h-4" />
-                Subir archivo
-              </label>
-              {archivo && (
-                <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                  {archivo.name}
-                </span>
-              )}
-            </div>
-          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+  {/* Izquierda: subir archivo + tipos permitidos */}
+  <div className="flex items-center gap-3 min-w-0">
+    <input
+      id="archivo"
+      type="file"
+      accept=".pdf,.doc,.docx,.pages,.txt"
+      className="hidden"
+      onChange={async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const arrayBuffer = await file.arrayBuffer();
+        const ruta = await window.electronAPI.guardarPDF(arrayBuffer, file.name);
+        if (!ruta) {
+          toast.error("No se pudo guardar el archivo.");
+          return;
+        }
+        setArchivo(file);
+        handleExtraerTexto(ruta);
+      }}
+      disabled={loading}
+    />
 
-          {/* CE detectados */}
-          {cesDetectados.length > 0 && (
-            <div className="mt-4">
-              <CEDetectedList results={cesDetectados} />
-            </div>
-          )}
+    {/* Botón subir archivo */}
+    <Button asChild variant="secondary" className="gap-2">
+      <label htmlFor="archivo">
+        <FileUp className="w-4 h-4" />
+        Subir archivo
+      </label>
+    </Button>
 
-          {/* Guardar */}
-          <Button className="w-full mt-4" onClick={handleGuardar} disabled={loading}>
-            <Bot className="w-4 h-4 mr-2" /> {loading ? "Guardando..." : "Guardar actividad"}
-          </Button>
-        </div>
+    {/* Texto de archivos permitidos */}
+    <span className="text-xs text-muted-foreground whitespace-nowrap">
+      archivos permitidos: PDF / Pages / Word / txt
+    </span>
+
+    {archivo && (
+      <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+        {archivo.name}
+      </span>
+    )}
+  </div>
+
+  {/* Derecha: guardar */}
+  <Button onClick={handleGuardar} disabled={loading} className="px-6">
+    <Bot className="w-4 h-4 mr-2" />
+    {loading ? "Guardando..." : "Guardar actividad"}
+  </Button>
+</div>
+</div>
       </DialogContent>
     </Dialog>
   );
