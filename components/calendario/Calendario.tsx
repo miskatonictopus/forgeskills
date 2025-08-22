@@ -122,7 +122,7 @@ export default function Calendario({
     <FullCalendar
       plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
       locale={esLocale}
-      timeZone="Europe/Madrid"
+      timeZone="local"
       initialView={initialView}
       initialDate={initialDate}
       height={height}
