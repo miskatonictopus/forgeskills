@@ -1925,3 +1925,106 @@ ipcMain.handle("leer-notas-detalle-asignatura", (_e, asignaturaId: string) => {
   return stmt.all(asignaturaId);
 });
 
+/* -------- utils -------- */
+function resolveTemplateDir(templateName: string) {
+  const base = app.isPackaged
+    ? path.join(process.resourcesPath, "pdf-templates") // empaquetado
+    : path.join(process.cwd(), "pdf-templates");        // dev
+  return path.join(base, templateName);
+}
+
+const mmToIn = (mm: number) => mm / 25.4;
+const parseMargin = (val: unknown, defMm: number) => {
+  if (typeof val === "number") return mmToIn(val); // si ya te pasan mm (número)
+  if (typeof val === "string") {
+    const v = val.trim().toLowerCase();
+    if (v.endsWith("mm")) return mmToIn(parseFloat(v));
+    if (v.endsWith("in")) return parseFloat(v);
+    const n = Number(v);
+    return Number.isFinite(n) ? mmToIn(n) : mmToIn(defMm);
+  }
+  return mmToIn(defMm);
+};
+
+/* -------- handler -------- */
+ipcMain.handle("pdf:actividad.render", async (_e, payload: {
+  html: string;
+  filename?: string;
+  template?: string; // ej. "academico"
+  options?: {
+    pageSize?: "A4" | "Letter";
+    margins?: { top?: string | number; right?: string | number; bottom?: string | number; left?: string | number };
+    landscape?: boolean;
+  };
+}) => {
+  const templateName = payload.template ?? "academico";
+  const tdir = resolveTemplateDir(templateName);
+
+  const headerHTML = fs.readFileSync(path.join(tdir, "header.html"), "utf8");
+  const footerHTML = fs.readFileSync(path.join(tdir, "footer.html"), "utf8");
+
+  const bw = new BrowserWindow({
+    show: false,
+    webPreferences: { offscreen: true },
+  });
+
+  try {
+    // Base en la carpeta de la plantilla para que <link href="styles.css"> funcione
+    const fullHTML = `
+<!doctype html><html><head>
+<meta charset="utf-8" />
+<base href="file://${tdir.endsWith(path.sep) ? tdir : tdir + path.sep}/" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: file:;">
+<link rel="stylesheet" href="styles.css">
+</head><body>${payload.html}</body></html>`;
+
+    await bw.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(fullHTML));
+
+    // espera a que carguen las fuentes (si hay @font-face)
+    await bw.webContents.executeJavaScript(`
+      (window.document && document.fonts && document.fonts.ready) 
+        ? document.fonts.ready.then(() => true) 
+        : Promise.resolve(true)
+    `);
+
+    // márgenes en pulgadas (Electron requiere numbers)
+    const topIn    = parseMargin(payload.options?.margins?.top,    18);
+    const rightIn  = parseMargin(payload.options?.margins?.right,  18);
+    const bottomIn = parseMargin(payload.options?.margins?.bottom, 20);
+    const leftIn   = parseMargin(payload.options?.margins?.left,   18);
+
+    const pdf = await bw.webContents.printToPDF({
+      pageSize: payload.options?.pageSize ?? "A4",
+      landscape: payload.options?.landscape ?? false,
+      printBackground: true,
+      preferCSSPageSize: true,
+
+      // Márgenes personalizados (en pulgadas)
+      margins: {
+        marginType: "custom",
+        top: topIn,
+        right: rightIn,
+        bottom: bottomIn,
+        left: leftIn,
+      } as any, // algunas definiciones de tipos de Electron no incluyen marginType string
+
+      // Header/Footer con tokens de Chromium (.title .date .pageNumber .totalPages)
+      displayHeaderFooter: true,
+      headerTemplate: headerHTML,
+      footerTemplate: footerHTML,
+    });
+
+    const outDir = path.join(process.cwd(), "exports");
+    fs.mkdirSync(outDir, { recursive: true });
+    const outPath = path.join(outDir, payload.filename ?? `actividad_${Date.now()}.pdf`);
+    fs.writeFileSync(outPath, pdf);
+
+    return { ok: true, path: outPath };
+  } catch (err: any) {
+    console.error("[pdf:actividad.render] error:", err);
+    return { ok: false, error: String(err?.message || err) };
+  } finally {
+    bw.destroy();
+  }
+});
+

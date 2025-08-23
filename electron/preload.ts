@@ -20,6 +20,21 @@ type BorrarHorarioIn = {
   horaInicio: string;
 };
 
+type RenderArgs = {
+  html: string;
+  filename?: string;
+  template?: string; // p.ej., "academico"
+  options?: {
+    pageSize?: "A4" | "Letter";
+    margins?: { top?: string | number; right?: string | number; bottom?: string | number; left?: string | number };
+    landscape?: boolean;
+  };
+};
+
+type RenderResult =
+  | { ok: true; path: string }
+  | { ok: false; error: string };
+
 
 
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -183,4 +198,7 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
 
     leerNotasDetalleAsignatura: (asignaturaId: string) =>
     ipcRenderer.invoke("leer-notas-detalle-asignatura", asignaturaId),
+
+    renderActividadPDF: (args: RenderArgs): Promise<RenderResult> =>
+    ipcRenderer.invoke("pdf:actividad.render", args),
 });

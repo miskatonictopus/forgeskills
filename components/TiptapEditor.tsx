@@ -160,7 +160,7 @@ export default function TiptapEditor({
       </div>
 
       {/* Editor: borde/scroll en el wrapper; .ProseMirror sin overflow/border */}
-      <div className="mt-3 rounded-md border border-input bg-background">
+      <div className="mt-3 rounded-md border border-input bg-white">
         <EditorContent
           editor={editor}
           className={`
@@ -168,8 +168,8 @@ export default function TiptapEditor({
             [&_.ProseMirror]:min-h-[420px]
             [&_.ProseMirror]:outline-none
             [&_.ProseMirror_p]:m-0
-            [&_.ProseMirror_ul]:my-2
-            [&_.ProseMirror_ol]:my-2
+            [&_.ProseMirror]:bg-white
++         [&_.ProseMirror]:text-zinc-900
           `}
         />
       </div>

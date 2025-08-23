@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-import { CalendarDays, Bot, X, Loader2, ArrowUp } from "lucide-react";
+import { CalendarDays, Bot, X, Loader2, ArrowUp, FileDown } from "lucide-react";
 import { Actividad, cargarActividades, estadoUI } from "@/store/actividadesPorCurso";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -20,7 +20,9 @@ import { Progress } from "@/components/ui/progress";
 import TiptapEditor from "@/components/TiptapEditor"; // ✅ editor sin parpadeo
 import { setAnalizadaEnMemoria } from "@/store/actividadesPorCurso";
 
-import { ExportarPDFButton } from "@/components/ExportarPDFButton";
+// ⛔️ quitamos el botón antiguo de exportar
+// import { ExportarPDFButton } from "@/components/ExportarPDFButton";
+
 import {
   Table,
   TableBody,
@@ -147,6 +149,96 @@ function EstadoBadgeHeader({
       )}
     </div>
   );
+}
+
+/* ===== PDF builder local (HTML académico) ===== */
+function buildPdfHtml({
+  titulo,
+  asignatura,
+  fechaStr,
+  umbral,
+  descripcionHtml,
+  cesFiltrados,
+  getCeText,
+  labelFor,
+}: {
+  titulo: string;
+  asignatura: string;
+  fechaStr: string;
+  umbral: number;
+  descripcionHtml: string;
+  cesFiltrados: Array<{
+    codigo: string;
+    puntuacion: number; // 0..1
+    reason?: "evidence" | "high_sim" | "lang_rule";
+    evidencias?: string[];
+    descripcion?: string;
+  }>;
+  getCeText: (ce: any) => string;
+  labelFor: (code: string) => string;
+}) {
+  const rows = cesFiltrados
+    .map((ce) => {
+      const pct = (ce.puntuacion * 100).toFixed(1) + "%";
+      const reason =
+        ce.reason === "high_sim"
+          ? "Alta similitud"
+          : ce.reason === "lang_rule"
+          ? "Lenguajes"
+          : "Con evidencias";
+      const evid =
+        ce.evidencias?.length
+          ? ` Evidencias: ${ce.evidencias
+              .slice(0, 2)
+              .map((e) => `“${e}”`)
+              .join(" · ")}.`
+          : "";
+
+      const justif =
+        ce.reason === "high_sim"
+          ? `Coincidencia semántica alta (${pct}) entre la descripción y el criterio.${evid}`
+          : ce.reason === "lang_rule"
+          ? `Menciones a lenguajes/tecnologías vinculadas al criterio (${pct}).${evid}`
+          : `Alineación de acción/objetos del criterio detectada en el enunciado (${pct}).${evid}`;
+
+      const desc = getCeText(ce) || ce.descripcion || "—";
+      return `
+        <tr>
+          <td>${labelFor(ce.codigo)}</td>
+          <td>${desc}</td>
+          <td style="text-align:right">${pct}</td>
+          <td>${reason}</td>
+          <td>${justif}</td>
+        </tr>`;
+    })
+    .join("");
+
+  const ceTable = cesFiltrados.length
+    ? `
+    <h2>CE detectados</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>CE</th>
+          <th>Descripción</th>
+          <th>Match</th>
+          <th>Razón</th>
+          <th>Justificación / Evidencias</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`
+    : "";
+
+  return `
+  <section>
+    <h1>${titulo}</h1>
+    <p class="meta"><strong>Asignatura:</strong> ${asignatura} &nbsp;·&nbsp; <strong>Fecha:</strong> ${fechaStr} &nbsp;·&nbsp; <strong>Umbral CE:</strong> ${umbral}%</p>
+    <hr/>
+    <h2>Descripción</h2>
+    ${descripcionHtml || "<p>Sin contenido</p>"}
+    ${ceTable}
+  </section>`;
 }
 
 /* ===== Dialog ===== */
@@ -580,7 +672,7 @@ export function DialogVerActividad({
     [hasActividad, cesDetectados, umbral, filtroRazon]
   );
 
-  /* === PDF: usa htmlLocal === */
+  /* === PDF: usa htmlLocal y CE filtrados === */
   const pdfData = useMemo(() => {
     if (!hasActividad) return null;
     const baseHtml =
@@ -595,14 +687,16 @@ export function DialogVerActividad({
       asignatura: asignaturaNombre ?? actividad!.asignaturaId ?? "—",
       html: baseHtml,
       umbral,
-      ces: cesDetectados.map((ce) => ({
+      ces: cesFiltrados.map((ce) => ({
         codigo: ce.codigo,
         texto: (ce.descripcion || "").trim() || "",
         descripcion: (ce.descripcion || "").trim() || "",
         similitud: ce.puntuacion ?? 0,
+        reason: ce.reason,
+        evidencias: ce.evidencias ?? [],
       })),
     };
-  }, [hasActividad, actividad, asignaturaNombre, umbral, cesDetectados, htmlLocal]);
+  }, [hasActividad, actividad, asignaturaNombre, umbral, cesFiltrados, htmlLocal]);
 
   const suggestedFileName = useMemo(() => {
     const base = (actividad?.nombre || "Informe_actividad")
@@ -610,6 +704,54 @@ export function DialogVerActividad({
       .replace(/[^\w\-]+/g, "");
     return `Informe_${base}.pdf`;
   }, [actividad?.nombre]);
+
+  // === Exportar PDF ===
+  const handleExportPDF = async () => {
+    if (!actividad || !pdfData) return;
+
+    if (!(window as any)?.electronAPI?.renderActividadPDF) {
+      toast.error("La API de impresión no está disponible (renderActividadPDF).");
+      return;
+    }
+    const fechaStr = (actividad?.fecha
+      ? new Date(actividad.fecha)
+      : new Date()
+    ).toLocaleDateString("es-ES");
+
+    const html = buildPdfHtml({
+      titulo: pdfData.titulo,
+      asignatura: pdfData.asignatura,
+      fechaStr,
+      umbral: pdfData.umbral,
+      descripcionHtml: pdfData.html,
+      cesFiltrados: (pdfData.ces ?? []).map((c: any) => ({
+        codigo: c.codigo,
+        puntuacion: c.similitud ?? 0,
+        reason: c.reason,
+        evidencias: c.evidencias,
+        descripcion: c.descripcion,
+      })),
+      getCeText,
+      labelFor,
+    });
+
+    try {
+      const { ok, path } = await (window as any).electronAPI.renderActividadPDF({
+        html,
+        filename: suggestedFileName,
+        template: "academico",
+        options: {
+          pageSize: "A4",
+          margins: { top: "18mm", right: "18mm", bottom: "20mm", left: "18mm" },
+        },
+      });
+      if (ok) toast.success(`PDF guardado en: ${path}`);
+      else toast.error("No se pudo generar el PDF.");
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al generar el PDF.");
+    }
+  };
 
   const totalCE = cesDetectados.length;
   const visiblesCE = cesFiltrados.length;
@@ -783,106 +925,97 @@ export function DialogVerActividad({
                     </TableHeader>
 
                     <TableBody>
-                      {cesFiltrados.map((ce, idx) => {
-                        const rowKey = keyFor(ce.codigo, idx);
-                        const pctTxt = `${(ce.puntuacion * 100).toFixed(1)}%`;
+  {cesFiltrados.map((ce, idx) => {
+    const rowKey = keyFor(ce.codigo, idx);
+    const pct = (ce.puntuacion * 100).toFixed(1) + "%";
 
-                        const whyBase =
-                          ce.reason === "high_sim"
-                            ? `Coincidencia semántica alta (${pctTxt}) entre la descripción y el criterio.`
-                            : ce.reason === "lang_rule"
-                            ? `Menciones claras a lenguajes/tecnologías que vinculan con el criterio (${pctTxt}).`
-                            : `Alineación de acción y objetos del criterio detectada en el enunciado (${pctTxt}).`;
+    const whyBase =
+      ce.reason === "high_sim"
+        ? `Coincidencia semántica alta (${pct}) entre la descripción y el criterio.`
+        : ce.reason === "lang_rule"
+        ? `Menciones claras a lenguajes/tecnologías que vinculan con el criterio (${pct}).`
+        : `Alineación de acción y objetos del criterio detectada en el enunciado (${pct}).`;
 
-                        const evid = ce.evidencias?.length
-                          ? ` Evidencias: ${ce.evidencias
-                              .slice(0, 2)
-                              .map((e) => `“${e}”`)
-                              .join("  ·  ")}.`
-                          : "";
-                        const why = `${whyBase}${evid}`;
+    const evid = ce.evidencias?.length
+      ? ` Evidencias: ${ce.evidencias.slice(0, 2).map(e => `“${e}”`).join("  ·  ")}.`
+      : "";
 
-                        const expanded = !!expandJusti[rowKey];
-                        const isLong = why.length > 220;
+    const why = `${whyBase}${evid}`;
 
-                        return (
-                          <TableRow key={rowKey} className="[&>td]:align-top">
-                            <TableCell className="font-medium">
-                              {labelFor(ce.codigo)}
-                            </TableCell>
+    const expanded = !!expandJusti[rowKey];
+    const isLong = why.length > 220;
 
-                            <TableCell className="pr-4">
-                              <p
-                                className="text-sm text-zinc-200 whitespace-pre-wrap break-words leading-snug"
-                                style={{ overflowWrap: "anywhere" }}
-                              >
-                                {getCeText(ce) ||
-                                  ceDescByCode[normCE(ce.codigo)] ||
-                                  "—"}
-                              </p>
-                            </TableCell>
+    return (
+      <TableRow key={rowKey} className="[&>td]:align-top">
+        <TableCell className="font-medium">
+          {labelFor(ce.codigo)}
+        </TableCell>
 
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={cn(
-                                    ce.puntuacion > 0.6
-                                      ? "text-emerald-400"
-                                      : ce.puntuacion >= 0.5
-                                      ? "text-yellow-400"
-                                      : "text-red-400",
-                                    "font-semibold"
-                                  )}
-                                >
-                                  {(ce.puntuacion * 100).toFixed(1)}%
-                                </span>
-                              </div>
-                              <div className="mt-1 min-w-[140px]">
-                                <Progress
-                                  className="h-2"
-                                  value={Math.round(ce.puntuacion * 100)}
-                                />
-                              </div>
-                            </TableCell>
+        <TableCell className="pr-4">
+          <p
+            className="text-sm text-zinc-200 whitespace-pre-wrap break-words leading-snug"
+            style={{ overflowWrap: "anywhere" }}
+          >
+            {getCeText(ce) || ceDescByCode[normCE(ce.codigo)] || "—"}
+          </p>
+        </TableCell>
 
-                            <TableCell>
-                              {ce.reason === "high_sim" ? (
-                                <Badge variant="secondary">Alta similitud</Badge>
-                              ) : ce.reason === "lang_rule" ? (
-                                <Badge variant="secondary">Lenguajes</Badge>
-                              ) : (
-                                <Badge>Con evidencias</Badge>
-                              )}
-                            </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                ce.puntuacion > 0.6
+                  ? "text-emerald-400"
+                  : ce.puntuacion >= 0.5
+                  ? "text-yellow-400"
+                  : "text-red-400",
+                "font-semibold"
+              )}
+            >
+              {pct}
+            </span>
+          </div>
+          <div className="mt-1 min-w-[140px]">
+            <Progress className="h-2" value={Math.round(ce.puntuacion * 100)} />
+          </div>
+        </TableCell>
 
-                            <TableCell>
-                              <div
-                                className={cn(
-                                  "text-xs whitespace-pre-wrap break-words",
-                                  !expanded && "line-clamp-3"
-                                )}
-                                style={{ overflowWrap: "anywhere" }}
-                              >
-                                {why}
-                              </div>
-                              {isLong && (
-                                <button
-                                  className="mt-1 text-xs underline text-muted-foreground hover:text-foreground"
-                                  onClick={() =>
-                                    setExpandJusti((s) => ({
-                                      ...s,
-                                      [rowKey]: !expanded,
-                                    }))
-                                  }
-                                >
-                                  {expanded ? "Ver menos" : "Ver más"}
-                                </button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
+        <TableCell>
+          {ce.reason === "high_sim" ? (
+            <Badge variant="secondary">Alta similitud</Badge>
+          ) : ce.reason === "lang_rule" ? (
+            <Badge variant="secondary">Lenguajes</Badge>
+          ) : (
+            <Badge>Con evidencias</Badge>
+          )}
+        </TableCell>
+
+        <TableCell>
+          <div
+            className={cn(
+              "text-xs whitespace-pre-wrap break-words",
+              !expanded && "line-clamp-3"
+            )}
+            style={{ overflowWrap: "anywhere" }}
+          >
+            {why}
+          </div>
+          {isLong && (
+            <button
+              className="mt-1 text-xs underline text-muted-foreground hover:text-foreground"
+              onClick={() =>
+                setExpandJusti(s => ({ ...s, [rowKey]: !expanded }))
+              }
+            >
+              {expanded ? "Ver menos" : "Ver más"}
+            </button>
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  })}
+</TableBody>
+
                   </Table>
                 </section>
               )}
@@ -948,13 +1081,15 @@ export function DialogVerActividad({
               </div>
 
               <div className="flex items-center gap-2">
-                <ExportarPDFButton
-                  data={pdfData as any}
-                  headerTitle="Informe de actividad"
-                  fileName={suggestedFileName}
-                  html={pdfData?.html}
+                {/* Nuevo botón: exportar PDF académico */}
+                <Button
+                  size="sm"
+                  onClick={handleExportPDF}
                   disabled={!pdfData}
-                />
+                >
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Exportar PDF (académico)
+                </Button>
 
                 <Button
                   variant="outline"
