@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import EvaluarActividad from "@/components/evaluar/EvaluarActividad";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import TiptapEditor from "@/components/TiptapEditor"; // ✅ editor sin parpadeo
+import TinyEditor from "@/components/TinyEditor";
 import { setAnalizadaEnMemoria } from "@/store/actividadesPorCurso";
 
 // ⛔️ quitamos el botón antiguo de exportar
@@ -758,459 +758,446 @@ export function DialogVerActividad({
   const pctCE = totalCE ? Math.round((visiblesCE / totalCE) * 100) : 0;
 
   /* =================== RENDER =================== */
-  return (
-    <>
-      {hasActividad && (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-          <DialogContent
-            forceMount
-            ref={contentRef}
-            className="w-[95vw] max-w-[95vw] sm:max-w-[1100px] lg:max-w-[1200px] max-h-[90vh] overflow-y-auto p-0"
-          >
-            {/* HEADER */}
-            <div className="sticky top-0 z-50 border-b bg-background/85 backdrop-blur">
-              <div className="relative px-6 pt-3 pb-4 pr-12">
-                <DialogClose asChild>
-                  <button
-                    aria-label="Cerrar"
-                    className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </DialogClose>
+return (
+  <>
+    {hasActividad && (
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
+          forceMount
+          ref={contentRef}
+          className="w-[95vw] max-w-[95vw] sm:max-w-[1100px] lg:max-w-[1200px] max-h-[90vh] overflow-y-auto p-0"
+          onInteractOutside={(e) => {
+            const el = e.target as HTMLElement;
+            // Si el click viene de la UI de TinyMCE, no cierres el diálogo
+            if (el.closest(".tox, .tox-tinymce-aux, .tox-dialog, .tox-menu")) {
+              e.preventDefault();
+            }
+          }}
+          onEscapeKeyDown={(e) => e.preventDefault()} // opcional: evita cerrar con ESC mientras editas
+        >
+          {/* HEADER */}
+          <div className="sticky top-0 z-50 border-b bg-background/85 backdrop-blur">
+            <div className="relative px-6 pt-3 pb-4 pr-12">
+              <DialogClose asChild>
+                <button
+                  aria-label="Cerrar"
+                  className="absolute right-3 top-3 rounded-md p-2 hover:bg-muted"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </DialogClose>
 
-                <DialogHeader className="flex items-start justify-between">
-                  {/* IZQUIERDA: título + metas */}
-                  <div className="flex flex-col">
-                    <DialogTitle className="text-xl">{actividad!.nombre}</DialogTitle>
+              <DialogHeader className="flex items-start justify-between">
+                {/* IZQUIERDA: título + metas */}
+                <div className="flex flex-col">
+                  <DialogTitle className="text-xl">{actividad!.nombre}</DialogTitle>
 
-                    <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <CalendarDays className="w-4 h-4" />
-                        <span>
-                          <span className="font-bold">Fecha de creación: </span>
-                          {new Date(actividad!.fecha).toLocaleDateString("es-ES")}
-                        </span>
-                      </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4" />
+                      <span>
+                        <span className="font-bold">Fecha de creación: </span>
+                        {new Date(actividad!.fecha).toLocaleDateString("es-ES")}
+                      </span>
+                    </div>
 
-                      <div className="flex items-center gap-2">
-                        <strong>Asignatura:</strong>
-                        <span className="uppercase">
-                          {asignaturaNombre || actividad!.asignaturaId}
-                        </span>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <strong>Asignatura:</strong>
+                      <span className="uppercase">
+                        {asignaturaNombre || actividad!.asignaturaId}
+                      </span>
                     </div>
                   </div>
+                </div>
 
-                  {/* DERECHA: badge */}
-                  <EstadoBadgeHeader
-                    estadoCanon={ev as any}
-                    programadaPara={programadaPara}
-                    analisisFecha={
-                      analizadaLocal ? analizadaFecha : actividad!.analisisFecha ?? null
-                    }
-                  />
-                </DialogHeader>
-              </div>
+                {/* DERECHA: badge */}
+                <EstadoBadgeHeader
+                  estadoCanon={ev as any}
+                  programadaPara={programadaPara}
+                  analisisFecha={
+                    analizadaLocal ? analizadaFecha : actividad!.analisisFecha ?? null
+                  }
+                />
+              </DialogHeader>
             </div>
+          </div>
 
-            {/* CONTENT */}
-            <div className="px-6 py-4 pb-28 space-y-4 text-sm text-muted-foreground">
-              {/* === Descripción: preview + editor sin flash === */}
-              <section>
-                <div className="flex items-center justify-between mb-1">
-                  <p className="font-semibold text-white">Descripción:</p>
+          {/* CONTENT */}
+          <div className="px-6 py-4 pb-28 space-y-4 text-sm text-muted-foreground">
+            {/* === Descripción: preview + editor === */}
+            <section>
+              <div className="flex items-center justify-between mb-1">
+                <p className="font-semibold text-white">Descripción:</p>
 
-                  <div className="print:hidden flex items-center gap-2">
-                    {canSaveDesc && editando && (
-                      <Button
-                        size="sm"
-                        onClick={guardarDescripcionManual}
-                        disabled={savingDesc || !dirtyDesc}
-                      >
-                        {savingDesc ? "Guardando..." : "Guardar descripción"}
-                      </Button>
-                    )}
+                <div className="print:hidden flex items-center gap-2">
+                  {canSaveDesc && editando && (
                     <Button
-                      variant={editando ? "secondary" : "default"}
                       size="sm"
-                      onClick={() => {
-                        firstUpdateSkipped.current = false;
-                        setEditando((v) => !v);
-                      }}
+                      onClick={guardarDescripcionManual}
+                      disabled={savingDesc || !dirtyDesc}
                     >
-                      {editando ? "Terminar edición" : "Editar descripción"}
+                      {savingDesc ? "Guardando..." : "Guardar descripción"}
+                    </Button>
+                  )}
+                  <Button
+                    variant={editando ? "secondary" : "default"}
+                    size="sm"
+                    onClick={() => {
+                      firstUpdateSkipped.current = false;
+                      setEditando((v) => !v);
+                    }}
+                  >
+                    {editando ? "Terminar edición" : "Editar descripción"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Vista previa */}
+              {!editando && (
+                <div className="rounded-md border bg-background/40 p-4">
+                  <RenderHTML html={htmlLocal || "<p>Sin contenido</p>"} />
+                </div>
+              )}
+
+              {/* Editor (no imprimir) */}
+              {editando && (
+                <div className="print:hidden">
+                  <div className="rounded-md border bg-white mt-2">
+                    <TinyEditor
+                      value={htmlLocal}
+                      onChange={(html) => onEditorChange(html)}
+                      onDirtyChange={setDirtyDesc}
+                      placeholder="Maqueta aquí la descripción para el PDF…"
+                      autoresize
+                      forceLight
+                    />
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={restaurarDescripcion}
+                      disabled={savingDesc || (!dirtyDesc && !!htmlLocal)}
+                    >
+                      Restaurar
                     </Button>
                   </div>
                 </div>
+              )}
 
-                {/* Vista previa */}
-                {!editando && (
-                  <div className="rounded-md border bg-background/40 p-4">
-                    <RenderHTML html={htmlLocal || "<p>Sin contenido</p>"} />
-                  </div>
+              {/* Solo impresión */}
+              <div className="hidden print:block rounded-md border bg-background/40 p-4">
+                <RenderHTML html={htmlLocal || "<p>Sin contenido</p>"} />
+              </div>
+            </section>
+
+            <div ref={ceAnchorRef} className="scroll-mt-24" />
+
+            {cesFiltrados.length > 0 && (
+              <section className="mt-6">
+                <p className="font-semibold text-white mb-2">
+                  CE detectados{" "}
+                  <span className="text-muted-foreground font-normal">
+                    ({visiblesCE} / {totalCE})
+                  </span>
+                </p>
+
+                {fuenteAnalisis === "snapshot" && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Mostrando análisis guardado (umbral {umbral}%). Puedes “Re-analizar”
+                    para actualizar.
+                  </p>
+                )}
+                {fuenteAnalisis === "fresh" && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Mostrando resultado reciente sin guardar. Pulsa “Guardar análisis”
+                    para persistir.
+                  </p>
                 )}
 
-                {/* Editor (no imprimir) */}
-                {editando && (
-                  <div className="print:hidden">
-                    <TiptapEditor
-                      key={actividad?.id ?? "actividad"}
-                      valueHtml={htmlLocal}
-                      onChange={onEditorChange}
-                      placeholder="Maqueta aquí la descripción para el PDF…"
-                      disabled={false}
-                      className="mt-2"
-                    />
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={restaurarDescripcion}
-                        disabled={savingDesc || (!dirtyDesc && !!htmlLocal)}
-                      >
-                        Restaurar
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                {/* Tabla CE */}
+                <Table className="w-full table-fixed">
+                  <colgroup>
+                    <col className="w-[8%]" />
+                    <col className="w-[28%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[40%]" />
+                  </colgroup>
 
-                {/* Solo impresión */}
-                <div className="hidden print:block rounded-md border bg-background/40 p-4">
-                  <RenderHTML html={htmlLocal || "<p>Sin contenido</p>"} />
-                </div>
+                  <TableHeader>
+                    <TableRow className="[&>th]:align-top">
+                      <TableHead>CE</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>Coincidencia</TableHead>
+                      <TableHead>Razón</TableHead>
+                      <TableHead>Justificación / Evidencias</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {cesFiltrados.map((ce, idx) => {
+                      const rowKey = keyFor(ce.codigo, idx);
+                      const pct = (ce.puntuacion * 100).toFixed(1) + "%";
+
+                      const whyBase =
+                        ce.reason === "high_sim"
+                          ? `Coincidencia semántica alta (${pct}) entre la descripción y el criterio.`
+                          : ce.reason === "lang_rule"
+                          ? `Menciones claras a lenguajes/tecnologías que vinculan con el criterio (${pct}).`
+                          : `Alineación de acción y objetos del criterio detectada en el enunciado (${pct}).`;
+
+                      const evid = ce.evidencias?.length
+                        ? ` Evidencias: ${ce.evidencias
+                            .slice(0, 2)
+                            .map((e) => `“${e}”`)
+                            .join(" · ")}.`
+                        : "";
+
+                      const why = `${whyBase}${evid}`;
+                      const expanded = !!expandJusti[rowKey];
+                      const isLong = why.length > 220;
+
+                      return (
+                        <TableRow key={rowKey} className="[&>td]:align-top">
+                          <TableCell className="font-medium">
+                            {labelFor(ce.codigo)}
+                          </TableCell>
+                          <TableCell className="pr-4">
+                            <p className="text-sm text-zinc-200 whitespace-pre-wrap break-words leading-snug">
+                              {getCeText(ce) ||
+                                ceDescByCode[normCE(ce.codigo)] ||
+                                "—"}
+                            </p>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  ce.puntuacion > 0.6
+                                    ? "text-emerald-400"
+                                    : ce.puntuacion >= 0.5
+                                    ? "text-yellow-400"
+                                    : "text-red-400",
+                                  "font-semibold"
+                                )}
+                              >
+                                {pct}
+                              </span>
+                            </div>
+                            <div className="mt-1 min-w-[140px]">
+                              <Progress
+                                className="h-2"
+                                value={Math.round(ce.puntuacion * 100)}
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {ce.reason === "high_sim" ? (
+                              <Badge variant="secondary">Alta similitud</Badge>
+                            ) : ce.reason === "lang_rule" ? (
+                              <Badge variant="secondary">Lenguajes</Badge>
+                            ) : (
+                              <Badge>Con evidencias</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div
+                              className={cn(
+                                "text-xs whitespace-pre-wrap break-words",
+                                !expanded && "line-clamp-3"
+                              )}
+                            >
+                              {why}
+                            </div>
+                            {isLong && (
+                              <button
+                                className="mt-1 text-xs underline text-muted-foreground hover:text-foreground"
+                                onClick={() =>
+                                  setExpandJusti((s) => ({
+                                    ...s,
+                                    [rowKey]: !expanded,
+                                  }))
+                                }
+                              >
+                                {expanded ? "Ver menos" : "Ver más"}
+                              </button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </section>
-
-              <div ref={ceAnchorRef} className="scroll-mt-24" />
-
-              {cesFiltrados.length > 0 && (
-                <section className="mt-6">
-                  <p className="font-semibold text-white mb-2">
-                    CE detectados{" "}
-                    <span className="text-muted-foreground font-normal">
-                      ({visiblesCE} / {totalCE})
-                    </span>
-                  </p>
-
-                  {fuenteAnalisis === "snapshot" && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Mostrando análisis guardado (umbral {umbral}%). Puedes “Re-analizar”
-                      para actualizar.
-                    </p>
-                  )}
-                  {fuenteAnalisis === "fresh" && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Mostrando resultado reciente sin guardar. Pulsa “Guardar análisis”
-                      para persistir.
-                    </p>
-                  )}
-
-                  <Table className="w-full table-fixed">
-                    <colgroup>
-                      <col className="w-[8%]" />
-                      <col className="w-[28%]" />
-                      <col className="w-[12%]" />
-                      <col className="w-[12%]" />
-                      <col className="w-[40%]" />
-                    </colgroup>
-
-                    <TableHeader>
-                      <TableRow className="[&>th]:align-top">
-                        <TableHead>CE</TableHead>
-                        <TableHead>Descripción</TableHead>
-                        <TableHead>Coincidencia</TableHead>
-                        <TableHead>Razón</TableHead>
-                        <TableHead>Justificación / Evidencias</TableHead>
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-  {cesFiltrados.map((ce, idx) => {
-    const rowKey = keyFor(ce.codigo, idx);
-    const pct = (ce.puntuacion * 100).toFixed(1) + "%";
-
-    const whyBase =
-      ce.reason === "high_sim"
-        ? `Coincidencia semántica alta (${pct}) entre la descripción y el criterio.`
-        : ce.reason === "lang_rule"
-        ? `Menciones claras a lenguajes/tecnologías que vinculan con el criterio (${pct}).`
-        : `Alineación de acción y objetos del criterio detectada en el enunciado (${pct}).`;
-
-    const evid = ce.evidencias?.length
-      ? ` Evidencias: ${ce.evidencias.slice(0, 2).map(e => `“${e}”`).join("  ·  ")}.`
-      : "";
-
-    const why = `${whyBase}${evid}`;
-
-    const expanded = !!expandJusti[rowKey];
-    const isLong = why.length > 220;
-
-    return (
-      <TableRow key={rowKey} className="[&>td]:align-top">
-        <TableCell className="font-medium">
-          {labelFor(ce.codigo)}
-        </TableCell>
-
-        <TableCell className="pr-4">
-          <p
-            className="text-sm text-zinc-200 whitespace-pre-wrap break-words leading-snug"
-            style={{ overflowWrap: "anywhere" }}
-          >
-            {getCeText(ce) || ceDescByCode[normCE(ce.codigo)] || "—"}
-          </p>
-        </TableCell>
-
-        <TableCell>
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                ce.puntuacion > 0.6
-                  ? "text-emerald-400"
-                  : ce.puntuacion >= 0.5
-                  ? "text-yellow-400"
-                  : "text-red-400",
-                "font-semibold"
-              )}
-            >
-              {pct}
-            </span>
-          </div>
-          <div className="mt-1 min-w-[140px]">
-            <Progress className="h-2" value={Math.round(ce.puntuacion * 100)} />
-          </div>
-        </TableCell>
-
-        <TableCell>
-          {ce.reason === "high_sim" ? (
-            <Badge variant="secondary">Alta similitud</Badge>
-          ) : ce.reason === "lang_rule" ? (
-            <Badge variant="secondary">Lenguajes</Badge>
-          ) : (
-            <Badge>Con evidencias</Badge>
-          )}
-        </TableCell>
-
-        <TableCell>
-          <div
-            className={cn(
-              "text-xs whitespace-pre-wrap break-words",
-              !expanded && "line-clamp-3"
             )}
-            style={{ overflowWrap: "anywhere" }}
-          >
-            {why}
+
+            {showTop && (
+              <div className="sticky bottom-28 flex justify-end pr-6">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="shadow-md"
+                  onClick={() =>
+                    contentRef.current?.scrollTo({
+                      top: 0,
+                      behavior: "smooth",
+                    })
+                  }
+                >
+                  <ArrowUp className="w-4 h-4 mr-1" />
+                  Arriba
+                </Button>
+              </div>
+            )}
           </div>
-          {isLong && (
-            <button
-              className="mt-1 text-xs underline text-muted-foreground hover:text-foreground"
-              onClick={() =>
-                setExpandJusti(s => ({ ...s, [rowKey]: !expanded }))
-              }
-            >
-              {expanded ? "Ver menos" : "Ver más"}
-            </button>
-          )}
-        </TableCell>
-      </TableRow>
-    );
-  })}
-</TableBody>
 
-                  </Table>
-                </section>
-              )}
+          {/* FOOTER acciones */}
+          <div className="sticky bottom-0 z-50 border-t bg-background/85 backdrop-blur px-6 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-xs text-muted-foreground">Mostrar:</label>
+              <select
+                className="h-8 rounded-md border bg-background px-2 text-xs"
+                value={filtroRazon}
+                onChange={(e) => setFiltroRazon(e.target.value as any)}
+              >
+                <option value="all">Todos</option>
+                <option value="evidence">Con evidencias</option>
+                <option value="high_sim">Alta similitud</option>
+                <option value="lang_rule">Lenguajes</option>
+              </select>
 
-              {showTop && (
-                <div className="sticky bottom-28 flex justify-end pr-6">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="shadow-md"
-                    onClick={() =>
-                      contentRef.current?.scrollTo({
-                        top: 0,
-                        behavior: "smooth",
-                      })
-                    }
-                  >
-                    <ArrowUp className="w-4 h-4 mr-1" />
-                    Arriba
-                  </Button>
-                </div>
+              <label className="text-xs text-muted-foreground ml-2">
+                Umbral:
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={umbral}
+                onChange={(e) => setUmbral(Number(e.target.value))}
+                className="w-40"
+              />
+              <span className="text-xs tabular-nums">{umbral}%</span>
+
+              {totalCE > 0 && (
+                <Badge variant="secondary" className="ml-3">
+                  CE <span className="tabular-nums ml-1">{visiblesCE}</span>
+                  <span className="mx-1 text-muted-foreground">/</span>
+                  <span className="tabular-nums">{totalCE}</span>
+                  <span className="mx-1 text-muted-foreground">·</span>
+                  <span className="tabular-nums">{pctCE}%</span>
+                </Badge>
               )}
             </div>
 
-            {/* FOOTER acciones */}
-            <div className="sticky bottom-0 z-50 border-t bg-background/85 backdrop-blur px-6 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="text-xs text-muted-foreground">Mostrar:</label>
-                <select
-                  className="h-8 rounded-md border bg-background px-2 text-xs"
-                  value={filtroRazon}
-                  onChange={(e) => setFiltroRazon(e.target.value as any)}
-                >
-                  <option value="all">Todos</option>
-                  <option value="evidence">Con evidencias</option>
-                  <option value="high_sim">Alta similitud</option>
-                  <option value="lang_rule">Lenguajes</option>
-                </select>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={handleExportPDF} disabled={!pdfData}>
+                <FileDown className="w-4 h-4 mr-2" />
+                Exportar PDF (académico)
+              </Button>
 
-                <label className="text-xs text-muted-foreground ml-2">
-                  Umbral:
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={umbral}
-                  onChange={(e) => setUmbral(Number(e.target.value))}
-                  className="w-40"
-                />
-                <span className="text-xs tabular-nums">{umbral}%</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setUmbral(0);
+                  setFiltroRazon("all");
+                  setCesDetectados([]);
+                  setFuenteAnalisis("none");
+                  setAnalizadaLocal(false);
+                }}
+              >
+                Limpiar
+              </Button>
 
-                {totalCE > 0 && (
-                  <Badge variant="secondary" className="ml-3">
-                    CE <span className="tabular-nums ml-1">{visiblesCE}</span>
-                    <span className="mx-1 text-muted-foreground">/</span>
-                    <span className="tabular-nums">{totalCE}</span>
-                    <span className="mx-1 text-muted-foreground">·</span>
-                    <span className="tabular-nums">{pctCE}%</span>
-                  </Badge>
-                )}
-              </div>
+              {cesDetectados.length > 0 && fuenteAnalisis !== "snapshot" && (
+                <Button size="sm" onClick={handleGuardarAnalisis} disabled={loading}>
+                  Guardar análisis
+                </Button>
+              )}
 
-              <div className="flex items-center gap-2">
-                {/* Nuevo botón: exportar PDF académico */}
+              {analizadaLocal || (actividad as any)?.estado === "analizada" ? (
                 <Button
                   size="sm"
-                  onClick={handleExportPDF}
-                  disabled={!pdfData}
+                  variant="secondary"
+                  onClick={handleAnalizar}
+                  disabled={loading}
                 >
-                  <FileDown className="w-4 h-4 mr-2" />
-                  Exportar PDF (académico)
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Bot className="w-4 h-4 mr-2" />
+                  )}
+                  {loading ? "Analizando..." : "Re-analizar"}
                 </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setUmbral(0);
-                    setFiltroRazon("all");
-                    setCesDetectados([]);
-                    setFuenteAnalisis("none");
-                    setAnalizadaLocal(false);
-                  }}
-                >
-                  Limpiar
+              ) : (
+                <Button size="sm" onClick={handleAnalizar} disabled={loading}>
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Bot className="w-4 h-4 mr-2" />
+                  )}
+                  {loading ? "Analizando..." : "Analizar descripción"}
                 </Button>
+              )}
 
-                {cesDetectados.length > 0 && fuenteAnalisis !== "snapshot" && (
-                  <Button size="sm" onClick={handleGuardarAnalisis} disabled={loading}>
-                    Guardar análisis
-                  </Button>
-                )}
+              {actividad && (actividad as any).estado === "pendiente_evaluar" && (
+                <Button onClick={() => setEvalOpen(true)}>Evaluar</Button>
+              )}
 
-                {analizadaLocal || (actividad as any)?.estado === "analizada" ? (
-                  <Button size="sm" variant="secondary" onClick={handleAnalizar} disabled={loading}>
-                    {loading ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Bot className="w-4 h-4 mr-2" />
-                    )}
-                    {loading ? "Analizando..." : "Re-analizar"}
-                  </Button>
-                ) : (
-                  <Button size="sm" onClick={handleAnalizar} disabled={loading}>
-                    {loading ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Bot className="w-4 h-4 mr-2" />
-                    )}
-                    {loading ? "Analizando..." : "Analizar descripción"}
-                  </Button>
-                )}
+              <EvaluarActividad
+                open={evalOpen}
+                onOpenChange={setEvalOpen}
+                actividadId={actividad!.id}
+                cursoId={actividad!.cursoId}
+                alumnos={alumnosStore.porCurso[actividad!.cursoId] ?? []}
+              />
 
-                {actividad && (actividad as any).estado === "pendiente_evaluar" && (
-                  <Button onClick={() => setEvalOpen(true)}>Evaluar</Button>
-                )}
+              <Button onClick={handleProgramar}>Programar actividad</Button>
+            </div>
+          </div>
 
-                <EvaluarActividad
-                  open={evalOpen}
-                  onOpenChange={setEvalOpen}
-                  actividadId={actividad!.id}
-                  cursoId={actividad!.cursoId}
-                  alumnos={alumnosStore.porCurso[actividad!.cursoId] ?? []}
-                />
-
-                <Button onClick={handleProgramar}>Programar actividad</Button>
+          {/* OVERLAY */}
+          {loading && (
+            <div className="pointer-events-none absolute inset-0 z-[1000] grid place-items-center bg-background/60 backdrop-blur-sm">
+              <div className="pointer-events-auto flex flex-col items-center gap-2">
+                <Loader2 className="w-8 h-8 animate-spin" />
+                <p className="text-xs text-muted-foreground">
+                  Analizando descripción…
+                </p>
               </div>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    )}
 
-            {/* OVERLAY */}
-            {loading && (
-              <div className="pointer-events-none absolute inset-0 z-[1000] grid place-items-center bg-background/60 backdrop-blur-sm">
-                <div className="pointer-events-auto flex flex-col items-center gap-2">
-                  <svg
-                    width={56}
-                    height={56}
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="xMidYMid"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="text-foreground/85"
-                  >
-                    <title>Loading…</title>
-                    <path
-                      d="M24.3 30C11.4 30 5 43.3 5 50s6.4 20 19.3 20c19.3 0 32.1-40 51.4-40C88.6 30 95 43.3 95 50s-6.4 20-19.3 20C56.4 70 43.6 30 24.3 30z"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="10"
-                      strokeLinecap="round"
-                      strokeDasharray="205.27 51.31"
-                      style={{ transform: "scale(0.8)", transformOrigin: "50px 50px" }}
-                    >
-                      <animate
-                        attributeName="stroke-dashoffset"
-                        dur="2s"
-                        keyTimes="0;1"
-                        values="0;256.59"
-                        repeatCount="indefinite"
-                      />
-                    </path>
-                  </svg>
-                  <p className="text-xs text-muted-foreground">
-                    Analizando descripción…
-                  </p>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
+    {/* Confirmación de cierre con cambios sin guardar */}
+    <AlertDialog open={showUnsaved} onOpenChange={setShowUnsaved}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cambios sin guardar</AlertDialogTitle>
+          <AlertDialogDescription>
+            Has re-analizado la actividad y hay cambios sin guardar. ¿Quieres
+            guardarlos antes de cerrar?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={closeWithoutSave}>
+            Descartar
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={saveAndClose}>
+            Guardar y cerrar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
-      {/* Confirmación de cierre con cambios sin guardar */}
-      <AlertDialog open={showUnsaved} onOpenChange={setShowUnsaved}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cambios sin guardar</AlertDialogTitle>
-            <AlertDialogDescription>
-              Has re-analizado la actividad y hay cambios sin guardar. ¿Quieres
-              guardarlos antes de cerrar?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={closeWithoutSave}>
-              Descartar
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={saveAndClose}>
-              Guardar y cerrar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Portal del Defensor de Horarios */}
-      {defensorDialog}
-    </>
-  );
-}
+    {/* Portal del Defensor de Horarios */}
+    {defensorDialog}
+  </>
+);
+          }
