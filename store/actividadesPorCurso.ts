@@ -29,6 +29,7 @@ export type Actividad = {
   cursoId: string;
   asignaturaId: string;
   descripcion?: string;
+  notaMedia?: number | null; // ✅
 
   estado?: EstadoDB;              // valor real de DB
   analisisFecha?: string | null;  // mapeo de analisis_fecha
@@ -58,6 +59,7 @@ type ActividadesPorCurso = Record<string, Actividad[]>;
 export const actividadesPorCurso = proxy<ActividadesPorCurso>({});
 
 /* ===== Helpers ===== */
+
 
 // Mapa estado DB → estado UI
 const MAPA_DB_A_UI: Record<string, EstadoUI> = {
@@ -121,6 +123,7 @@ function normalizaFila(raw: any): Actividad {
   const programadaFin  = raw.programadaFin  ?? raw.programada_fin  ?? null;
   const analisisFecha  = raw.analisisFecha  ?? raw.analisis_fecha  ?? null; // ✅
   const evaluadaFecha  = raw.evaluadaFecha  ?? raw.evaluada_fecha  ?? null; // ✅
+  const notaMedia = raw.notaMedia ?? raw.nota_media ?? null;
 
   const act: Actividad = {
     ...raw,
@@ -128,6 +131,7 @@ function normalizaFila(raw: any): Actividad {
     programadaFin,
     analisisFecha,
     evaluadaFecha,
+    notaMedia,
   };
 
   return {

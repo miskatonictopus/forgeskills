@@ -204,4 +204,7 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
 
     guardarImagen: (data: Uint8Array, filename: string) =>
     ipcRenderer.invoke("fs.guardar-imagen", { data, filename }),
+
+    leerActividadesPorCurso: (cursoId: string) =>
+    ipcRenderer.invoke("actividades.leer-por-curso", { cursoId }),
 });

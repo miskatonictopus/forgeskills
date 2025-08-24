@@ -644,6 +644,7 @@ ipcMain.handle("asociar-asignaturas-curso", (_event, cursoId: string, asignatura
 
 /* ---------------- IPC: ACTIVIDADES POR ASIGNATURA / CURSO ---------------- */
 
+// main.ts
 ipcMain.handle("actividades-de-curso", (_event, cursoId: string) => {
   const stmt = db.prepare(`
     WITH ult AS (
@@ -655,6 +656,11 @@ ipcMain.handle("actividades-de-curso", (_event, cursoId: string) => {
       SELECT h.actividad_id, lower(h.estado) AS estado
       FROM actividad_estado_historial h
       JOIN ult u ON u.actividad_id = h.actividad_id AND u.max_rowid = h.rowid
+    ),
+    media_final AS (
+      SELECT actividad_id, AVG(nota) AS media
+      FROM actividad_nota
+      GROUP BY actividad_id
     )
     SELECT 
       a.id,
@@ -667,28 +673,23 @@ ipcMain.handle("actividades-de-curso", (_event, cursoId: string) => {
       a.analisis_fecha,
       a.programada_para,
       a.programada_fin,
-      COALESCE(a.estado, e.estado) AS estado_derivado  -- 👈 preferimos la columna real
+      a.evaluada_fecha,                      -- 👈 AÑADIDO
+      COALESCE(a.estado, e.estado) AS estado_derivado,
+      CASE
+        WHEN lower(COALESCE(a.estado, e.estado)) = 'evaluada'
+        THEN ROUND(mf.media, 1)
+        ELSE NULL
+      END AS nota_media
     FROM actividades a
-    LEFT JOIN estados e ON e.actividad_id = a.id
+    LEFT JOIN estados     e  ON e.actividad_id   = a.id
+    LEFT JOIN media_final mf ON mf.actividad_id  = a.id
     WHERE a.curso_id = ?
     ORDER BY date(a.fecha) ASC, a.nombre ASC
   `);
 
-  const actividades = stmt.all(cursoId) as Array<{
-    id: string;
-    nombre: string;
-    fecha: string | null;
-    curso_id: string;
-    asignatura_id: string;
-    descripcion?: string | null;
-    umbral_aplicado?: number | null;
-    analisis_fecha?: string | null;
-    programada_para?: string | null;
-    programada_fin?: string | null;
-    estado_derivado?: string | null;
-  }>;
+  const rows = stmt.all(cursoId) as any[];
 
-  return actividades.map((a) => ({
+  return rows.map((a) => ({
     id: a.id,
     nombre: a.nombre,
     fecha: a.fecha ?? "",
@@ -698,11 +699,16 @@ ipcMain.handle("actividades-de-curso", (_event, cursoId: string) => {
     estado: a.estado_derivado ?? "borrador",
     analisisFecha: a.analisis_fecha ?? null,
     umbralAplicado: a.umbral_aplicado ?? null,
-    // 👇 mantenemos snake_case para que el front las reciba igual
     programada_para: a.programada_para ?? null,
     programada_fin:  a.programada_fin  ?? null,
+    evaluada_fecha:  a.evaluada_fecha  ?? null,   // 👈 AÑADIDO
+    nota_media: a.nota_media ?? null,
+    notaMedia: a.nota_media ?? null,
   }));
 });
+
+
+
 
 
 
@@ -2026,5 +2032,42 @@ ipcMain.handle("pdf:actividad.render", async (_e, payload: {
   } finally {
     bw.destroy();
   }
+});
+
+ipcMain.handle("actividades.leer-por-curso", (_e, { cursoId }) => {
+  const stmt = db.prepare(`
+    WITH media_final AS (
+      SELECT actividad_id, AVG(nota) AS media
+      FROM actividad_nota
+      GROUP BY actividad_id
+    ),
+    media_ce AS (
+      -- media por alumno (de sus CE en la actividad) y luego media entre alumnos
+      SELECT actividad_id, AVG(nota_promedio_alumno) AS media
+      FROM (
+        SELECT actividad_id, alumno_id, AVG(nota) AS nota_promedio_alumno
+        FROM nota_ce
+        GROUP BY actividad_id, alumno_id
+      ) t
+      GROUP BY actividad_id
+    )
+    SELECT
+      a.id,
+      a.nombre,
+      a.fecha,
+      a.curso_id        AS cursoId,
+      a.asignatura_id   AS asignaturaId,
+      a.descripcion,
+      a.estado,
+      a.analisis_fecha  AS analisisFecha,
+      a.programada_para AS programadaPara,
+      ROUND(COALESCE(mf.media, mc.media), 1) AS notaMedia
+    FROM actividades a
+    LEFT JOIN media_final mf ON mf.actividad_id = a.id
+    LEFT JOIN media_ce    mc ON mc.actividad_id = a.id
+    WHERE a.curso_id = ?
+    ORDER BY a.fecha DESC
+  `);
+  return stmt.all(cursoId);
 });
 
