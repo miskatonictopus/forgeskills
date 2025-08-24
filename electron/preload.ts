@@ -201,4 +201,7 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
 
     renderActividadPDF: (args: RenderArgs): Promise<RenderResult> =>
     ipcRenderer.invoke("pdf:actividad.render", args),
+
+    guardarImagen: (data: Uint8Array, filename: string) =>
+    ipcRenderer.invoke("fs.guardar-imagen", { data, filename }),
 });

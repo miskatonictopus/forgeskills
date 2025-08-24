@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import dynamic from "next/dynamic";
-const TiptapEditor = dynamic(() => import("@/components/TiptapEditor"), { ssr: false });
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
@@ -23,6 +21,10 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
+
+// 👇 TinyMCE
+import TinyEditor from "@/components/TinyEditor";
+import { Badge } from "@/components/ui/badge";
 
 type Props = {
   open: boolean;
@@ -42,6 +44,9 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.5 } },
 };
 
+const CEDetectedListAny =
+  CEDetectedList as unknown as React.ComponentType<{ items: any[]; className?: string }>;
+
 export function DialogCrearActividad({
   open,
   onOpenChange,
@@ -51,12 +56,13 @@ export function DialogCrearActividad({
   asignaturaNombre,
 }: Props) {
   const [nombre, setNombre] = useState("");
-  const [descripcion, setDescripcion] = useState("");
+  const [descripcion, setDescripcion] = useState("");         // HTML para guardar
   const [archivo, setArchivo] = useState<File | null>(null);
   const [cesDetectados, setCesDetectados] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [descripcionHtml, setDescripcionHtml] = useState<string>("");
   const [descripcionPlain, setDescripcionPlain] = useState<string>("");
+  const [dirty, setDirty] = useState(false); // 👈 indicador de cambios sin guardar
 
   const [cursoIdLocal, setCursoIdLocal] = useState<string | undefined>(cursoId);
   const [asignaturaIdLocal, setAsignaturaIdLocal] = useState<string | undefined>(asignaturaIdProp);
@@ -114,10 +120,10 @@ export function DialogCrearActividad({
     const nuevaActividad = {
       id: uuidv4(),
       nombre,
-      fecha: new Date().toISOString().slice(0, 10), // 👈 fecha automática de creación
+      fecha: new Date().toISOString().slice(0, 10), // fecha de creación
       cursoId: cursoIdEf,
       asignaturaId: asignaturaIdEf,
-      descripcion,
+      descripcion: descripcionHtml || descripcion, // prioridad al último HTML
       estado: "borrador",
     };
 
@@ -133,11 +139,14 @@ export function DialogCrearActividad({
 
       añadirActividad(cursoIdEf, nuevaActividad as any);
       toast.success("Actividad guardada correctamente.");
+      setDirty(false);
 
       // reset
       onOpenChange(false);
       setNombre("");
       setDescripcion("");
+      setDescripcionHtml("");
+      setDescripcionPlain("");
       setArchivo(null);
       setCesDetectados([]);
       setRefreshKey?.((k) => k + 1);
@@ -163,14 +172,13 @@ export function DialogCrearActividad({
     const html = `<p>${texto
       .replace(/\r\n/g, "\n")
       .split(/\n{2,}/)
-      .map((p) =>
-        p.trim().length ? p.trim().replace(/\n/g, "<br/>") : "<br/>"
-      )
+      .map((p) => (p.trim().length ? p.trim().replace(/\n/g, "<br/>") : "<br/>"))
       .join("</p><p>")}</p>`;
 
     setDescripcionHtml(html);
     setDescripcion(html);
     setDescripcionPlain(texto);
+    setDirty(true);
 
     const ceDetectados = await window.electronAPI.analizarDescripcionDesdeTexto(
       texto,
@@ -186,161 +194,184 @@ export function DialogCrearActividad({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(95vw,1000px)] sm:max-w-[1000px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="font-bold">
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="show"
-              className="space-y-1"
-            >
-              <div className="flex items-baseline gap-2">
-  <motion.p variants={itemVariants}>Creando Actividad para</motion.p>
-  {asignaturaNombreEf && (
-    <motion.p variants={itemVariants} className="font-bold">
-      {asignaturaNombreEf}
-    </motion.p>
-  )}
-</div>
-            </motion.div>
-          </DialogTitle>
-        </DialogHeader>
-
-        <Separator className="my-3" />
-
-        <div className="space-y-4">
-          {/* Curso + Asignatura en la misma fila */}
-          {(!cursoId || !asignaturaIdProp) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {!cursoId && (
-                <div>
-                  <Label className="mb-2">Curso</Label>
-                  <Select
-                    value={cursoIdLocal}
-                    onValueChange={(v) => {
-                      setCursoIdLocal(v);
-                      setAsignaturaIdLocal(undefined);
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecciona curso" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cursos.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.id} - {c.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {!asignaturaIdProp && (
-                <div>
-                  <Label className="mb-2">Asignatura</Label>
-                  <Select
-                    disabled={!cursoIdEf}
-                    value={asignaturaIdLocal}
-                    onValueChange={setAsignaturaIdLocal}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue
-                        placeholder={
-                          cursoIdEf ? "Selecciona asignatura" : "Elige antes un curso"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {asigsDeCurso.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.id} - {a.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
+      <DialogContent
+  className="w-[min(95vw,1000px)] sm:max-w-[1000px] max-h-[90vh] overflow-y-auto"
+  onInteractOutside={(e) => {
+    const el = e.target as HTMLElement;
+    // si el click ocurre en menús/popovers del editor, bloqueamos el cierre
+    if (el.closest(".tox, .tox-tinymce-aux, .tox-dialog, .tox-menu")) {
+      e.preventDefault();
+    }
+  }}
+  onEscapeKeyDown={(e) => e.preventDefault()} // opcional: evita que ESC cierre
+>
+  <DialogHeader>
+    <DialogTitle className="font-bold">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="space-y-1"
+      >
+        <div className="flex items-baseline gap-2">
+          <motion.p variants={itemVariants}>Creando Actividad para</motion.p>
+          {asignaturaNombreEf && (
+            <motion.p variants={itemVariants} className="font-bold">
+              {asignaturaNombreEf}
+            </motion.p>
           )}
+        </div>
+      </motion.div>
+    </DialogTitle>
+  </DialogHeader>
 
-          {/* Nombre */}
-          <div>
-            <Label className="mb-2">Nombre de la actividad</Label>
-            <Input
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej: Práctica 1"
-            />
-          </div>
+  <Separator className="my-3" />
 
-          {/* Descripción */}
+  <div className="space-y-4">
+    {/* Curso + Asignatura */}
+    {(!cursoId || !asignaturaIdProp) && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {!cursoId && (
           <div>
-            <Label className="mb-2">Descripción de la actividad</Label>
-            <TiptapEditor
-              valueHtml={descripcionHtml}
-              onChange={(html, plain) => {
-                setDescripcionHtml(html);
-                setDescripcionPlain(plain);
-                setDescripcion(html);
+            <Label className="mb-2">Curso</Label>
+            <Select
+              value={cursoIdLocal}
+              onValueChange={(v) => {
+                setCursoIdLocal(v);
+                setAsignaturaIdLocal(undefined);
               }}
-              className="w-full tiptap ProseMirror border border-zinc-700 rounded-md p-4 min-h-[200px] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400"
-            />
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecciona curso" />
+              </SelectTrigger>
+              <SelectContent>
+                {cursos.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.id} - {c.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+        )}
 
-          {/* Archivo */}
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-  {/* Izquierda: subir archivo + tipos permitidos */}
-  <div className="flex items-center gap-3 min-w-0">
-    <input
-      id="archivo"
-      type="file"
-      accept=".pdf,.doc,.docx,.pages,.txt"
-      className="hidden"
-      onChange={async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const arrayBuffer = await file.arrayBuffer();
-        const ruta = await window.electronAPI.guardarPDF(arrayBuffer, file.name);
-        if (!ruta) {
-          toast.error("No se pudo guardar el archivo.");
-          return;
-        }
-        setArchivo(file);
-        handleExtraerTexto(ruta);
-      }}
-      disabled={loading}
-    />
-
-    {/* Botón subir archivo */}
-    <Button asChild variant="secondary" className="gap-2">
-      <label htmlFor="archivo">
-        <FileUp className="w-4 h-4" />
-        Subir archivo
-      </label>
-    </Button>
-
-    {/* Texto de archivos permitidos */}
-    <span className="text-xs text-muted-foreground whitespace-nowrap">
-      archivos permitidos: PDF / Pages / Word / txt
-    </span>
-
-    {archivo && (
-      <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-        {archivo.name}
-      </span>
+        {!asignaturaIdProp && (
+          <div>
+            <Label className="mb-2">Asignatura</Label>
+            <Select
+              disabled={!cursoIdEf}
+              value={asignaturaIdLocal}
+              onValueChange={setAsignaturaIdLocal}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue
+                  placeholder={cursoIdEf ? "Selecciona asignatura" : "Elige antes un curso"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {asigsDeCurso.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.id} - {a.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
     )}
-  </div>
 
-  {/* Derecha: guardar */}
-  <Button onClick={handleGuardar} disabled={loading} className="px-6">
-    <Bot className="w-4 h-4 mr-2" />
-    {loading ? "Guardando..." : "Guardar actividad"}
-  </Button>
-</div>
-</div>
-      </DialogContent>
+    {/* Nombre */}
+    <div>
+      <Label className="mb-2">Nombre de la actividad</Label>
+      <Input
+        value={nombre}
+        onChange={(e) => setNombre(e.target.value)}
+        placeholder="Ej: Práctica 1"
+      />
+    </div>
+
+    {/* Descripción (TinyMCE) */}
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="mb-2">Descripción de la actividad</Label>
+        {dirty && <Badge variant="destructive">● Cambios sin guardar</Badge>}
+      </div>
+
+      <div className="rounded-md border bg-white">
+        <TinyEditor
+          value={descripcionHtml}
+          onChange={(html, plain) => {
+            setDescripcionHtml(html);
+            setDescripcion(html);
+            setDescripcionPlain(plain ?? "");
+          }}
+          onDirtyChange={setDirty}
+          placeholder="Describe la actividad con todo detalle…"
+          autoresize
+          forceLight
+        />
+      </div>
+
+      {/* Lista de CE detectados (si ya hay) */}
+      {Array.isArray(cesDetectados) && cesDetectados.length > 0 && (
+        <CEDetectedListAny items={cesDetectados} className="mt-2" />
+      )}
+    </div>
+
+    {/* Archivo */}
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      {/* Izquierda: subir archivo + tipos permitidos */}
+      <div className="flex items-center gap-3 min-w-0">
+        <input
+          id="archivo"
+          type="file"
+          accept=".pdf,.doc,.docx,.pages,.txt"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const arrayBuffer = await file.arrayBuffer();
+            const ruta = await window.electronAPI.guardarPDF(arrayBuffer, file.name);
+            if (!ruta) {
+              toast.error("No se pudo guardar el archivo.");
+              return;
+            }
+            setArchivo(file);
+            handleExtraerTexto(ruta);
+          }}
+          disabled={loading}
+        />
+
+        {/* Botón subir archivo */}
+        <Button asChild variant="secondary" className="gap-2">
+          <label htmlFor="archivo">
+            <FileUp className="w-4 h-4" />
+            Subir archivo
+          </label>
+        </Button>
+
+        {/* Texto de archivos permitidos */}
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          archivos permitidos: PDF / Pages / Word / txt
+        </span>
+
+        {archivo && (
+          <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+            {archivo.name}
+          </span>
+        )}
+      </div>
+
+      {/* Derecha: guardar */}
+      <Button onClick={handleGuardar} disabled={loading} className="px-6">
+        <Bot className="w-4 h-4 mr-2" />
+        {loading ? "Guardando..." : "Guardar actividad"}
+      </Button>
+    </div>
+  </div>
+</DialogContent>
+
     </Dialog>
   );
 }
