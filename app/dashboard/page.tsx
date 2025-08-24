@@ -15,6 +15,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { GraduationCap, BookA, User, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 import { cursoStore } from "@/store/cursoStore";
 import { CursoCard } from "@/components/CursoCard";
@@ -194,7 +195,8 @@ export default function Page() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <span className="text-sm text-muted-foreground font-mono tabular-nums">{fechaActual}</span>
+            <span className="text-xl text-white font-bold tabular-nums">{fechaActual}</span>
+            <ThemeToggle />
           </div>
         </header>
 

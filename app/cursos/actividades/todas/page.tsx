@@ -162,8 +162,8 @@ export default function ActividadesTodosLosCursosPage() {
         <div className="flex items-center justify-between px-4 py-4">
   <div>
     {/* ... breadcrumb + título como ya tienes ... */}
-    <p className="text-sm text-muted-foreground mt-1">
-      Vista global de actividades. Usa el botón de cada curso para crear una nueva.
+    <p className="text-2xl text-white mt-1 font-bold">
+      Vista global de actividades
     </p>
   </div>
 
