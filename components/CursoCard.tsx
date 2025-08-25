@@ -283,7 +283,7 @@ export function CursoCard({ curso }: Props) {
                           <span className="text-white">{a.nombre}</span>
                         </div>
 
-                        <Button
+                        {/* <Button
                           variant="ghost"
                           size="sm"
                           aria-label={`Crear actividad para ${a.nombre}`}
@@ -292,14 +292,14 @@ export function CursoCard({ curso }: Props) {
                         >
                           <PlusCircle className="w-4 h-4" />
                           Crear actividad
-                        </Button>
+                        </Button> */}
                       </div>
                     </li>
                   );
                 })}
               </ul>
 
-              <Button
+              {/* <Button
                 size="sm"
                 aria-label="Modificar asignaturas"
                 className="mt-2 inline-flex items-center gap-2 bg-white text-black hover:bg-gray-100 px-3 py-2 text-xs rounded-md shadow-sm"
@@ -307,14 +307,14 @@ export function CursoCard({ curso }: Props) {
               >
                 <SquarePen className="w-4 h-4" />
                 Modificar asignaturas
-              </Button>
+              </Button> */}
             </div>
           )}
 
           <Separator className="my-4" />
         </CardContent>
 
-        <div className="p-3 pt-0">
+        {/* <div className="p-3 pt-0">
           <Button
             variant="ghost"
             size="sm"
@@ -325,7 +325,7 @@ export function CursoCard({ curso }: Props) {
             Ver actividades
             <span className="text-xs text-zinc-400 ml-1">(0)</span>
           </Button>
-        </div>
+        </div> */}
       </Card>
 
       <DialogAsignaturas cursoId={curso.id} open={openAdd} onOpenChange={setOpenAdd} mode="add" />
