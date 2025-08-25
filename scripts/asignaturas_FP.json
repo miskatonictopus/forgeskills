@@ -1,0 +1,1319 @@
+[
+  {
+    "id": "0612",
+    "nombre": "Desarrollo web en entorno cliente",
+    "creditos": "10",
+    "descripcion": {
+      "duracion": "165h",
+      "centro": "99h",
+      "empresa": "66h"
+    },
+    "CE": [],
+    "RA": [
+      {
+        "codigo": "RA1",
+        "descripcion": "Selecciona las arquitecturas y tecnologías de programación sobre clientes web, identificando y analizando las capacidades y características de cada una.",
+        "CE": [
+          {
+            "codigo": "CE1.1",
+            "descripcion": "Caracteriza y diferencia los modelos de ejecución de código en el servidor y en el cliente web."
+          },
+          {
+            "codigo": "CE1.2",
+            "descripcion": "Identifica las capacidades y los mecanismos de ejecución de código de los navegadores web."
+          },
+          {
+            "codigo": "CE1.3",
+            "descripcion": "Identifica y caracteriza los principales lenguajes relacionados con la programación de clientes web."
+          },
+          {
+            "codigo": "CE1.4",
+            "descripcion": "Reconoce las particularidades de la programación de scripts y sus ventajas y desventajas frente a la programación tradicional."
+          },
+          {
+            "codigo": "CE1.5",
+            "descripcion": "Verifica los mecanismos de integración de los lenguajes de marcas con los de programación de clientes web."
+          },
+          {
+            "codigo": "CE1.6",
+            "descripcion": "Reconoce y evalúa herramientas de programación y prueba para clientes web."
+          },
+          {
+            "codigo": "CE1.7",
+            "descripcion": "Escribe sentencias simples, aplicando la sintaxis del lenguaje y verificando su ejecución en navegadores web."
+          }
+        ]
+      },
+      {
+        "codigo": "RA2",
+        "descripcion": "Selecciona un lenguaje de programación de cliente web en función de sus posibilidades.",
+        "CE": [
+          {
+            "codigo": "CE2.1",
+            "descripcion": "Utiliza distintos tipos de variables y operadores del lenguaje."
+          },
+          {
+            "codigo": "CE2.2",
+            "descripcion": "Identifica los ámbitos de uso de las variables."
+          },
+          {
+            "codigo": "CE2.3",
+            "descripcion": "Reconoce y comprueba peculiaridades del lenguaje respecto a conversiones entre distintos tipos de datos."
+          },
+          {
+            "codigo": "CE2.4",
+            "descripcion": "Utiliza estructuras de decisión para crear bloques de sentencias."
+          },
+          {
+            "codigo": "CE2.5",
+            "descripcion": "Utiliza bucles y verifica su funcionamiento."
+          },
+          {
+            "codigo": "CE2.6",
+            "descripcion": "Añade comentarios al código."
+          },
+          {
+            "codigo": "CE2.7",
+            "descripcion": "Usa herramientas y entornos para facilitar la programación, prueba y documentación del código."
+          },
+          {
+            "codigo": "CE2.8",
+            "descripcion": "Escribe código aplicando funcionalidades de objetos predefinidos del lenguaje."
+          }
+        ]
+      },
+      {
+        "codigo": "RA3",
+        "descripcion": "Programa con objetos predefinidos del lenguaje.",
+        "CE": [
+          {
+            "codigo": "CE3.1",
+            "descripcion": "Identifica los objetos predefinidos del lenguaje."
+          },
+          {
+            "codigo": "CE3.2",
+            "descripcion": "Analiza los objetos relacionados con las ventanas del navegador y los documentos que contienen."
+          },
+          {
+            "codigo": "CE3.3",
+            "descripcion": "Escribe sentencias para cambiar la apariencia del navegador y el documento usando objetos predefinidos."
+          },
+          {
+            "codigo": "CE3.4",
+            "descripcion": "Genera texto y etiquetas como resultado de ejecución de código en el navegador."
+          },
+          {
+            "codigo": "CE3.5",
+            "descripcion": "Escribe sentencias que interactúan con el usuario."
+          },
+          {
+            "codigo": "CE3.6",
+            "descripcion": "Usa características del lenguaje en documentos con varias ventanas."
+          },
+          {
+            "codigo": "CE3.7",
+            "descripcion": "Usa mecanismos del navegador para almacenar y recuperar información."
+          },
+          {
+            "codigo": "CE3.8",
+            "descripcion": "Depura y documenta el código."
+          }
+        ]
+      },
+      {
+        "codigo": "RA4",
+        "descripcion": "Programa código para clientes web analizando y utilizando estructuras definidas por el usuario.",
+        "CE": [
+          {
+            "codigo": "CE4.1",
+            "descripcion": "Clasifica y utiliza funciones predefinidas del lenguaje."
+          },
+          {
+            "codigo": "CE4.2",
+            "descripcion": "Crea y usa funciones definidas por el usuario."
+          },
+          {
+            "codigo": "CE4.3",
+            "descripcion": "Reconoce características del lenguaje relacionadas con arrays."
+          },
+          {
+            "codigo": "CE4.4",
+            "descripcion": "Crea y usa arrays."
+          },
+          {
+            "codigo": "CE4.5",
+            "descripcion": "Usa operaciones agregadas para manipular datos en colecciones."
+          },
+          {
+            "codigo": "CE4.6",
+            "descripcion": "Reconoce características de orientación a objetos del lenguaje."
+          },
+          {
+            "codigo": "CE4.7",
+            "descripcion": "Crea estructuras de objetos, métodos y propiedades."
+          },
+          {
+            "codigo": "CE4.8",
+            "descripcion": "Usa objetos definidos por el usuario."
+          },
+          {
+            "codigo": "CE4.9",
+            "descripcion": "Aplica patrones de diseño."
+          },
+          {
+            "codigo": "CE4.10",
+            "descripcion": "Depura y documenta el código."
+          }
+        ]
+      },
+      {
+        "codigo": "RA5",
+        "descripcion": "Desarrolla aplicaciones web interactivas integrando gestión de eventos.",
+        "CE": [
+          {
+            "codigo": "CE5.1",
+            "descripcion": "Reconoce las capacidades del lenguaje de marcas para capturar eventos."
+          },
+          {
+            "codigo": "CE5.2",
+            "descripcion": "Identifica características del lenguaje de programación para la gestión de eventos."
+          },
+          {
+            "codigo": "CE5.3",
+            "descripcion": "Diferencia tipos de eventos gestionables."
+          },
+          {
+            "codigo": "CE5.4",
+            "descripcion": "Crea código que captura y utiliza eventos."
+          },
+          {
+            "codigo": "CE5.5",
+            "descripcion": "Reconoce capacidades para gestión de formularios."
+          },
+          {
+            "codigo": "CE5.6",
+            "descripcion": "Valida formularios usando eventos."
+          },
+          {
+            "codigo": "CE5.7",
+            "descripcion": "Usa expresiones regulares para validar."
+          },
+          {
+            "codigo": "CE5.8",
+            "descripcion": "Prueba y documenta el código."
+          }
+        ]
+      },
+      {
+        "codigo": "RA6",
+        "descripcion": "Desarrolla aplicaciones web analizando y aplicando el modelo de objetos del documento (DOM).",
+        "CE": [
+          {
+            "codigo": "CE6.1",
+            "descripcion": "Reconoce el modelo de objetos del documento (DOM) de una página web."
+          },
+          {
+            "codigo": "CE6.2",
+            "descripcion": "Identifica objetos, propiedades y métodos."
+          },
+          {
+            "codigo": "CE6.3",
+            "descripcion": "Crea código que accede a la estructura del documento."
+          },
+          {
+            "codigo": "CE6.4",
+            "descripcion": "Crea o modifica elementos de la estructura."
+          },
+          {
+            "codigo": "CE6.5",
+            "descripcion": "Asocia acciones a eventos del modelo."
+          },
+          {
+            "codigo": "CE6.6",
+            "descripcion": "Identifica diferencias del modelo entre navegadores."
+          },
+          {
+            "codigo": "CE6.7",
+            "descripcion": "Programa para navegadores con distintas implementaciones del modelo."
+          },
+          {
+            "codigo": "CE6.8",
+            "descripcion": "Separa contenido, estilo y comportamiento en las aplicaciones web."
+          }
+        ]
+      },
+      {
+        "codigo": "RA7",
+        "descripcion": "Desarrolla aplicaciones web dinámicas, aplicando comunicación asíncrona entre cliente y servidor.",
+        "CE": [
+          {
+            "codigo": "CE7.1",
+            "descripcion": "Evalúa ventajas e inconvenientes de la comunicación asíncrona."
+          },
+          {
+            "codigo": "CE7.2",
+            "descripcion": "Analiza mecanismos disponibles para establecer comunicación asíncrona."
+          },
+          {
+            "codigo": "CE7.3",
+            "descripcion": "Usa los objetos relacionados."
+          },
+          {
+            "codigo": "CE7.4",
+            "descripcion": "Identifica propiedades y métodos."
+          },
+          {
+            "codigo": "CE7.5",
+            "descripcion": "Usa comunicación asíncrona para actualizar dinámicamente el documento."
+          },
+          {
+            "codigo": "CE7.6",
+            "descripcion": "Utiliza distintos formatos de envío/recepción de información."
+          },
+          {
+            "codigo": "CE7.7",
+            "descripcion": "Programa apps web asíncronas compatibles con diferentes navegadores."
+          },
+          {
+            "codigo": "CE7.8",
+            "descripcion": "Clasifica y usa librerías/frameworks de actualización dinámica."
+          },
+          {
+            "codigo": "CE7.9",
+            "descripcion": "Crea, prueba y documenta apps web usando estas herramientas."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "0488",
+    "nombre": "Desarrollo de interfaces",
+    "creditos": "10",
+    "descripcion": {
+      "duracion": "119h",
+      "centro": "66h",
+      "empresa": "53h"
+    },
+    "CE": [],
+    "RA": [
+      {
+        "codigo": "RA1",
+        "descripcion": "Genera interfaces gráficas de usuario mediante editores visuales, utilizando las funcionalidades del editor y adaptando el código generado.",
+        "CE": [
+          {
+            "codigo": "CE1.1",
+            "descripcion": "Analiza las herramientas y bibliotecas disponibles para la generación de interfaces gráficas."
+          },
+          {
+            "codigo": "CE1.2",
+            "descripcion": "Crea una interfaz gráfica utilizando las herramientas de un editor visual."
+          },
+          {
+            "codigo": "CE1.3",
+            "descripcion": "Utiliza las funciones del editor para ubicar los componentes de la interfaz."
+          },
+          {
+            "codigo": "CE1.4",
+            "descripcion": "Modifica las propiedades de los componentes para adecuarlas a las necesidades de la aplicación."
+          },
+          {
+            "codigo": "CE1.5",
+            "descripcion": "Analiza el código generado por el editor visual."
+          },
+          {
+            "codigo": "CE1.6",
+            "descripcion": "Modifica el código generado por el editor visual."
+          },
+          {
+            "codigo": "CE1.7",
+            "descripcion": "Asocia a los eventos las acciones correspondientes."
+          },
+          {
+            "codigo": "CE1.8",
+            "descripcion": "Desarrolla una aplicación que incluya la interfaz gráfica obtenida."
+          }
+        ]
+      },
+      {
+        "codigo": "RA2",
+        "descripcion": "Genera interfaces naturales de usuario utilizando herramientas visuales.",
+        "CE": [
+          {
+            "codigo": "CE2.1",
+            "descripcion": "Identifica las herramientas disponibles de aprendizaje automático relacionadas con las interfaces de usuario."
+          },
+          {
+            "codigo": "CE2.2",
+            "descripcion": "Crea una interfaz de usuario natural utilizando las herramientas disponibles."
+          },
+          {
+            "codigo": "CE2.3",
+            "descripcion": "Utiliza el reconocimiento de voz para implementar acciones en interfaces naturales de usuario."
+          },
+          {
+            "codigo": "CE2.4",
+            "descripcion": "Incorpora la detección del movimiento del cuerpo para implementar acciones en interfaces naturales de usuario."
+          },
+          {
+            "codigo": "CE2.5",
+            "descripcion": "Integra elementos de detección de partes del cuerpo para implementar acciones en interfaces naturales de usuario."
+          },
+          {
+            "codigo": "CE2.6",
+            "descripcion": "Integra la realidad aumentada en las interfaces de usuario."
+          }
+        ]
+      },
+      {
+        "codigo": "RA3",
+        "descripcion": "Crea componentes visuales valorando y empleando herramientas específicas.",
+        "CE": [
+          {
+            "codigo": "CE3.1",
+            "descripcion": "Identifica las herramientas para el diseño y prueba de componentes."
+          },
+          {
+            "codigo": "CE3.2",
+            "descripcion": "Crea componentes visuales."
+          },
+          {
+            "codigo": "CE3.3",
+            "descripcion": "Define sus métodos y propiedades asignando valores por defecto."
+          },
+          {
+            "codigo": "CE3.4",
+            "descripcion": "Determina los eventos a los que debe responder el componente y les asocia las acciones correspondientes."
+          },
+          {
+            "codigo": "CE3.5",
+            "descripcion": "Realiza pruebas unitarias sobre los componentes desarrollados."
+          },
+          {
+            "codigo": "CE3.6",
+            "descripcion": "Documenta los componentes creados."
+          },
+          {
+            "codigo": "CE3.7",
+            "descripcion": "Empaqueta componentes."
+          },
+          {
+            "codigo": "CE3.8",
+            "descripcion": "Programa aplicaciones cuya interfaz gráfica utiliza los componentes creados."
+          }
+        ]
+      },
+      {
+        "codigo": "RA4",
+        "descripcion": "Diseña interfaces gráficas identificando y aplicando criterios de usabilidad y accesibilidad.",
+        "CE": [
+          {
+            "codigo": "CE4.1",
+            "descripcion": "Identifica los principales estándares de usabilidad y accesibilidad."
+          },
+          {
+            "codigo": "CE4.2",
+            "descripcion": "Valora la importancia del uso de estándares para crear interfaces."
+          },
+          {
+            "codigo": "CE4.3",
+            "descripcion": "Crea diferentes tipos de menús cuya estructura y contenido siguen los estándares establecidos."
+          },
+          {
+            "codigo": "CE4.4",
+            "descripcion": "Distribuye las acciones en menús, barras de herramientas, botones de comando, entre otros, siguiendo un criterio coherente."
+          },
+          {
+            "codigo": "CE4.5",
+            "descripcion": "Distribuye adecuadamente los controles en la interfaz de usuario."
+          },
+          {
+            "codigo": "CE4.6",
+            "descripcion": "Utiliza el tipo de control más apropiado en cada caso."
+          },
+          {
+            "codigo": "CE4.7",
+            "descripcion": "Diseña el aspecto de la interfaz de usuario (colores y tipografías, entre otros) teniendo en cuenta su legibilidad."
+          },
+          {
+            "codigo": "CE4.8",
+            "descripcion": "Verifica que los mensajes generados por la aplicación son adecuados en extensión y claridad."
+          },
+          {
+            "codigo": "CE4.9",
+            "descripcion": "Realiza pruebas para evaluar la usabilidad y la accesibilidad de la aplicación."
+          }
+        ]
+      },
+      {
+        "codigo": "RA5",
+        "descripcion": "Crea informes evaluando y utilizando herramientas gráficas.",
+        "CE": [
+          {
+            "codigo": "CE5.1",
+            "descripcion": "Establece la estructura del informe."
+          },
+          {
+            "codigo": "CE5.2",
+            "descripcion": "Genera informes básicos a partir de diferentes fuentes de datos mediante asistentes."
+          },
+          {
+            "codigo": "CE5.3",
+            "descripcion": "Establece filtros sobre los valores que se presentan en los informes."
+          },
+          {
+            "codigo": "CE5.4",
+            "descripcion": "Incluye valores calculados, recuentos y totales."
+          },
+          {
+            "codigo": "CE5.5",
+            "descripcion": "Incluye gráficos generados a partir de los datos."
+          },
+          {
+            "codigo": "CE5.6",
+            "descripcion": "Utiliza herramientas para generar el código correspondiente a los informes de una aplicación."
+          },
+          {
+            "codigo": "CE5.7",
+            "descripcion": "Modifica el código correspondiente a los informes."
+          },
+          {
+            "codigo": "CE5.8",
+            "descripcion": "Desarrolla una aplicación que incluya informes incrustados."
+          }
+        ]
+      },
+      {
+        "codigo": "RA6",
+        "descripcion": "Documenta aplicaciones seleccionando y utilizando herramientas específicas.",
+        "CE": [
+          {
+            "codigo": "CE6.1",
+            "descripcion": "Identifica sistemas de generación de ayudas."
+          },
+          {
+            "codigo": "CE6.2",
+            "descripcion": "Genera ayudas en los formatos habituales."
+          },
+          {
+            "codigo": "CE6.3",
+            "descripcion": "Genera ayudas sensibles al contexto."
+          },
+          {
+            "codigo": "CE6.4",
+            "descripcion": "Documenta la estructura de la información persistente."
+          },
+          {
+            "codigo": "CE6.5",
+            "descripcion": "Crea el manual de usuario y la guía de referencia."
+          },
+          {
+            "codigo": "CE6.6",
+            "descripcion": "Confecciona los manuales de instalación, configuración y administración."
+          },
+          {
+            "codigo": "CE6.7",
+            "descripcion": "Crea tutoriales."
+          }
+        ]
+      },
+      {
+        "codigo": "RA7",
+        "descripcion": "Prepara aplicaciones para la distribución evaluando y utilizando herramientas específicas.",
+        "CE": [
+          {
+            "codigo": "CE7.1",
+            "descripcion": "Empaqueta los componentes que requiere la aplicación."
+          },
+          {
+            "codigo": "CE7.2",
+            "descripcion": "Personaliza el asistente de instalación."
+          },
+          {
+            "codigo": "CE7.3",
+            "descripcion": "Genera paquetes de instalación utilizando el entorno de desarrollo."
+          },
+          {
+            "codigo": "CE7.4",
+            "descripcion": "Genera paquetes de instalación utilizando herramientas externas."
+          },
+          {
+            "codigo": "CE7.5",
+            "descripcion": "Firma digitalmente las aplicaciones para su distribución."
+          },
+          {
+            "codigo": "CE7.6",
+            "descripcion": "Genera paquetes instalables en modo desatendido."
+          },
+          {
+            "codigo": "CE7.7",
+            "descripcion": "Prepara el paquete de instalación para que la aplicación pueda desinstalarse correctamente."
+          },
+          {
+            "codigo": "CE7.8",
+            "descripcion": "Prepara la aplicación para ser distribuida a través de diferentes canales de distribución."
+          }
+        ]
+      },
+      {
+        "codigo": "RA8",
+        "descripcion": "Evalúa el funcionamiento de aplicaciones diseñando y ejecutando pruebas.",
+        "CE": [
+          {
+            "codigo": "CE8.1",
+            "descripcion": "Establece una estrategia de pruebas."
+          },
+          {
+            "codigo": "CE8.2",
+            "descripcion": "Realiza pruebas de integración de los distintos elementos."
+          },
+          {
+            "codigo": "CE8.3",
+            "descripcion": "Realiza pruebas de regresión."
+          },
+          {
+            "codigo": "CE8.4",
+            "descripcion": "Realiza pruebas de volumen y estrés."
+          },
+          {
+            "codigo": "CE8.5",
+            "descripcion": "Realiza pruebas de seguridad."
+          },
+          {
+            "codigo": "CE8.6",
+            "descripcion": "Realiza pruebas de uso de recursos por parte de la aplicación."
+          },
+          {
+            "codigo": "CE8.7",
+            "descripcion": "Documenta la estrategia de pruebas y los resultados obtenidos."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "0615",
+    "nombre": "Diseño de interfaces web",
+    "creditos": "10",
+    "descripcion": {
+      "duracion": "132h",
+      "centro": "66h",
+      "empresa": "66h"
+    },
+    "CE": [],
+    "RA": [
+      {
+        "codigo": "RA1",
+        "descripcion": "Planifica la creación de una interfaz web valorando y aplicando especificaciones de diseño.",
+        "CE": [
+          {
+            "codigo": "CE1.1",
+            "descripcion": "Reconoce la importancia de la comunicación visual y sus principios básicos"
+          },
+          {
+            "codigo": "CE1.2",
+            "descripcion": "Analiza y selecciona colores y tipografías adecuados para su visualización en pantalla"
+          },
+          {
+            "codigo": "CE1.3",
+            "descripcion": "Analiza alternativas para la presentación de información en documentos web"
+          },
+          {
+            "codigo": "CE1.4",
+            "descripcion": "Valora la importancia de definir y aplicar una guía de estilo en el desarrollo de una aplicación web"
+          },
+          {
+            "codigo": "CE1.5",
+            "descripcion": "Utiliza y valora diferentes tecnologías para el diseño de documentos web"
+          },
+          {
+            "codigo": "CE1.6",
+            "descripcion": "Crea y utiliza plantillas de diseño"
+          },
+          {
+            "codigo": "CE1.7",
+            "descripcion": "Crea interfaces web homogéneas definiendo y aplicando estilos"
+          }
+        ]
+      },
+      {
+        "codigo": "RA2",
+        "descripcion": "Crea interfaces web homogéneas definiendo y aplicando estilos.",
+        "CE": [
+          {
+            "codigo": "CE2.1",
+            "descripcion": "Reconoce las posibilidades de modificar etiquetas HTML"
+          },
+          {
+            "codigo": "CE2.2",
+            "descripcion": "Define estilos de forma directa"
+          },
+          {
+            "codigo": "CE2.3",
+            "descripcion": "Define y asocia estilos globales a hojas externas"
+          },
+          {
+            "codigo": "CE2.4",
+            "descripcion": "Define hojas de estilo alternativas"
+          },
+          {
+            "codigo": "CE2.5",
+            "descripcion": "Redefine estilos"
+          },
+          {
+            "codigo": "CE2.6",
+            "descripcion": "Identifica las distintas propiedades de cada elemento"
+          },
+          {
+            "codigo": "CE2.7",
+            "descripcion": "Crea clases de estilos"
+          },
+          {
+            "codigo": "CE2.8",
+            "descripcion": "Utiliza herramientas de validación de hojas de estilo"
+          },
+          {
+            "codigo": "CE2.9",
+            "descripcion": "Analiza y utiliza tecnologías y frameworks para crear interfaces web con diseño responsive"
+          },
+          {
+            "codigo": "CE2.10",
+            "descripcion": "Analiza y utiliza preprocesadores de estilos para traducir estilos comunes a un código estándar reconocido por los navegadores"
+          }
+        ]
+      },
+      {
+        "codigo": "RA3",
+        "descripcion": "Prepara archivos multimedia para la web, analizando sus características y utilizando herramientas específicas.",
+        "CE": [
+          {
+            "codigo": "CE3.1",
+            "descripcion": "Reconoce implicaciones de licencias y derechos de autor en el uso de material multimedia"
+          },
+          {
+            "codigo": "CE3.2",
+            "descripcion": "Identifica los formatos de imagen, audio y vídeo adecuados"
+          },
+          {
+            "codigo": "CE3.3",
+            "descripcion": "Analiza herramientas disponibles para generar contenido multimedia"
+          },
+          {
+            "codigo": "CE3.4",
+            "descripcion": "Emplea herramientas para el tratamiento digital de la imagen"
+          },
+          {
+            "codigo": "CE3.5",
+            "descripcion": "Utiliza herramientas para manipular audio y vídeo"
+          },
+          {
+            "codigo": "CE3.6",
+            "descripcion": "Realiza animaciones a partir de imágenes fijas"
+          },
+          {
+            "codigo": "CE3.7",
+            "descripcion": "Importa y exporta imágenes, audio y vídeo en varios formatos según su finalidad"
+          },
+          {
+            "codigo": "CE3.8",
+            "descripcion": "Aplica la guía de estilo"
+          }
+        ]
+      },
+      {
+        "codigo": "RA4",
+        "descripcion": "Integra contenido multimedia en documentos web valorando su aportación y seleccionando adecuadamente los elementos interactivos.",
+        "CE": [
+          {
+            "codigo": "CE4.1",
+            "descripcion": "Reconoce y analiza tecnologías relacionadas con la inclusión de contenido multimedia e interactivo"
+          },
+          {
+            "codigo": "CE4.2",
+            "descripcion": "Identifica configuraciones específicas necesarias en los navegadores para soportar contenido multimedia e interactivo"
+          },
+          {
+            "codigo": "CE4.3",
+            "descripcion": "Utiliza herramientas gráficas para el desarrollo de contenido multimedia interactivo"
+          },
+          {
+            "codigo": "CE4.4",
+            "descripcion": "Analiza el código generado por las herramientas de contenido interactivo"
+          },
+          {
+            "codigo": "CE4.5",
+            "descripcion": "Añade elementos multimedia a documentos web"
+          },
+          {
+            "codigo": "CE4.6",
+            "descripcion": "Añade interactividad a elementos de un documento web"
+          },
+          {
+            "codigo": "CE4.7",
+            "descripcion": "Verifica el funcionamiento de elementos multimedia e interactivos en diferentes navegadores y dispositivos"
+          }
+        ]
+      },
+      {
+        "codigo": "RA5",
+        "descripcion": "Desarrolla interfaces web accesibles analizando las pautas establecidas y aplicando técnicas de verificación.",
+        "CE": [
+          {
+            "codigo": "CE5.1",
+            "descripcion": "Reconoce la necesidad de diseñar webs accesibles"
+          },
+          {
+            "codigo": "CE5.2",
+            "descripcion": "Analiza la accesibilidad de distintos documentos web"
+          },
+          {
+            "codigo": "CE5.3",
+            "descripcion": "Analiza los principios y pautas de accesibilidad al contenido y sus niveles de conformidad"
+          },
+          {
+            "codigo": "CE5.4",
+            "descripcion": "Analiza posibles errores según los puntos de verificación de prioridad"
+          },
+          {
+            "codigo": "CE5.5",
+            "descripcion": "Alcanza el nivel de conformidad deseado"
+          },
+          {
+            "codigo": "CE5.6",
+            "descripcion": "Verifica niveles alcanzados mediante tests externos"
+          },
+          {
+            "codigo": "CE5.7",
+            "descripcion": "Verifica la visualización de la interfaz en distintos navegadores y tecnologías"
+          },
+          {
+            "codigo": "CE5.8",
+            "descripcion": "Analiza y utiliza herramientas y estrategias que mejoran la visibilidad y accesibilidad de sitios y páginas web en los resultados de buscadores"
+          }
+        ]
+      },
+      {
+        "codigo": "RA6",
+        "descripcion": "Desarrolla interfaces web amigables analizando y aplicando pautas de usabilidad establecidas.",
+        "CE": [
+          {
+            "codigo": "CE6.1",
+            "descripcion": "Analiza la usabilidad de diferentes documentos web"
+          },
+          {
+            "codigo": "CE6.2",
+            "descripcion": "Valora la importancia del uso de estándares en la creación de documentos web"
+          },
+          {
+            "codigo": "CE6.3",
+            "descripcion": "Modifica la interfaz web para adaptarla a sus objetivos y a su público"
+          },
+          {
+            "codigo": "CE6.4",
+            "descripcion": "Verifica la facilidad de navegación de un documento web mediante distintos periféricos"
+          },
+          {
+            "codigo": "CE6.5",
+            "descripcion": "Analiza técnicas para verificar la usabilidad de un documento web"
+          },
+          {
+            "codigo": "CE6.6",
+            "descripcion": "Verifica la usabilidad de la interfaz web creada en distintos navegadores y tecnologías"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "0616",
+    "nombre": "Proyecto intermodular de desarrollo de aplicaciones web",
+    "creditos": "5",
+    "descripcion": {
+      "duracion": "198h",
+      "centro": "198h",
+      "empresa": "0h"
+    },
+    "CE": [],
+    "RA": [
+      {
+        "codigo": "RA1",
+        "descripcion": "Identifica necesidades del sector productivo, relacionándolas con proyectos tipo que las puedan satisfacer.",
+        "CE": [
+          { "codigo": "CE1.1", "descripcion": "Clasifica las empresas del sector por características organizativas y por el tipo de producto o servicio que ofrecen." },
+          { "codigo": "CE1.2", "descripcion": "Caracteriza las empresas tipo indicando la estructura organizativa y las funciones de cada departamento." },
+          { "codigo": "CE1.3", "descripcion": "Identifica las necesidades más demandadas en las empresas." },
+          { "codigo": "CE1.4", "descripcion": "Valora las oportunidades de negocio previsibles en el sector." },
+          { "codigo": "CE1.5", "descripcion": "Identifica el tipo de proyecto requerido para dar respuesta a las demandas previstas." },
+          { "codigo": "CE1.6", "descripcion": "Determina las características específicas del proyecto según los requerimientos." },
+          { "codigo": "CE1.7", "descripcion": "Determina las obligaciones fiscales, laborales y de prevención de riesgos y sus condiciones de aplicación." },
+          { "codigo": "CE1.8", "descripcion": "Identifica posibles ayudas o subvenciones para la incorporación de nuevas tecnologías de producción o de servicio propuestas." },
+          { "codigo": "CE1.9", "descripcion": "Elabora el guion de trabajo que se debe seguir para la elaboración del proyecto." }
+        ]
+      },
+      {
+        "codigo": "RA2",
+        "descripcion": "Diseña proyectos relacionados con las competencias expresadas en el título, desarrollando explícitamente las fases que los componen.",
+        "CE": [
+          { "codigo": "CE2.1", "descripcion": "Recopila información relativa a los aspectos que serán tratados en el proyecto." },
+          { "codigo": "CE2.2", "descripcion": "Realiza el estudio de viabilidad técnica del proyecto." },
+          { "codigo": "CE2.3", "descripcion": "Identifica las fases del proyecto especificando su contenido y los plazos de ejecución." },
+          { "codigo": "CE2.4", "descripcion": "Establece los objetivos que se pretenden conseguir identificando su alcance." },
+          { "codigo": "CE2.5", "descripcion": "Determina las actividades necesarias para el desarrollo del proyecto." },
+          { "codigo": "CE2.6", "descripcion": "Prevé los recursos materiales y personales necesarios para realizar el proyecto." },
+          { "codigo": "CE2.7", "descripcion": "Identifica las necesidades de financiación para la puesta en marcha del proyecto." },
+          { "codigo": "CE2.8", "descripcion": "Define y elabora la documentación necesaria para el diseño." },
+          { "codigo": "CE2.9", "descripcion": "Identifica los aspectos que deben controlarse para garantizar la calidad del proyecto." }
+        ]
+      },
+      {
+        "codigo": "RA3",
+        "descripcion": "Planifica la ejecución del proyecto, determinando el plan de intervención y la documentación asociada.",
+        "CE": [
+          { "codigo": "CE3.1", "descripcion": "Secuencia las tareas en función de las necesidades de implementación." },
+          { "codigo": "CE3.2", "descripcion": "Determina los recursos y la logística necesaria para cada tarea." },
+          { "codigo": "CE3.3", "descripcion": "Identifica las necesidades de permisos y autorizaciones para llevar a cabo las tareas." },
+          { "codigo": "CE3.4", "descripcion": "Determina los procedimientos para ejecutar las tareas." },
+          { "codigo": "CE3.5", "descripcion": "Identifica los riesgos inherentes a la ejecución del proyecto y define el plan de prevención de riesgos y los medios necesarios." },
+          { "codigo": "CE3.6", "descripcion": "Planifica la asignación de recursos materiales y humanos según los tiempos de ejecución." },
+          { "codigo": "CE3.7", "descripcion": "Realiza la valoración económica que da respuesta a las condiciones de la ejecución del proyecto." },
+          { "codigo": "CE3.8", "descripcion": "Define y elabora la documentación necesaria para ejecutar el proyecto." }
+        ]
+      },
+      {
+        "codigo": "RA4",
+        "descripcion": "Define los procedimientos para el seguimiento y el control en la ejecución del proyecto, justificando la selección de variables e instrumentos empleados.",
+        "CE": [
+          { "codigo": "CE4.1", "descripcion": "Define el procedimiento de evaluación de las actividades o intervenciones realizadas durante la ejecución del proyecto." },
+          { "codigo": "CE4.2", "descripcion": "Define los indicadores de calidad para realizar la evaluación del proyecto." },
+          { "codigo": "CE4.3", "descripcion": "Define el procedimiento para el registro y la evaluación de las incidencias que puedan presentarse durante la ejecución del proyecto." },
+          { "codigo": "CE4.4", "descripcion": "Define el procedimiento para solucionar las incidencias registradas." },
+          { "codigo": "CE4.5", "descripcion": "Define el procedimiento para la gestión y el registro de los cambios en los recursos y en las tareas." },
+          { "codigo": "CE4.6", "descripcion": "Establece el procedimiento para la participación de los usuarios en la evaluación y elabora documentos específicos." },
+          { "codigo": "CE4.7", "descripcion": "Establece un sistema para garantizar el cumplimiento del pliego de condiciones del proyecto cuando este exista." }
+        ]
+      }
+    ]
+  },
+  {
+  "id": "0613",
+  "nombre": "Desarrollo web en entorno servidor",
+  "creditos": "13",
+  "descripcion": {
+    "duracion": "165h",
+    "centro": "99h",
+    "empresa": "66h"
+  },
+  "RA": [
+    {
+      "codigo": "RA1",
+      "descripcion": "Selecciona las arquitecturas y tecnologías de programación web en entorno servidor, analizando sus capacidades y características propias.",
+      "CE": [
+        {
+          "codigo": "CE1.1",
+          "descripcion": "Caracteriza y diferencia los modelos de ejecución de código en el servidor y en el cliente web."
+        },
+        {
+          "codigo": "CE1.2",
+          "descripcion": "Reconoce las ventajas que proporciona la generación dinámica de páginas."
+        },
+        {
+          "codigo": "CE1.3",
+          "descripcion": "Identifica los mecanismos de ejecución de código en los servidores web."
+        },
+        {
+          "codigo": "CE1.4",
+          "descripcion": "Reconoce las funcionalidades que aportan los servidores de aplicaciones y su integración con los servidores web."
+        },
+        {
+          "codigo": "CE1.5",
+          "descripcion": "Identifica y caracteriza los principales lenguajes y tecnologías relacionados con la programación web en entorno servidor."
+        },
+        {
+          "codigo": "CE1.6",
+          "descripcion": "Verifica los mecanismos de integración de los lenguajes de marcas con los lenguajes de programación en entorno servidor."
+        },
+        {
+          "codigo": "CE1.7",
+          "descripcion": "Reconoce y evalúa las herramientas y frameworks de programación en entorno servidor."
+        }
+      ]
+    },
+    {
+      "codigo": "RA2",
+      "descripcion": "Escribe sentencias ejecutables por un servidor web reconociendo y aplicando procedimientos de integración del código en lenguajes de marcas.",
+      "CE": [
+        {
+          "codigo": "CE2.1",
+          "descripcion": "Reconoce los mecanismos de generación de páginas web a partir de lenguajes de marcas con código embebido."
+        },
+        {
+          "codigo": "CE2.2",
+          "descripcion": "Identifica las principales tecnologías asociadas."
+        },
+        {
+          "codigo": "CE2.3",
+          "descripcion": "Utiliza etiquetas para la inclusión de código en el lenguaje de marcas."
+        },
+        {
+          "codigo": "CE2.4",
+          "descripcion": "Reconoce la sintaxis del lenguaje de programación que se debe utilizar."
+        },
+        {
+          "codigo": "CE2.5",
+          "descripcion": "Escribe sentencias simples y comprueba sus efectos en el documento resultante."
+        },
+        {
+          "codigo": "CE2.6",
+          "descripcion": "Utiliza directivas para modificar el comportamiento predeterminado."
+        },
+        {
+          "codigo": "CE2.7",
+          "descripcion": "Utiliza los distintos tipos de variables y operadores disponibles en el lenguaje."
+        },
+        {
+          "codigo": "CE2.8",
+          "descripcion": "Identifica los ámbitos de utilización de las variables."
+        },
+        {
+          "codigo": "CE2.9",
+          "descripcion": "Escribe bloques de sentencias embebidas en lenguajes de marcas, seleccionando y utilizando estructuras de programación."
+        }
+      ]
+    },
+    {
+      "codigo": "RA3",
+      "descripcion": "Utiliza estructuras de programación para el desarrollo de lógica de servidor.",
+      "CE": [
+        {
+          "codigo": "CE3.1",
+          "descripcion": "Utiliza mecanismos de decisión en la creación de bloques de sentencias."
+        },
+        {
+          "codigo": "CE3.2",
+          "descripcion": "Utiliza bucles y verifica su funcionamiento."
+        },
+        {
+          "codigo": "CE3.3",
+          "descripcion": "Utiliza matrices (arrays) para almacenar y recuperar conjuntos de datos."
+        },
+        {
+          "codigo": "CE3.4",
+          "descripcion": "Crea y utiliza funciones."
+        },
+        {
+          "codigo": "CE3.5",
+          "descripcion": "Utiliza formularios web para interactuar con el usuario del navegador web."
+        },
+        {
+          "codigo": "CE3.6",
+          "descripcion": "Emplea métodos para recuperar la información introducida en el formulario."
+        },
+        {
+          "codigo": "CE3.7",
+          "descripcion": "Añade comentarios al código."
+        }
+      ]
+    },
+    {
+      "codigo": "RA4",
+      "descripcion": "Desarrolla aplicaciones web embebidas en lenguajes de marcas analizando e incorporando funcionalidades según especificaciones.",
+      "CE": [
+        {
+          "codigo": "CE4.1",
+          "descripcion": "Identifica los mecanismos disponibles para el mantenimiento de la información relativa a un cliente web concreto y señala sus ventajas."
+        },
+        {
+          "codigo": "CE4.2",
+          "descripcion": "Utiliza mecanismos para mantener el estado de las aplicaciones web."
+        },
+        {
+          "codigo": "CE4.3",
+          "descripcion": "Utiliza mecanismos para almacenar información en el cliente web y recuperar su contenido."
+        },
+        {
+          "codigo": "CE4.4",
+          "descripcion": "Identifica y caracteriza los mecanismos disponibles para la autenticación de usuarios."
+        },
+        {
+          "codigo": "CE4.5",
+          "descripcion": "Escribe aplicaciones que integren mecanismos de autenticación de usuarios."
+        },
+        {
+          "codigo": "CE4.6",
+          "descripcion": "Utiliza herramientas y entornos para facilitar la programación, prueba y depuración del código."
+        }
+      ]
+    },
+    {
+      "codigo": "RA5",
+      "descripcion": "Desarrolla aplicaciones web identificando y aplicando mecanismos para separar el código de presentación de la lógica de negocio.",
+      "CE": [
+        {
+          "codigo": "CE5.1",
+          "descripcion": "Identifica las ventajas de separar la lógica de negocio de los aspectos de presentación de la aplicación."
+        },
+        {
+          "codigo": "CE5.2",
+          "descripcion": "Analiza y utiliza mecanismos y frameworks que permiten realizar esta separación y sus principales características."
+        },
+        {
+          "codigo": "CE5.3",
+          "descripcion": "Utiliza objetos y controles en el servidor para generar el aspecto visual de la aplicación web en el cliente."
+        },
+        {
+          "codigo": "CE5.4",
+          "descripcion": "Utiliza formularios generados de forma dinámica para responder a los eventos de la aplicación web."
+        },
+        {
+          "codigo": "CE5.5",
+          "descripcion": "Identifica y aplica los parámetros relativos a la configuración de la aplicación web."
+        },
+        {
+          "codigo": "CE5.6",
+          "descripcion": "Escribe aplicaciones web con mantenimiento de estado y separación de la lógica de negocio."
+        },
+        {
+          "codigo": "CE5.7",
+          "descripcion": "Aplica los principios y patrones de diseño de la programación orientada a objetos."
+        },
+        {
+          "codigo": "CE5.8",
+          "descripcion": "Prueba y documenta el código."
+        }
+      ]
+    },
+    {
+      "codigo": "RA6",
+      "descripcion": "Desarrolla aplicaciones web de acceso a almacenes de datos, aplicando medidas para mantener la seguridad y la integridad de la información.",
+      "CE": [
+        {
+          "codigo": "CE6.1",
+          "descripcion": "Analiza las tecnologías que permiten el acceso mediante programación a la información disponible en almacenes de datos."
+        },
+        {
+          "codigo": "CE6.2",
+          "descripcion": "Crea aplicaciones que establezcan conexiones con bases de datos."
+        },
+        {
+          "codigo": "CE6.3",
+          "descripcion": "Recupera información almacenada en bases de datos."
+        },
+        {
+          "codigo": "CE6.4",
+          "descripcion": "Publica en aplicaciones web la información recuperada."
+        },
+        {
+          "codigo": "CE6.5",
+          "descripcion": "Utiliza conjuntos de datos para almacenar la información."
+        },
+        {
+          "codigo": "CE6.6",
+          "descripcion": "Crea aplicaciones web que permitan la actualización y eliminación de información disponible en una base de datos."
+        },
+        {
+          "codigo": "CE6.7",
+          "descripcion": "Prueba y documenta las aplicaciones web."
+        }
+      ]
+    },
+    {
+      "codigo": "RA7",
+      "descripcion": "Desarrolla servicios web reutilizables y accesibles mediante protocolos web, verificando su funcionamiento.",
+      "CE": [
+        {
+          "codigo": "CE7.1",
+          "descripcion": "Reconoce las características propias y el ámbito de aplicación de los servicios web."
+        },
+        {
+          "codigo": "CE7.2",
+          "descripcion": "Reconoce las ventajas de utilizar servicios web para proporcionar acceso a funcionalidades incorporadas en la lógica de negocio de una aplicación."
+        },
+        {
+          "codigo": "CE7.3",
+          "descripcion": "Identifica las tecnologías y los protocolos implicados en el consumo de servicios web."
+        },
+        {
+          "codigo": "CE7.4",
+          "descripcion": "Utiliza los estándares y arquitecturas más difundidos e implicados en el desarrollo de servicios web."
+        },
+        {
+          "codigo": "CE7.5",
+          "descripcion": "Programa un servicio web."
+        },
+        {
+          "codigo": "CE7.6",
+          "descripcion": "Verifica el funcionamiento del servicio web."
+        },
+        {
+          "codigo": "CE7.7",
+          "descripcion": "Consume el servicio web."
+        },
+        {
+          "codigo": "CE7.8",
+          "descripcion": "Documenta un servicio web."
+        }
+      ]
+    },
+    {
+      "codigo": "RA8",
+      "descripcion": "Genera páginas web dinámicas analizando y utilizando tecnologías y frameworks del servidor web que añaden código al lenguaje de marcas.",
+      "CE": [
+        {
+          "codigo": "CE8.1",
+          "descripcion": "Identifica las diferencias entre la ejecución de código en el servidor y en el cliente web."
+        },
+        {
+          "codigo": "CE8.2",
+          "descripcion": "Reconoce las ventajas de unir ambas tecnologías en el proceso de desarrollo de programas."
+        },
+        {
+          "codigo": "CE8.3",
+          "descripcion": "Identifica las tecnologías y los frameworks relacionados con la generación por parte del servidor de páginas web con scripts embebidos."
+        },
+        {
+          "codigo": "CE8.4",
+          "descripcion": "Utiliza estas tecnologías y frameworks para generar páginas web que incluyan interacción con el usuario."
+        },
+        {
+          "codigo": "CE8.5",
+          "descripcion": "Utiliza estas tecnologías y frameworks para generar páginas web que incluyan verificación de formularios."
+        },
+        {
+          "codigo": "CE8.6",
+          "descripcion": "Utiliza estas tecnologías y frameworks para generar páginas web que incluyan modificación dinámica de su contenido y su estructura."
+        },
+        {
+          "codigo": "CE8.7",
+          "descripcion": "Aplica estas tecnologías y frameworks en la programación de aplicaciones web."
+        }
+      ]
+    },
+    {
+      "codigo": "RA9",
+      "descripcion": "Desarrolla aplicaciones web híbridas seleccionando y utilizando tecnologías, frameworks de servidor y repositorios heterogéneos de información.",
+      "CE": [
+        {
+          "codigo": "CE9.1",
+          "descripcion": "Reconoce las ventajas que proporciona la reutilización de código y el aprovechamiento de información ya existente."
+        },
+        {
+          "codigo": "CE9.2",
+          "descripcion": "Identifica tecnologías y frameworks aplicables en la creación de aplicaciones web híbridas."
+        },
+        {
+          "codigo": "CE9.3",
+          "descripcion": "Crea una aplicación web que recupere y procese depósitos de información ya existentes."
+        },
+        {
+          "codigo": "CE9.4",
+          "descripcion": "Crea depósitos específicos a partir de información existente en almacenes de información."
+        },
+        {
+          "codigo": "CE9.5",
+          "descripcion": "Utiliza librerías de código y frameworks para incorporar funcionalidades específicas a una aplicación web."
+        },
+        {
+          "codigo": "CE9.6",
+          "descripcion": "Programa servicios y aplicaciones web utilizando como base información y código generados por terceros."
+        },
+        {
+          "codigo": "CE9.7",
+          "descripcion": "Analiza y utiliza librerías de código relacionadas con Big Data e inteligencia de negocio, para incorporar análisis e inteligencia de datos provenientes de repositorios."
+        },
+       {
+    "codigo": "CE9.8",
+            "descripcion": "Prueba, depura y documenta las aplicaciones generadas."
+          }
+        ]
+      }
+    ]
+  }, 
+  {
+    "id": "0490",
+    "nombre": "Programación de servicios y procesos",
+  "creditos": "5",
+  "descripcion": {
+    "duracion": "99h",
+    "centro": "66h",
+    "empresa": "33h"
+  },
+  "RA": [
+    {
+      "codigo": "RA1",
+      "descripcion": "Desarrolla aplicaciones compuestas por varios procesos, reconociendo y aplicando principios de programación paralela.",
+      "CE": [
+        { "codigo": "CE1.1", "descripcion": "Reconoce las características de la programación concurrente y sus ámbitos de aplicación." },
+        { "codigo": "CE1.2", "descripcion": "Identifica las diferencias entre programación paralela y programación distribuida, sus ventajas e inconvenientes." },
+        { "codigo": "CE1.3", "descripcion": "Analiza las características de los procesos y su ejecución por parte del sistema operativo." },
+        { "codigo": "CE1.4", "descripcion": "Caracteriza los hilos de ejecución y describe su relación con los procesos." },
+        { "codigo": "CE1.5", "descripcion": "Utiliza clases para programar aplicaciones que crean subprocesos." },
+        { "codigo": "CE1.6", "descripcion": "Utiliza mecanismos para compartir información con los subprocesos iniciados." },
+        { "codigo": "CE1.7", "descripcion": "Utiliza mecanismos para sincronizar y obtener el valor retornado por los subprocesos iniciados." },
+        { "codigo": "CE1.8", "descripcion": "Desarrolla aplicaciones que gestionan y utilizan procesos para ejecutar diversas tareas en paralelo." },
+        { "codigo": "CE1.9", "descripcion": "Depura y documenta las aplicaciones desarrolladas." }
+      ]
+    },
+    {
+      "codigo": "RA2",
+      "descripcion": "Desarrolla aplicaciones compuestas por varios hilos de ejecución, analizando y aplicando librerías específicas del lenguaje de programación.",
+      "CE": [
+        { "codigo": "CE2.1", "descripcion": "Identifica situaciones en las que es útil el uso de varios hilos en un programa." },
+        { "codigo": "CE2.2", "descripcion": "Reconoce los mecanismos para crear, iniciar y finalizar hilos." },
+        { "codigo": "CE2.3", "descripcion": "Programa aplicaciones que implementan varios hilos." },
+        { "codigo": "CE2.4", "descripcion": "Identifica los posibles estados de ejecución de un hilo y programa aplicaciones que los gestionan." },
+        { "codigo": "CE2.5", "descripcion": "Utiliza mecanismos para compartir información entre varios hilos de un mismo proceso." },
+        { "codigo": "CE2.6", "descripcion": "Desarrolla programas formados por varios hilos sincronizados mediante técnicas específicas." },
+        { "codigo": "CE2.7", "descripcion": "Establece y controla la prioridad de cada uno de los hilos de ejecución." },
+        { "codigo": "CE2.8", "descripcion": "Depura y documenta los programas desarrollados." },
+        { "codigo": "CE2.9", "descripcion": "Analiza el contexto de ejecución de los hilos." },
+        { "codigo": "CE2.10", "descripcion": "Analiza librerías específicas del lenguaje de programación que permiten la programación multihilo." },
+        { "codigo": "CE2.11", "descripcion": "Reconoce los problemas derivados de compartir información entre los hilos de un mismo proceso." }
+      ]
+    },
+    {
+      "codigo": "RA3",
+      "descripcion": "Programa mecanismos de comunicación en red usando sockets y analizando el escenario de ejecución.",
+      "CE": [
+        { "codigo": "CE3.1", "descripcion": "Identifica escenarios que necesitan establecer comunicación en red entre varias aplicaciones." },
+        { "codigo": "CE3.2", "descripcion": "Identifica los roles de cliente y servidor y sus funciones asociadas." },
+        { "codigo": "CE3.3", "descripcion": "Reconoce librerías y mecanismos del lenguaje de programación que permiten programar aplicaciones en red." },
+        { "codigo": "CE3.4", "descripcion": "Analiza el concepto de socket, sus tipos y características." },
+        { "codigo": "CE3.5", "descripcion": "Utiliza sockets para programar una aplicación cliente que se comunique con un servidor." },
+        { "codigo": "CE3.6", "descripcion": "Desarrolla una aplicación servidor en red y verifica su funcionamiento." },
+        { "codigo": "CE3.7", "descripcion": "Desarrolla aplicaciones que utilizan sockets para intercambiar información." },
+        { "codigo": "CE3.8", "descripcion": "Utiliza hilos para permitir la comunicación simultánea de varios clientes con el servidor." },
+        { "codigo": "CE3.9", "descripcion": "Caracteriza los modelos de comunicación más habituales en las arquitecturas de aplicaciones distribuidas." },
+        { "codigo": "CE3.10", "descripcion": "Depura y documenta las aplicaciones desarrolladas." }
+      ]
+    },
+    {
+      "codigo": "RA4",
+      "descripcion": "Desarrolla aplicaciones que ofrecen servicios en red, utilizando librerías de clases y aplicando criterios de eficiencia y disponibilidad.",
+      "CE": [
+        { "codigo": "CE4.1", "descripcion": "Identifica diferentes protocolos estándar de comunicación para la implementación de servicios en red." },
+        { "codigo": "CE4.2", "descripcion": "Reconoce las ventajas del uso de protocolos estándar para la comunicación entre aplicaciones y procesos." },
+        { "codigo": "CE4.3", "descripcion": "Analiza librerías que permiten implementar servicios en red utilizando protocolos estándar de comunicación." },
+        { "codigo": "CE4.4", "descripcion": "Desarrolla y prueba servicios de comunicación en red." },
+        { "codigo": "CE4.5", "descripcion": "Utiliza clientes de comunicación para verificar el funcionamiento de los servicios." },
+        { "codigo": "CE4.6", "descripcion": "Incorpora mecanismos que permiten la comunicación simultánea de varios clientes con el servicio." },
+        { "codigo": "CE4.7", "descripcion": "Verifica la disponibilidad del servicio." },
+        { "codigo": "CE4.8", "descripcion": "Depura y documenta las aplicaciones desarrolladas." }
+      ]
+    },
+    {
+      "codigo": "RA5",
+      "descripcion": "Protege las aplicaciones y los datos, definiendo y aplicando criterios de seguridad en el acceso, almacenamiento y transmisión de la información.",
+      "CE": [
+        { "codigo": "CE5.1", "descripcion": "Identifica y aplica principios y prácticas de programación segura." },
+        { "codigo": "CE5.2", "descripcion": "Analiza las principales técnicas y prácticas criptográficas." },
+        { "codigo": "CE5.3", "descripcion": "Define e implanta políticas de seguridad para limitar y controlar el acceso de los usuarios a las aplicaciones desarrolladas." },
+        { "codigo": "CE5.4", "descripcion": "Utiliza esquemas de seguridad basados en roles." },
+        { "codigo": "CE5.5", "descripcion": "Utiliza algoritmos criptográficos para proteger el acceso a la información almacenada." },
+        { "codigo": "CE5.6", "descripcion": "Identifica métodos para asegurar la información transmitida." },
+        { "codigo": "CE5.7", "descripcion": "Desarrolla aplicaciones que utilizan comunicaciones seguras para la transmisión de información." },
+        { "codigo": "CE5.8", "descripcion": "Depura y documenta las aplicaciones desarrolladas." }
+       ]
+    }
+  ]
+}
+]

@@ -299,7 +299,7 @@ export function CursoCard({ curso }: Props) {
                 })}
               </ul>
 
-              {/* <Button
+              <Button
                 size="sm"
                 aria-label="Modificar asignaturas"
                 className="mt-2 inline-flex items-center gap-2 bg-white text-black hover:bg-gray-100 px-3 py-2 text-xs rounded-md shadow-sm"
@@ -307,7 +307,7 @@ export function CursoCard({ curso }: Props) {
               >
                 <SquarePen className="w-4 h-4" />
                 Modificar asignaturas
-              </Button> */}
+              </Button> 
             </div>
           )}
 

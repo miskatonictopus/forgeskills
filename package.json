@@ -16,7 +16,9 @@
     "generar:asignaturas": "ts-node scripts/generar-asignaturas.ts",
     "agent:inf": "ts-node -P tsconfig.tools.json tools/agent/run_informatica.ts",
     "asig:parse-multi": "ts-node -P tsconfig.tools.json tools/asignaturas/parse_xtec_multi.ts",
-    "asig:upsert": "ts-node -P tsconfig.tools.json tools/asignaturas/upsert_to_branch.ts"
+    "asig:upsert": "ts-node -P tsconfig.tools.json tools/asignaturas/upsert_to_branch.ts",
+    "scrape": "python3 scripts/scrape_catedu_ifc.py",
+  "build:asignaturas": "node scripts/transform_ifc_to_legacy.cjs ifc_catedu.json public/asignaturas_FP.json"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",
