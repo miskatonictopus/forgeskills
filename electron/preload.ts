@@ -207,4 +207,7 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
 
     leerActividadesPorCurso: (cursoId: string) =>
     ipcRenderer.invoke("actividades.leer-por-curso", { cursoId }),
+
+    obtenerMediasAlumnosCurso: (cursoId: string) =>
+    ipcRenderer.invoke("curso:alumnos-medias-asignatura", cursoId),
 });

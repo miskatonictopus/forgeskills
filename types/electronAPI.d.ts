@@ -234,6 +234,14 @@ evaluarActividad: (
   ) => Promise<
     Array<{ ceCodigo: string; descripcion: string; raCodigo: string }>
   >;
+
+  obtenerMediasAlumnosCurso: (
+    cursoId: string
+  ) => Promise<{
+    asignaturas: { id: string; nombre: string; color: string }[];
+    alumnos: { id: string; nombre: string; apellidos: string; mail?: string | null }[];
+    mediaMap: Record<string, Record<string, number>>;
+  }>;
   
 }
 

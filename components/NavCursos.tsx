@@ -16,6 +16,7 @@ import {
   GraduationCap,
   BookOpen,
   ClipboardList,
+  Users,
 } from "lucide-react";
 
 import {
@@ -36,7 +37,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-// ✅ usa el wrapper de shadcn (internamente Radix)
 import {
   Popover,
   PopoverTrigger,
@@ -51,9 +51,10 @@ export function NavCursos({ setCursoAEliminar }: Props) {
   const { isMobile } = useSidebar();
   const snap = useSnapshot(cursoStore);
 
-  // Controla qué curso tiene el popover abierto
+  // Control del popover abierto
   const [openCursoId, setOpenCursoId] = useState<string | null>(null);
-  const [hoverLock, setHoverLock] = useState(false); // evita cerrar al pasar del trigger al content
+  const [hoverLock, setHoverLock] = useState(false); // evita cierre al cruzar trigger↔content
+
   const closeAll = () => !hoverLock && setOpenCursoId(null);
 
   useEffect(() => {
@@ -72,7 +73,7 @@ export function NavCursos({ setCursoAEliminar }: Props) {
           return (
             <SidebarMenuItem key={curso.id}>
               <div
-                className="flex items-center justify-between w-full"
+                className="flex w-full items-center justify-between"
                 onMouseLeave={() => {
                   setHoverLock(false);
                   closeAll();
@@ -82,41 +83,38 @@ export function NavCursos({ setCursoAEliminar }: Props) {
                   open={open}
                   onOpenChange={(v) => setOpenCursoId(v ? curso.id : null)}
                 >
-                  {/* Trigger: navega al curso; hover abre popover */}
+                  {/* Trigger: click navega al curso; hover abre el popover */}
                   <PopoverTrigger asChild>
                     <SidebarMenuButton
                       asChild
-                      onMouseEnter={() => {
-                        if (hasAsignaturas) setOpenCursoId(curso.id);
-                      }}
-                      onFocus={() => {
-                        if (hasAsignaturas) setOpenCursoId(curso.id);
-                      }}
+                      onMouseEnter={() => setOpenCursoId(curso.id)}
+                      onFocus={() => setOpenCursoId(curso.id)}
                     >
                       <Link href={`/cursos/${curso.id}`}>
-                        <GraduationCap className="w-4 h-4" />
-                        <span>
+                        <GraduationCap className="h-4 w-4" />
+                        <span className="truncate">
                           {curso.acronimo}
-                          {curso.nivel}
+                          {curso.nivel ? ` ${curso.nivel}` : ""}
                         </span>
                       </Link>
                     </SidebarMenuButton>
                   </PopoverTrigger>
 
-                  {hasAsignaturas && (
-                    <PopoverContent
-                      side="right"
-                      align="start"
-                      sideOffset={8}
-                      className="z-[60] w-80 p-3 rounded-lg bg-popover shadow-popover-3d-strong border border-black/20"
-                      onMouseEnter={() => setHoverLock(true)}
-                      onMouseLeave={() => {
-                        setHoverLock(false);
-                        setOpenCursoId(null);
-                      }}
-                    >
-                      <div className="flex flex-col gap-2">
-                        {asignaturas.map((asig) => {
+                  <PopoverContent
+                    side="right"
+                    align="start"
+                    sideOffset={8}
+                    className="z-[80] w-80 rounded-lg border border-black/30 bg-popover p-3 shadow-popover-3d-ultra"
+                    onMouseEnter={() => setHoverLock(true)}
+                    onMouseLeave={() => {
+                      setHoverLock(false);
+                      setOpenCursoId(null);
+                    }}
+                  >
+                    <div className="flex flex-col gap-2">
+                      {/* Lista de asignaturas (si hay) */}
+                      {hasAsignaturas ? (
+                        asignaturas.map((asig) => {
                           const url = `/cursos/${curso.id}/asignaturas/${asig.id}`;
                           return (
                             <div key={asig.id} className="flex flex-col gap-1">
@@ -126,7 +124,7 @@ export function NavCursos({ setCursoAEliminar }: Props) {
                                 onClick={() => setOpenCursoId(null)}
                               >
                                 <Dot color={asig.color ?? "#9ca3af"} />
-                                <BookOpen className="w-4 h-4" />
+                                <BookOpen className="h-4 w-4" />
                                 <span className="truncate">
                                   {asig.id} {asig.nombre}
                                 </span>
@@ -135,36 +133,58 @@ export function NavCursos({ setCursoAEliminar }: Props) {
                                 asChild
                                 variant="secondary"
                                 size="sm"
-                                className="h-6 px-2 text-[10px] leading-none rounded-md"
+                                className="h-6 rounded-md px-2 text-[10px] leading-none"
                               >
                                 <Link href={url} onClick={() => setOpenCursoId(null)}>
-                                  <BookOpen className="w-3 h-3 mr-1" />
+                                  <BookOpen className="mr-1 h-3 w-3" />
                                   Ver RA / CE
                                 </Link>
                               </Button>
                             </div>
                           );
-                        })}
+                        })
+                      ) : (
+                        <div className="text-xs text-muted-foreground">
+                          Este curso aún no tiene asignaturas.
+                        </div>
+                      )}
 
-                        <Separator className="my-1" />
+                      <Separator className="my-1" />
 
-                        <Button
-                          asChild
-                          size="sm"
-                          className="px-2.5 py-2 rounded-md bg-white text-black text-xs hover:bg-gray-100"
+                      {/* Ver actividades */}
+                      <Button
+                        asChild
+                        size="sm"
+                        className="rounded-md px-2.5 py-2 text-xs"
+                      >
+                        <Link
+                          href={`/cursos/${curso.id}/actividades`}
+                          className="inline-flex items-center gap-1"
+                          onClick={() => setOpenCursoId(null)}
                         >
-                          <Link
-                            href={`/cursos/${curso.id}/actividades`}
-                            className="inline-flex items-center gap-1"
-                            onClick={() => setOpenCursoId(null)}
-                          >
-                            <ClipboardList className="w-3.5 h-3.5" />
-                            Ver actividades
-                          </Link>
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  )}
+                          <ClipboardList className="h-3.5 w-3.5" />
+                          Ver actividades
+                        </Link>
+                      </Button>
+
+                      {/* Ver alumnos (nuevo) */}
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="rounded-md px-2.5 py-2 text-xs"
+                      >
+                        <Link
+                          href={`/cursos/${curso.id}/alumnos`}
+                          className="inline-flex items-center gap-1"
+                          onClick={() => setOpenCursoId(null)}
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          Ver alumnos
+                        </Link>
+                      </Button>
+                    </div>
+                  </PopoverContent>
                 </Popover>
 
                 {/* Acciones del curso */}
@@ -196,7 +216,6 @@ export function NavCursos({ setCursoAEliminar }: Props) {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-
               </div>
 
               <Separator className="my-3" />

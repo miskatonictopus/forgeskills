@@ -2071,3 +2071,59 @@ ipcMain.handle("actividades.leer-por-curso", (_e, { cursoId }) => {
   return stmt.all(cursoId);
 });
 
+ipcMain.handle("curso:alumnos-medias-asignatura", (_e, cursoId: string) => {
+  if (!cursoId) throw new Error("cursoId requerido");
+
+  const asignaturas = db
+    .prepare(`
+      SELECT a.id, a.nombre, COALESCE(a.color,'#4B5563') AS color
+      FROM curso_asignatura ca
+      JOIN asignaturas a ON a.id = ca.asignatura_id
+      WHERE ca.curso_id = ?
+      ORDER BY a.nombre
+    `)
+    .all(cursoId) as { id: string; nombre: string; color: string }[];
+
+  const alumnos = db
+    .prepare(`
+      SELECT id, nombre, apellidos, mail
+      FROM alumnos
+      WHERE curso = ?
+      ORDER BY apellidos, nombre
+    `)
+    .all(cursoId) as { id: string; nombre: string; apellidos: string; mail?: string | null }[];
+
+  // --- TIPADO AQUÍ ---
+ // --- TIPADO ---
+ type MediaRow = { alumnoId: string; asignaturaId: string; media: number | string | null };
+
+ const medias = db
+   .prepare(`
+     SELECT
+       ac.alumno_id            AS alumnoId,
+       act.asignatura_id       AS asignaturaId,
+       ROUND(AVG(ac.nota), 2)  AS media
+     FROM alumno_ce ac
+     JOIN actividades act ON act.id = ac.actividad_id
+     WHERE act.curso_id = ?
+     GROUP BY ac.alumno_id, act.asignatura_id
+   `)
+   .all(cursoId) as MediaRow[];
+ 
+
+
+  const mediaMap: Record<string, Record<string, number>> = {};
+
+  for (const m of medias) {
+    const alumnoId = String(m.alumnoId);
+    const asignaturaId = String(m.asignaturaId);
+    const valor = m.media == null ? NaN : Number(m.media); // por si viene como string
+
+    if (!mediaMap[alumnoId]) mediaMap[alumnoId] = {};
+    if (!Number.isNaN(valor)) mediaMap[alumnoId][asignaturaId] = valor;
+  }
+
+  return { asignaturas, alumnos, mediaMap };
+});
+
+
