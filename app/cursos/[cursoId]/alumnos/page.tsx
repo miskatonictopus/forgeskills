@@ -24,6 +24,9 @@ import { alumnosStore, cargarAlumnosCurso, type Alumno as StoreAlumno } from "@/
 import { cursoStore } from "@/store/cursoStore";
 import { Dot } from "@/components/ui/Dot";
 
+// 👇 importa el ranking reutilizable
+import RankingLista from "@/components/RankingLista";
+
 type UIAlumno = StoreAlumno & { mail?: string | null };
 
 // helper visual de notas
@@ -92,22 +95,18 @@ export default function AlumnosPorCursoPage() {
     );
   }, [snapAlumnos.porCurso, cursoId, search]);
 
-  // top 3 global (no depende del filtro de búsqueda)
-  const top3 = useMemo(() => {
+  // items de ranking (globales, no dependen del filtro de búsqueda)
+  const rankingItems = useMemo(() => {
     const todos = (alumnosStore.porCurso[cursoId] ?? []) as UIAlumno[];
-    const items = todos.map((al) => {
+    return todos.map((al) => {
       const mediasAlumno = mediaMap[al.id] || {};
       const nums = Object.values(mediasAlumno).filter(
         (v) => typeof v === "number" && !Number.isNaN(v)
       ) as number[];
-      const media =
-        nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : undefined;
-      return { alumno: al, media };
+      const media = nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : NaN;
+      const nombre = `${al.apellidos ?? ""} ${al.nombre ?? ""}`.trim() || "Sin nombre";
+      return { id: String(al.id), nombre, media };
     });
-    return items
-      .filter((x) => typeof x.media === "number")
-      .sort((a, b) => (b.media! - a.media!))
-      .slice(0, 3);
   }, [snapAlumnos.porCurso, mediaMap, cursoId]);
 
   const isLoadingBase = !!snapAlumnos.loading[cursoId];
@@ -153,53 +152,27 @@ export default function AlumnosPorCursoPage() {
           </div>
         </div>
 
-        {/* ===== Top 3 card ===== */}
+        {/* ===== Rankings (25% ancho en XL) ===== */}
         <div className="px-6 mt-4">
-          <div className="rounded-2xl border bg-card/60 backdrop-blur-sm p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-                Top 3 alumnos del curso
-              </h2>
-              {!isLoading && top3.length > 0 ? (
-                <span className="text-xs text-muted-foreground">
-                  Basado en medias globales por asignatura
-                </span>
-              ) : null}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <RankingLista
+  titulo="Top 3"
+  subtitulo="Basado en medias globales por asignatura"
+  items={rankingItems}
+  cantidad={3}
+  orden="mejores"
+  isLoading={isLoading}
+/>
 
-            {isLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Calculando clasificaciones…
-              </div>
-            ) : top3.length === 0 ? (
-              <div className="text-sm text-muted-foreground">Aún no hay notas suficientes.</div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {top3.map((item, i) => {
-                  const { alumno, media } = item;
-                  const nombre = `${alumno.apellidos ?? ""} ${alumno.nombre ?? ""}`.trim();
-                  const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
-                  return (
-                    <div
-                      key={alumno.id}
-                      className="rounded-xl border bg-background p-3 flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-lg">{medal}</span>
-                        <div className="min-w-0">
-                          <div className="truncate font-medium">{nombre || "Sin nombre"}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            ID: {alumno.id}
-                          </div>
-                        </div>
-                      </div>
-                      <div>{notaBadge(media)}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+<RankingLista
+  titulo="Last 3"
+  items={rankingItems}
+  cantidad={3}
+  orden="peores"
+  isLoading={isLoading}
+/>
+
+
           </div>
         </div>
 
@@ -257,7 +230,7 @@ export default function AlumnosPorCursoPage() {
 
                     return (
                       <TableRow key={String(al.id)}>
-                        <TableCell>
+                        <TableCell className="text-xs">
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4 opacity-70" />
                             <div className="font-medium">{nombreCompleto || "Sin nombre"}</div>
@@ -266,16 +239,16 @@ export default function AlumnosPorCursoPage() {
                         <TableCell className="text-sm">{al.mail || "—"}</TableCell>
 
                         {colsAsignaturas.map((asig) => (
-                          <TableCell key={asig.id} className="text-center">
+                          <TableCell key={asig.id} className="text-center text-xs">
                             {notaBadge(mediasAlumno[asig.id])}
                           </TableCell>
                         ))}
 
-                        <TableCell className="text-center">
+                        <TableCell className="text-center text-xs">
                           {notaBadge(mediaGlobal)}
                         </TableCell>
 
-                        <TableCell className="text-right">
+                        <TableCell className="text-right text-xs">
                           <Button
                             variant="ghost"
                             size="sm"
