@@ -82,6 +82,7 @@ export default function AlumnosPorCursoPage() {
     [snapCursos.cursos, cursoId]
   );
 
+  // lista mostrada (responde a búsqueda)
   const alumnos: UIAlumno[] = useMemo(() => {
     const lista = (alumnosStore.porCurso[cursoId] ?? []) as UIAlumno[];
     if (!search.trim()) return lista;
@@ -90,6 +91,24 @@ export default function AlumnosPorCursoPage() {
       `${a.apellidos ?? ""} ${a.nombre ?? ""} ${a.mail ?? ""}`.toLowerCase().includes(q)
     );
   }, [snapAlumnos.porCurso, cursoId, search]);
+
+  // top 3 global (no depende del filtro de búsqueda)
+  const top3 = useMemo(() => {
+    const todos = (alumnosStore.porCurso[cursoId] ?? []) as UIAlumno[];
+    const items = todos.map((al) => {
+      const mediasAlumno = mediaMap[al.id] || {};
+      const nums = Object.values(mediasAlumno).filter(
+        (v) => typeof v === "number" && !Number.isNaN(v)
+      ) as number[];
+      const media =
+        nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : undefined;
+      return { alumno: al, media };
+    });
+    return items
+      .filter((x) => typeof x.media === "number")
+      .sort((a, b) => (b.media! - a.media!))
+      .slice(0, 3);
+  }, [snapAlumnos.porCurso, mediaMap, cursoId]);
 
   const isLoadingBase = !!snapAlumnos.loading[cursoId];
   const isLoading = isLoadingBase || loadingMedias;
@@ -131,6 +150,56 @@ export default function AlumnosPorCursoPage() {
                 className="w-72"
               />
             </div>
+          </div>
+        </div>
+
+        {/* ===== Top 3 card ===== */}
+        <div className="px-6 mt-4">
+          <div className="rounded-2xl border bg-card/60 backdrop-blur-sm p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+                Top 3 alumnos del curso
+              </h2>
+              {!isLoading && top3.length > 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  Basado en medias globales por asignatura
+                </span>
+              ) : null}
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Calculando clasificaciones…
+              </div>
+            ) : top3.length === 0 ? (
+              <div className="text-sm text-muted-foreground">Aún no hay notas suficientes.</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {top3.map((item, i) => {
+                  const { alumno, media } = item;
+                  const nombre = `${alumno.apellidos ?? ""} ${alumno.nombre ?? ""}`.trim();
+                  const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
+                  return (
+                    <div
+                      key={alumno.id}
+                      className="rounded-xl border bg-background p-3 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-lg">{medal}</span>
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{nombre || "Sin nombre"}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            ID: {alumno.id}
+                          </div>
+                        </div>
+                      </div>
+                      <div>{notaBadge(media)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -178,8 +247,6 @@ export default function AlumnosPorCursoPage() {
                   alumnos.map((al) => {
                     const nombreCompleto = `${al.apellidos ?? ""} ${al.nombre ?? ""}`.trim();
                     const mediasAlumno = mediaMap[al.id] || {};
-
-                    // media global: promedio de las asignaturas que tienen nota
                     const mediasNumeros = Object.values(mediasAlumno).filter(
                       (v) => typeof v === "number" && !Number.isNaN(v)
                     ) as number[];
