@@ -1,102 +1,64 @@
 @page {
     size: A4;
-    margin: 18mm 18mm 20mm 18mm;
+    margin: 30mm 18mm 25mm 18mm; /* hueco para header/footer */
   }
   
   html, body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    margin: 0;
+    padding: 0;
+    background: #fff;
   }
   
-  /* ==== FUENTE GEIST ==== */
-  @font-face {
-    font-family: "Geist";
-    src: url("./fonts/Geist-VariableFont_wght.ttf") format("truetype");
-    font-weight: 100 900; /* soporta el rango variable */
-    font-style: normal;
-  }
-  
-  /* ==== TEXTO GENERAL ==== */
+  /* === Tipografía global === */
+  /* Si NO incrustas Geist por VFS, añade aquí el @font-face o linkea geist-embedded.css */
   body {
-    font-family: "Geist", sans-serif;
-    font-size: 11.5pt;
+    font-family: "Geist", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.45;
     color: #111;
-    line-height: 1.35;
   }
   
-  h1 {
-    font-size: 20pt;
-    margin: 0 0 6pt 0;
+  /* === Título y descripción === */
+  .pdf-title {
+    font-size: 18pt;
     font-weight: 700;
+    margin: 10pt 18mm 6pt 18mm;
+    color: #111;
   }
   
-  h2 {
-    font-size: 14pt;
-    margin: 14pt 0 4pt;
-    page-break-after: avoid;
-    font-weight: 600;
+  .pdf-descripcion {
+    font-size: 11pt;
+    margin: 0 18mm 18pt 18mm;
+    text-align: justify;
   }
   
-  h3 {
-    font-size: 12pt;
-    margin: 10pt 0 4pt;
-    page-break-after: avoid;
-    font-weight: 600;
-  }
+  /* === Elementos base === */
+  h2 { font-size: 14pt; margin: 14pt 18mm 6pt 18mm; font-weight: 600; page-break-after: avoid; }
+  h3 { font-size: 12pt; margin: 10pt 18mm 4pt 18mm; font-weight: 600; page-break-after: avoid; }
   
-  strong {
-    font-family: "Geist", sans-serif;
-    font-weight: 700;
-  }
-  
-  .meta {
-    font-family: "Geist", sans-serif;
-    font-size: 10pt;
-    color: #444;
-    font-weight: 400;
-  }
-  
-  /* ==== ELEMENTOS VISUALES ==== */
   hr {
     border: none;
-    border-top: 0.5pt solid #ddd;
-    margin: 10pt 0;
+    border-top: 0.5pt solid #e5e5e5;
+    margin: 10pt 18mm;
   }
   
-  .page-break {
-    page-break-before: always;
-  }
-  
-  /* ==== TABLAS ==== */
+  /* === Tablas limpias === */
   table {
-    width: 100%;
+    width: calc(100% - 36mm);
+    margin: 8pt 18mm;
     border-collapse: collapse;
-    margin: 8pt 0;
-    font-family: "Geist", sans-serif;
     font-size: 10pt;
   }
-  
-  thead {
-    display: table-header-group;
-  }
-  
+  thead { display: table-header-group; }
   th, td {
     border: 0.5pt solid #e3e3e3;
     padding: 6pt 8pt;
     vertical-align: top;
   }
+  th { background: #f6f6f6; font-weight: 600; }
+  tbody tr:nth-child(even) td { background: #fbfbfb; }
   
-  th {
-    background: #f6f6f6;
-    font-weight: 600;
-  }
-  
-  tbody tr:nth-child(even) td {
-    background: #fbfbfb;
-  }
-  
-  /* evita cortes raros */
-  h2, h3, .section {
-    page-break-inside: avoid;
-  }
-  
+  /* === Evitar cortes raros === */
+  h2, h3, .section { page-break-inside: avoid; }

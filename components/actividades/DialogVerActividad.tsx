@@ -45,6 +45,15 @@ import DOMPurify from "isomorphic-dompurify";
 import { useDefensorDeHorarios } from "@/components/horarios/useDefensorDeHorarios";
 
 /* ---------------------- helpers ---------------------- */
+const toPlainText = (html?: string) =>
+  String(html ?? "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h\d)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+
 const normCE = (s?: string) =>
   (s ?? "").toString().trim().toUpperCase().replace(/\s+/g, "");
 
@@ -706,52 +715,48 @@ export function DialogVerActividad({
   }, [actividad?.nombre]);
 
   // === Exportar PDF ===
-  const handleExportPDF = async () => {
-    if (!actividad || !pdfData) return;
+ // === Exportar PDF (jsPDF + Geist) ===
+const handleExportPDF = async () => {
+  if (!actividad || !pdfData) return;
 
-    if (!(window as any)?.electronAPI?.renderActividadPDF) {
-      toast.error("La API de impresión no está disponible (renderActividadPDF).");
+  // Preparamos el input que espera /lib/pdf/actividadInforme.ts
+  const input = {
+    titulo: pdfData.titulo ?? "Actividad",
+    fechaISO: pdfData.fechaISO ?? new Date().toISOString(),
+    asignatura: pdfData.asignatura ?? "—",
+    descripcion: toPlainText(pdfData.html),  // jsPDF trabaja con texto plano
+    umbral,
+    ces: (pdfData.ces ?? []).map((c: any) => ({
+      codigo: c.codigo,
+      ra: raOf(c.codigo),                                 // <- RA separado
+      texto: (c.descripcion || c.texto || "—").trim(),    // <- descripción CE
+      similitud: Number(c.similitud ?? 0),                // <- 0..1
+    })),
+  };
+
+  try {
+    if (!(window as any)?.electronAPI?.generarInformeActividad) {
+      console.error("Falta electronAPI.generarInformeActividad (preload/main).");
+      toast.error("No está disponible la exportación por jsPDF.");
       return;
     }
-    const fechaStr = (actividad?.fecha
-      ? new Date(actividad.fecha)
-      : new Date()
-    ).toLocaleDateString("es-ES");
 
-    const html = buildPdfHtml({
-      titulo: pdfData.titulo,
-      asignatura: pdfData.asignatura,
-      fechaStr,
-      umbral: pdfData.umbral,
-      descripcionHtml: pdfData.html,
-      cesFiltrados: (pdfData.ces ?? []).map((c: any) => ({
-        codigo: c.codigo,
-        puntuacion: c.similitud ?? 0,
-        reason: c.reason,
-        evidencias: c.evidencias,
-        descripcion: c.descripcion,
-      })),
-      getCeText,
-      labelFor,
-    });
+    const res = await (window as any).electronAPI.generarInformeActividad(
+      input,
+      suggestedFileName // ya lo tienes montado arriba
+    );
 
-    try {
-      const { ok, path } = await (window as any).electronAPI.renderActividadPDF({
-        html,
-        filename: suggestedFileName,
-        template: "academico",
-        options: {
-          pageSize: "A4",
-          margins: { top: "18mm", right: "18mm", bottom: "20mm", left: "18mm" },
-        },
-      });
-      if (ok) toast.success(`PDF guardado en: ${path}`);
-      else toast.error("No se pudo generar el PDF.");
-    } catch (e) {
-      console.error(e);
-      toast.error("Error al generar el PDF.");
+    if (res?.ok) {
+      toast.success(`PDF guardado en: ${res.path}`);
+    } else {
+      toast.error(res?.error ?? "No se pudo generar el PDF.");
     }
-  };
+  } catch (e) {
+    console.error(e);
+    toast.error("Error al generar el PDF.");
+  }
+};
+
 
   const totalCE = cesDetectados.length;
   const visiblesCE = cesFiltrados.length;
@@ -1096,7 +1101,7 @@ return (
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={handleExportPDF} disabled={!pdfData}>
                 <FileDown className="w-4 h-4 mr-2" />
-                Exportar PDF (académico)
+                Exportar PDF
               </Button>
 
               <Button

@@ -210,4 +210,10 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
 
     obtenerMediasAlumnosCurso: (cursoId: string) =>
     ipcRenderer.invoke("curso:alumnos-medias-asignatura", cursoId),
+
+    getPdfBaseDir: () => ipcRenderer.invoke("pdf.get-base-dir"),
+
+    generarInformeActividad: (data: any, fileName: string) =>
+    ipcRenderer.invoke("pdf.generar-actividad", data, fileName),
+  
 });
