@@ -25,6 +25,20 @@ const config: Config = {
         "accent-foreground": "hsl(var(--accent-foreground))",
         destructive: "hsl(var(--destructive))",
         "destructive-foreground": "hsl(var(--destructive-foreground))",
+        boxShadow: {
+          'popover-3d': `
+            0 12px 28px rgba(0, 0, 0, 0.45),
+            0 20px 60px rgba(0, 0, 0, 0.40)
+          `,
+          'popover-3d-strong': `
+            0 20px 40px rgba(0, 0, 0, 0.55),
+            0 28px 80px rgba(0, 0, 0, 0.50)
+          `,
+          'popover-3d-ultra': `
+            0 32px 64px rgba(0, 0, 0, 0.65),
+            0 48px 120px rgba(0, 0, 0, 0.60)
+          `,
+        },
       },
       fontFamily: {
         geist: ["var(--font-geist)"],
