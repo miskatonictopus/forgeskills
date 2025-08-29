@@ -1,5 +1,7 @@
 "use client";
 
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, Calendar as CalendarIcon, Save, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -12,7 +14,6 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Save, Plus, Trash2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -22,7 +23,7 @@ import type { DateRange } from "react-day-picker";
 import { cursoStore } from "@/store/cursoStore";
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 
-// NUEVO: UI extra shadcn
+// UI extra shadcn
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -73,6 +74,9 @@ export default function ConfiguracionPage() {
 
   const canSaveFestivo = !!festivoRange?.from && !!motivo.trim();
   const rangoListo = useMemo(() => !!range?.from && !!range?.to && range.from <= range.to, [range]);
+
+  // plegado por defecto
+  const [openHorarios, setOpenHorarios] = useState(false);
 
   // Hidratar cursos + asignaturas (para que el Sidebar se vea igual que en otras páginas)
   useEffect(() => {
@@ -285,330 +289,351 @@ export default function ConfiguracionPage() {
         <div className="p-6 space-y-6">
           <h1 className="text-3xl font-bold tracking-tight">Configuración</h1>
 
-          {/* ===== Fila 50/50 ===== */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Columna izquierda: Periodo lectivo */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Periodo lectivo</CardTitle>
-                <CardDescription>
-                  Define el intervalo de clases. Se usará para bloquear navegación, creación y movimiento de eventos fuera de rango.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Popover modal={false}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn("w-[280px] justify-start text-left font-normal", !range && "text-muted-foreground")}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {range?.from ? (
-                          range.to ? (
-                            <>
-                              {range.from.toLocaleDateString()} — {range.to.toLocaleDateString()}
-                            </>
-                          ) : (
-                            range.from.toLocaleDateString()
-                          )
-                        ) : (
-                          <span>Selecciona periodo</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="z-50 w-auto p-0"
-                      align="start"
-                      side="bottom"
-                      sideOffset={8}
-                      avoidCollisions={false}
-                      collisionPadding={0}
-                      // @ts-expect-error prop Radix
-                      position="popper"
-                    >
-                      <Calendar mode="range" selected={range} onSelect={setRange} numberOfMonths={2} initialFocus />
-                    </PopoverContent>
-                  </Popover>
-
-                  <Button onClick={handleSaveLectivo} disabled={!rangoListo} className="gap-2">
-                    <Save className="h-4 w-4" />
-                    Guardar periodo
-                  </Button>
-                </div>
-
-                <Separator />
-
-                <div className="text-sm text-muted-foreground">
-                  {persisted?.start && persisted?.end ? (
-                    <>Lectivo actual: <span className="font-medium">{persisted.start}</span> → <span className="font-medium">{persisted.end}</span></>
-                  ) : (
-                    <>Aún no hay periodo lectivo guardado.</>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Columna derecha: Presencialidades + FCT */}
-            <div className="space-y-6">
-              {/* ===== Card Presencialidades ===== */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Presencialidades</CardTitle>
-                  <CardDescription>
-                    Tramos fijos y recurrentes de presencia en el centro (no lectivos).
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Formulario alta */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-sm font-medium">Día</label>
-                      <Select value={diaSemana} onValueChange={setDiaSemana}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Día" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DIAS.map((d) => (
-                            <SelectItem key={d.value} value={String(d.value)}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Inicio</label>
-                      <Input className="mt-1" type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Fin</label>
-                      <Input className="mt-1" type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
-                    </div>
+          {/* ===== Tarjeta plegable: Configurar horarios ===== */}
+          <Collapsible open={openHorarios} onOpenChange={setOpenHorarios}>
+            <Card className="border-muted/60">
+              <CardHeader className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl">Configurar horarios</CardTitle>
+                    <CardDescription>Periodo lectivo, presencialidades, FCT y festivos.</CardDescription>
                   </div>
 
-                  <Button onClick={handleAddPresencialidad} className="gap-2 w-full sm:w-auto">
-                    <Plus className="h-4 w-4" />
-                    Añadir presencialidad
-                  </Button>
-
-                  {/* Listado */}
-                  <Separator />
-                  {presencialidades.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">No hay presencialidades registradas.</div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[180px]">Día</TableHead>
-                            <TableHead>Horario</TableHead>
-                            <TableHead className="w-[80px] text-right">Acciones</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {presencialidades.map((p) => (
-                            <TableRow key={p.id}>
-                              <TableCell className="font-medium">
-                                {DIAS.find((d) => d.value === p.diaSemana)?.label ?? p.diaSemana}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="secondary">{p.horaInicio} — {p.horaFin}</Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeletePresencialidad(p.id)}
-                                  aria-label="Eliminar presencialidad"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* ===== Card FCT ===== */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>FCT (prácticas con alumnado)</CardTitle>
-                  <CardDescription>Tramos fijos y recurrentes (no lectivos) asociados a FCT.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-sm font-medium">Día</label>
-                      <Select value={fctDia} onValueChange={setFctDia}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Día" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DIAS.map((d) => (
-                            <SelectItem key={d.value} value={String(d.value)}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Inicio</label>
-                      <Input className="mt-1" type="time" value={fctInicio} onChange={(e) => setFctInicio(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Fin</label>
-                      <Input className="mt-1" type="time" value={fctFin} onChange={(e) => setFctFin(e.target.value)} />
-                    </div>
-                  </div>
-
-                  <Button onClick={handleAddFCT} className="gap-2 w-full sm:w-auto">
-                    <Plus className="h-4 w-4" />
-                    Añadir FCT
-                  </Button>
-
-                  <Separator />
-
-                  {fct.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">No hay FCT registradas.</div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[180px]">Día</TableHead>
-                            <TableHead>Horario</TableHead>
-                            <TableHead className="w-[80px] text-right">Acciones</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {fct.map((t) => (
-                            <TableRow key={t.id}>
-                              <TableCell className="font-medium">
-                                {DIAS.find((d) => d.value === t.diaSemana)?.label ?? t.diaSemana}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="secondary">{t.horaInicio} — {t.horaFin}</Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteFCT(t.id)}
-                                  aria-label="Eliminar FCT"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* ===== Card Festivos (debajo) ===== */}
-          <Card className="max-w-3xl">
-            <CardHeader>
-              <CardTitle>Festivos</CardTitle>
-              <CardDescription>
-                Crea días o rangos no lectivos con su motivo. El calendario bloqueará la creación y movimiento de eventos en estas fechas.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-start gap-3">
-                <Popover modal={false}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-[280px] justify-start text-left font-normal",
-                        !festivoRange && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {festivoRange?.from
-                        ? festivoRange.to
-                          ? `${festivoRange.from.toLocaleDateString()} — ${festivoRange.to.toLocaleDateString()}`
-                          : festivoRange.from.toLocaleDateString()
-                        : "Selecciona fecha o rango"}
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-2">
+                      {openHorarios ? "Ocultar" : "Mostrar"}
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${openHorarios ? "rotate-180" : ""}`}
+                      />
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="z-50 w-auto p-0"
-                    align="start"
-                    side="bottom"
-                    sideOffset={8}
-                    avoidCollisions={false}
-                    collisionPadding={0}
-                    // @ts-expect-error Radix
-                    position="popper"
-                  >
-                    <Calendar mode="range" selected={festivoRange} onSelect={setFestivoRange} numberOfMonths={2} initialFocus />
-                  </PopoverContent>
-                </Popover>
-
-                <Textarea
-                  placeholder="Motivo (p. ej., Fiesta nacional, Semana Santa, Puente local...)"
-                  value={motivo}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  className="min-w-[280px] w-[400px]"
-                  rows={2}
-                />
-
-                <Button onClick={handleAddFestivo} disabled={!canSaveFestivo} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Añadir festivo
-                </Button>
-              </div>
-
-              <Separator />
-
-              {festivos.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No hay festivos guardados aún.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[180px]">Fecha</TableHead>
-                        <TableHead>Motivo</TableHead>
-                        <TableHead className="w-[80px] text-right">Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {festivos.map((f) => (
-                        <TableRow key={f.id}>
-                          <TableCell className="font-medium">
-                            {f.end && f.end !== f.start ? (
-                              <Badge variant="secondary">{f.start} → {f.end}</Badge>
-                            ) : (
-                              <Badge variant="secondary">{f.start}</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>{f.title}</TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteFestivo(f.id)} aria-label="Eliminar festivo">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  </CollapsibleTrigger>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+
+              <CollapsibleContent>
+                <CardContent className="pt-6 space-y-6">
+                  {/* ===== Fila 50/50 ===== */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Columna izquierda: Periodo lectivo */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Periodo lectivo</CardTitle>
+                        <CardDescription>
+                          Define el intervalo de clases. Se usará para bloquear navegación, creación y movimiento de eventos fuera de rango.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Popover modal={false}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn("w-[280px] justify-start text-left font-normal", !range && "text-muted-foreground")}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {range?.from ? (
+                                  range.to ? (
+                                    <>
+                                      {range.from.toLocaleDateString()} — {range.to.toLocaleDateString()}
+                                    </>
+                                  ) : (
+                                    range.from.toLocaleDateString()
+                                  )
+                                ) : (
+                                  <span>Selecciona periodo</span>
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="z-50 w-auto p-0"
+                              align="start"
+                              side="bottom"
+                              sideOffset={8}
+                              avoidCollisions={false}
+                              collisionPadding={0}
+                              // @ts-expect-error prop Radix
+                              position="popper"
+                            >
+                              <Calendar mode="range" selected={range} onSelect={setRange} numberOfMonths={2} initialFocus />
+                            </PopoverContent>
+                          </Popover>
+
+                          <Button onClick={handleSaveLectivo} disabled={!rangoListo} className="gap-2 text-xs">
+                            <Save className="h-4 w-4" />
+                            Guardar periodo
+                          </Button>
+                        </div>
+
+                        <Separator />
+
+                        <div className="text-sm text-muted-foreground">
+                          {persisted?.start && persisted?.end ? (
+                            <>Lectivo actual: <span className="font-medium">{persisted.start}</span> → <span className="font-medium">{persisted.end}</span></>
+                          ) : (
+                            <>Aún no hay periodo lectivo guardado.</>
+                          )}
+                        </div>
+                      </CardContent>
+                      <Separator className="my-4" />
+                      <CardHeader>
+                          <CardTitle>Presencialidades</CardTitle>
+                          <CardDescription>
+                            Tramos fijos y recurrentes de presencia en el centro (no lectivos).
+                          </CardDescription>
+                        </CardHeader>
+                      <CardContent className="space-y-4">
+                          {/* Formulario alta */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-sm font-medium">Día</label>
+                              <Select value={diaSemana} onValueChange={setDiaSemana}>
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue placeholder="Día" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {DIAS.map((d) => (
+                                    <SelectItem key={d.value} value={String(d.value)}>
+                                      {d.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Inicio</label>
+                              <Input className="mt-1" type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Fin</label>
+                              <Input className="mt-1" type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
+                            </div>
+                          </div>
+
+                          <Button onClick={handleAddPresencialidad} className="gap-2 w-full sm:w-auto text-xs">
+                            <Plus className="h-4 w-4" />
+                            Añadir presencialidad
+                          </Button>
+
+                          {/* Listado */}
+                          <Separator />
+                          {presencialidades.length === 0 ? (
+                            <div className="text-sm text-muted-foreground">No hay presencialidades registradas.</div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-[180px]">Día</TableHead>
+                                    <TableHead>Horario</TableHead>
+                                    <TableHead className="w-[80px] text-right">Acciones</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {presencialidades.map((p) => (
+                                    <TableRow key={p.id}>
+                                      <TableCell className="font-medium">
+                                        {DIAS.find((d) => d.value === p.diaSemana)?.label ?? p.diaSemana}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant="secondary">{p.horaInicio} — {p.horaFin}</Badge>
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleDeletePresencialidad(p.id)}
+                                          aria-label="Eliminar presencialidad"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </CardContent>
+                        <Separator className="my-4" />
+                        <CardHeader>
+                          <CardTitle>FCT (prácticas con alumnado)</CardTitle>
+                          <CardDescription>Tramos fijos y recurrentes (no lectivos) asociados a FCT.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-sm font-medium">Día</label>
+                              <Select value={fctDia} onValueChange={setFctDia}>
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue placeholder="Día" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {DIAS.map((d) => (
+                                    <SelectItem key={d.value} value={String(d.value)}>
+                                      {d.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Inicio</label>
+                              <Input className="mt-1" type="time" value={fctInicio} onChange={(e) => setFctInicio(e.target.value)} />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium">Fin</label>
+                              <Input className="mt-1" type="time" value={fctFin} onChange={(e) => setFctFin(e.target.value)} />
+                            </div>
+                          </div>
+
+                          <Button onClick={handleAddFCT} className="gap-2 w-full sm:w-auto">
+                            <Plus className="h-4 w-4" />
+                            Añadir FCT
+                          </Button>
+
+                          <Separator />
+
+                          {fct.length === 0 ? (
+                            <div className="text-sm text-muted-foreground">No hay FCT registradas.</div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-[180px]">Día</TableHead>
+                                    <TableHead>Horario</TableHead>
+                                    <TableHead className="w-[80px] text-right">Acciones</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {fct.map((t) => (
+                                    <TableRow key={t.id}>
+                                      <TableCell className="font-medium">
+                                        {DIAS.find((d) => d.value === t.diaSemana)?.label ?? t.diaSemana}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant="secondary">{t.horaInicio} — {t.horaFin}</Badge>
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleDeleteFCT(t.id)}
+                                          aria-label="Eliminar FCT"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                          </CardContent>
+                          <Separator className="my-4" />
+
+                    <CardHeader>
+                      <CardTitle>Festivos</CardTitle>
+                      <CardDescription>
+                        Crea días o rangos no lectivos con su motivo. El calendario bloqueará la creación y movimiento de eventos en estas fechas.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-wrap items-start gap-3">
+                        <Popover modal={false}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-[280px] justify-start text-left font-normal",
+                                !festivoRange && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {festivoRange?.from
+                                ? festivoRange.to
+                                  ? `${festivoRange.from.toLocaleDateString()} — ${festivoRange.to.toLocaleDateString()}`
+                                  : festivoRange.from.toLocaleDateString()
+                                : "Selecciona fecha o rango"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="z-50 w-auto p-0"
+                            align="start"
+                            side="bottom"
+                            sideOffset={8}
+                            avoidCollisions={false}
+                            collisionPadding={0}
+                            // @ts-expect-error Radix
+                            position="popper"
+                          >
+                            <Calendar mode="range" selected={festivoRange} onSelect={setFestivoRange} numberOfMonths={2} initialFocus />
+                          </PopoverContent>
+                        </Popover>
+
+                        <Textarea
+                          placeholder="Motivo (p. ej., Fiesta nacional, Semana Santa, Puente local...)"
+                          value={motivo}
+                          onChange={(e) => setMotivo(e.target.value)}
+                          className="min-w-[280px] w-[400px]"
+                          rows={2}
+                        />
+
+                        <Button onClick={handleAddFestivo} disabled={!canSaveFestivo} className="gap-2">
+                          <Plus className="h-4 w-4" />
+                          Añadir festivo
+                        </Button>
+                      </div>
+
+                      <Separator />
+
+                      {festivos.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">No hay festivos guardados aún.</div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[180px]">Fecha</TableHead>
+                                <TableHead>Motivo</TableHead>
+                                <TableHead className="w-[80px] text-right">Acciones</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {festivos.map((f) => (
+                                <TableRow key={f.id}>
+                                  <TableCell className="font-medium">
+                                    {f.end && f.end !== f.start ? (
+                                      <Badge variant="secondary">{f.start} → {f.end}</Badge>
+                                    ) : (
+                                      <Badge variant="secondary">{f.start}</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{f.title}</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteFestivo(f.id)} aria-label="Eliminar festivo">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                        
+                        
+                    </Card>
+                  </div>
+
+                  {/* ===== Card Festivos (debajo) ===== */}
+                  
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </div>
       </SidebarInset>
     </SidebarProvider>
