@@ -217,5 +217,7 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
       input: any,             // { titulo, fechaISO, asignatura, descripcionHtml, umbral, ces: [...] }
       suggestedFileName?: string
     ) => ipcRenderer.invoke("informe:generar-html", { input, suggestedFileName }),
+
+    invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
   
 });

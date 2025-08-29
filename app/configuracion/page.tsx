@@ -1,5 +1,5 @@
 "use client";
-
+import BackupsCard from "@/components/BackupsCard"; // ajusta la ruta
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Calendar as CalendarIcon, Save, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, useCallback } from "react";
@@ -288,7 +288,7 @@ export default function ConfiguracionPage() {
         {/* Contenido */}
         <div className="p-6 space-y-6">
           <h1 className="text-3xl font-bold tracking-tight">Configuración</h1>
-
+          <div className="w-full md:w-1/2">
           {/* ===== Tarjeta plegable: Configurar horarios ===== */}
           <Collapsible open={openHorarios} onOpenChange={setOpenHorarios}>
             <Card className="border-muted/60">
@@ -313,7 +313,7 @@ export default function ConfiguracionPage() {
               <CollapsibleContent>
                 <CardContent className="pt-6 space-y-6">
                   {/* ===== Fila 50/50 ===== */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 gap-6">
                     {/* Columna izquierda: Periodo lectivo */}
                     <Card>
                       <CardHeader>
@@ -413,6 +413,7 @@ export default function ConfiguracionPage() {
                             <Plus className="h-4 w-4" />
                             Añadir presencialidad
                           </Button>
+                          <BackupsCard />
 
                           {/* Listado */}
                           <Separator />
@@ -634,6 +635,7 @@ export default function ConfiguracionPage() {
               </CollapsibleContent>
             </Card>
           </Collapsible>
+        </div>
         </div>
       </SidebarInset>
     </SidebarProvider>

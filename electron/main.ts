@@ -1,6 +1,10 @@
 /* ============================================================================
  * IMPORTS (únicos)
  * ==========================================================================*/
+import { openDbSingleton, closeDbSingleton, getDb } from "../src/main/db/singleton";
+import { BackupManager } from "../main/backup";
+
+
 import * as dotenv from "dotenv";
 dotenv.config();
 import { app, BrowserWindow, ipcMain, dialog } from "electron";
@@ -61,6 +65,33 @@ try {
 } catch (e) {
   console.error("❌ Error listando tablas:", e);
 }
+
+
+const DB_PATH =
+  app.isPackaged
+    ? path.join(app.getPath("userData"), "forgeskills.sqlite") // PROD
+    : path.join(process.cwd(), "data", "forgeskills.sqlite");  // DEV
+
+fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+
+// Abre la DB (singleton) al arrancar
+app.whenReady().then(() => {
+  openDbSingleton(DB_PATH);
+  (globalThis as any).db = getDb(); // si tu initDB lo usa
+  initDB();
+});
+
+// Si haces restore en caliente:
+ipcMain.handle("backup:restore", async (_e, filePath: string) => {
+  try {
+    closeDbSingleton();                // 1) cerrar
+    await backups.restore(filePath);   // 2) copiar/replace
+    openDbSingleton(DB_PATH);          // 3) reabrir
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) };
+  }
+});
 
 /* ============================================================================
  * IPC de diagnóstico (opcional, útil para depurar rutas/tablas desde el front)
@@ -2304,4 +2335,44 @@ ipcMain.handle("informe:generar-html", async (_e, payload) => {
     console.error("[informe:generar-html] error:", err);
     return { ok: false, error: err?.message || "Error generando PDF" };
   }
+});
+
+const backups = new BackupManager(DB_PATH);
+
+// IPC para UI
+ipcMain.handle("backup:list", async (_e, kind?: "INC" | "FULL") => {
+  try { return { ok: true, list: backups.list(kind) }; }
+  catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
+});
+ipcMain.handle("backup:now", async (_e, kind: "INC" | "FULL" = "INC") => {
+  try { return { ok: true, info: await backups.backup(kind) }; }
+  catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
+});
+// ipcMain.handle("backup:restore", async (_e, filePath: string) => {
+//   try {
+//     // 🔒 opcional: cierra tu DB singleton aquí
+//     // await closeDbSingleton();
+//     await backups.restore(filePath);
+//     // await openDbSingleton();
+//     return { ok: true };
+//   } catch (e: any) {
+//     return { ok: false, error: String(e?.message || e) };
+//   }
+// });
+
+// Planificador: INC cada 20' y FULL cada hora, alineado a reloj
+app.whenReady().then(() => {
+  const msUntilNext = (stepMin: number) => {
+    const now = new Date();
+    const next = Math.ceil(now.getMinutes() / stepMin) * stepMin;
+    const t = new Date(now);
+    t.setMinutes(next === 60 ? 0 : next, 0, 0);
+    if (next === 60) t.setHours(now.getHours() + 1);
+    return t.getTime() - now.getTime();
+  };
+  const startEvery = (minutes: number, fn: () => void) =>
+    setTimeout(() => { fn(); setInterval(fn, minutes * 60 * 1000); }, msUntilNext(minutes));
+
+  startEvery(20, async () => { try { await backups.backup("INC"); } catch (e) { console.error("[INC]", e); } });
+  startEvery(60, async () => { try { await backups.backup("FULL"); } catch (e) { console.error("[FULL]", e); } });
 });
