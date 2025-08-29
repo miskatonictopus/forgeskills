@@ -716,34 +716,34 @@ export function DialogVerActividad({
 
   // === Exportar PDF ===
  // === Exportar PDF (jsPDF + Geist) ===
-const handleExportPDF = async () => {
+ const handleExportPDF_HTML = async () => {
   if (!actividad || !pdfData) return;
 
-  // Preparamos el input que espera /lib/pdf/actividadInforme.ts
+  // Enviamos HTML (no texto plano). Usa el htmlLocal ya saneado/maquetado.
   const input = {
     titulo: pdfData.titulo ?? "Actividad",
     fechaISO: pdfData.fechaISO ?? new Date().toISOString(),
     asignatura: pdfData.asignatura ?? "—",
-    descripcion: toPlainText(pdfData.html),  // jsPDF trabaja con texto plano
+    descripcionHtml: pdfData.html || "<p>Sin contenido</p>",  // 👈 HTML
     umbral,
     ces: (pdfData.ces ?? []).map((c: any) => ({
       codigo: c.codigo,
-      ra: raOf(c.codigo),                                 // <- RA separado
-      texto: (c.descripcion || c.texto || "—").trim(),    // <- descripción CE
-      similitud: Number(c.similitud ?? 0),                // <- 0..1
+      ra: raOf(c.codigo),
+      texto: (c.descripcion || c.texto || "—").trim(),
+      similitud: Number(c.similitud ?? 0),
     })),
   };
 
   try {
-    if (!(window as any)?.electronAPI?.generarInformeActividad) {
-      console.error("Falta electronAPI.generarInformeActividad (preload/main).");
-      toast.error("No está disponible la exportación por jsPDF.");
+    if (!(window as any)?.electronAPI?.generarInformeActividadHTML) {
+      console.error("Falta electronAPI.generarInformeActividadHTML.");
+      toast.error("Exportación HTML→PDF no disponible.");
       return;
     }
 
-    const res = await (window as any).electronAPI.generarInformeActividad(
+    const res = await (window as any).electronAPI.generarInformeActividadHTML(
       input,
-      suggestedFileName // ya lo tienes montado arriba
+      suggestedFileName // reusa el nombre sugerido que ya calculas
     );
 
     if (res?.ok) {
@@ -1099,10 +1099,11 @@ return (
             </div>
 
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={handleExportPDF} disabled={!pdfData}>
-                <FileDown className="w-4 h-4 mr-2" />
-                Exportar PDF
-              </Button>
+            <Button size="sm" onClick={handleExportPDF_HTML} disabled={!pdfData}>
+  <FileDown className="w-4 h-4 mr-2" />
+  Exportar PDF
+</Button>
+
 
               <Button
                 variant="outline"

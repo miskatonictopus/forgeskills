@@ -213,7 +213,9 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
 
     getPdfBaseDir: () => ipcRenderer.invoke("pdf.get-base-dir"),
 
-    generarInformeActividad: (data: any, fileName: string) =>
-    ipcRenderer.invoke("pdf.generar-actividad", data, fileName),
+    generarInformeActividadHTML: (
+      input: any,             // { titulo, fechaISO, asignatura, descripcionHtml, umbral, ces: [...] }
+      suggestedFileName?: string
+    ) => ipcRenderer.invoke("informe:generar-html", { input, suggestedFileName }),
   
 });

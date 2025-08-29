@@ -62,7 +62,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <img src={skillforge_black.src} alt="SkillForge" className="h-12 mx-auto" />
+        <img src={skillforge_black.src} alt="SkillForge" className="h-15 mx-auto" />
         <p className="text-right text-zinc-400 text-xs">alpha version 1.0</p>
       </SidebarHeader>
 

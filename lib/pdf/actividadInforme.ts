@@ -2,15 +2,16 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ActividadInformeInput, GenerarPDFOpts } from "./pdf.types";
-import { GEIST_TTF_BASE64 } from "./fonts/geist.base64";
+
+// Usa las dos fuentes exportadas
+import { GEIST_REG_TTF_BASE64 } from "./fonts/geist-regular.base64";
+import { GEIST_BOLD_TTF_BASE64 } from "./fonts/geist-bold.base64";
 
 function registerGeist(doc: jsPDF) {
-  // 1) Cargar la fuente en el VFS
-  doc.addFileToVFS("Geist.ttf", GEIST_TTF_BASE64);
-  // 2) Registrar familias/estilos
-  doc.addFont("Geist.ttf", "Geist", "normal");
-  doc.addFont("Geist.ttf", "Geist", "bold");
-  // 3) Dejar por defecto Geist normal
+  doc.addFileToVFS("Geist-Regular.ttf", GEIST_REG_TTF_BASE64);
+  doc.addFileToVFS("Geist-Bold.ttf", GEIST_BOLD_TTF_BASE64);
+  doc.addFont("Geist-Regular.ttf", "Geist", "normal");
+  doc.addFont("Geist-Bold.ttf", "Geist", "bold");
   doc.setFont("Geist", "normal");
 }
 
@@ -20,6 +21,9 @@ const fmtFechaES = (iso?: string) =>
     month: "long",
     year: "numeric",
   });
+
+// helper de altura de línea
+const lh = (size: number) => size * 1.2;
 
 export function generarPDFInformeActividad(
   data: ActividadInformeInput,
@@ -40,74 +44,80 @@ export function generarPDFInformeActividad(
   const pageWidth  = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const fechaStr   = fmtFechaES(fechaISO);
+  const M = { left: 56, right: 56, top: 56, bottom: 56 };
 
-  // ---- Header / Footer en todas las páginas ----
+  // Header/Footer reutilizable
   const drawHeaderFooter = (pageNumber: number) => {
-    // Header: asignatura ← / fecha →
+    // Header
     doc.setFont("Geist", "bold");
     doc.setFontSize(10);
-    doc.text(asignatura, 56, 32);
-    doc.text(fechaStr, pageWidth - 56, 32, { align: "right" });
+    // por si quedó charSpace activo en algún punto:
+    // @ts-ignore
+    doc.setCharSpace?.(0);
+    doc.text(asignatura, M.left, 32);
+    doc.text(fechaStr, pageWidth - M.right, 32, { align: "right" });
 
-    // Línea bajo header (opcional)
+    // línea
     doc.setDrawColor(230);
     doc.setLineWidth(0.5);
-    doc.line(56, 38, pageWidth - 56, 38);
+    doc.line(M.left, 38, pageWidth - M.right, 38);
 
-    // Footer: paginación →
+    // Footer
     const total = doc.getNumberOfPages();
     doc.setFont("Geist", "normal");
     doc.setFontSize(10);
-    doc.text(
-      `Página ${pageNumber} de ${total}`,
-      pageWidth - 56,
-      pageHeight - 24,
-      { align: "right" }
-    );
+    doc.text(`Página ${pageNumber} de ${total}`, pageWidth - M.right, pageHeight - 24, { align: "right" });
   };
 
-  // ---- Contenido portada: Título + Descripción ----
-  let y = 56 + 16; // un poco de aire tras el header fijo
+  // ✅ DIBUJAR CABECERA DE LA PÁGINA 1 ANTES DE TODO
+  drawHeaderFooter(1);
 
-  // 1) TÍTULO PRINCIPAL (fijo)
+  // aire tras header
+  let y = M.top + 16;
+
+  // ======= TÍTULO PRINCIPAL =======
   const headerTitle = opts.headerTitle ?? "Actividad evaluativa";
   doc.setFont("Geist", "bold");
-  doc.setFontSize(18);
-  const h1Lines = doc.splitTextToSize(headerTitle, pageWidth - 112);
-  doc.text(h1Lines, 56, y);
-  y += h1Lines.length * 20; // altura aproximada por línea
-  
-  // 2) SUBTÍTULO (título de la actividad)
+  doc.setFontSize(24);
+  // tracking más estrecho
+  // @ts-ignore
+  doc.setCharSpace?.(-0.5);
+
+  const h1Lines = doc.splitTextToSize(headerTitle, pageWidth - (M.left + M.right));
+  doc.text(h1Lines, M.left, y);
+  // avanzar usando altura proporcional al tamaño actual
+  y += h1Lines.length * lh(24);
+
+  // IMPORTANTE: resetear tracking para que no afecte al resto
+  // @ts-ignore
+  doc.setCharSpace?.(0);
+
+  // ======= SUBTÍTULO (título de la actividad) =======
   doc.setFont("Geist", "bold");
   doc.setFontSize(14);
-  const h2Lines = doc.splitTextToSize(titulo || "—", pageWidth - 112);
-  doc.text(h2Lines, 56, y);
-  y += h2Lines.length * 16;
-  
-  // 3) Meta opcional (umbral)
+  const h2Lines = doc.splitTextToSize(titulo || "—", pageWidth - (M.left + M.right));
+  doc.text(h2Lines, M.left, y);
+  y += h2Lines.length * lh(14);
+
+  // ======= Meta (umbral) =======
   doc.setFont("Geist", "normal");
   doc.setFontSize(11);
   doc.setTextColor(85);
-  doc.text(`Umbral aplicado: ${umbral}%`, 56, y);
+  doc.text(`Umbral aplicado: ${umbral}%`, M.left, y);
   doc.setTextColor(17);
-  y += 18;
-  
-  // 4) Descripción (texto plano, no HTML)
-  doc.setFontSize(12);
-  const descLines = doc.splitTextToSize(descripcion || "—", pageWidth - 112);
-  doc.text(descLines, 56, y);
-  y += descLines.length * 14 + 10;
-  
-  // 5) Título de la tabla
-  doc.setFont("Geist", "bold");
-  doc.setFontSize(12);
-  doc.text("Criterios de Evaluación incluidos", 56, y);
-  doc.setFont("Geist", "normal");
+  y += lh(11);
 
-  // Título de la tabla
+  // ======= Descripción =======
+  doc.setFont("Geist", "normal");
+  doc.setFontSize(12);
+  const descLines = doc.splitTextToSize(descripcion || "—", pageWidth - (M.left + M.right));
+  doc.text(descLines, M.left, y);
+  y += descLines.length * lh(12) + 8;
+
+  // ======= Título de la tabla =======
   doc.setFont("Geist", "bold");
   doc.setFontSize(12);
-  doc.text("Criterios de Evaluación incluidos", 56, y);
+  doc.text("Criterios de Evaluación incluidos", M.left, y);
   doc.setFont("Geist", "normal");
 
   // ---- Tabla CE ----
@@ -146,13 +156,14 @@ export function generarPDFInformeActividad(
       2: { cellWidth: 260 },
       3: { cellWidth: 70, halign: "right" },
     },
-    didDrawPage: (dataHook) => {
-      drawHeaderFooter(dataHook.pageNumber);
+    // pintamos header/footer en todas las páginas que toquen la tabla
+    didDrawPage: (hook) => {
+      drawHeaderFooter(hook.pageNumber);
     },
-    margin: { left: 56, right: 56, top: 56, bottom: 56 },
+    margin: { left: M.left, right: M.right, top: M.top, bottom: M.bottom },
   });
 
-  // Asegura que la última página también tenga header/footer consistentes
+  // repaso final para asegurar la cabecera en la última página
   drawHeaderFooter(doc.getNumberOfPages());
 
   return doc.output("arraybuffer");

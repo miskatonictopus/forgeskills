@@ -2252,3 +2252,43 @@ ipcMain.handle(CHANNEL, async (_e, data: any, fileName: string) => {
     return { ok: false, error: String(err?.message || err) };
   }
 });
+
+import { buildActividadHTML } from "../lib/pdf/actividadInformeHTML";
+import { renderHTMLtoPDF } from "../lib/pdf/renderHTMLtoPDF";
+
+ipcMain.handle("informe:generar-html", async (_e, payload) => {
+  const { input, suggestedFileName } = payload || {};
+  try {
+    const html = buildActividadHTML(
+      {
+        titulo: String(input?.titulo ?? "Actividad"),
+        fechaISO: String(input?.fechaISO ?? new Date().toISOString()),
+        asignatura: String(input?.asignatura ?? "—"),
+        descripcion: String(input?.descripcionHtml ?? "<p>Sin contenido</p>"),
+        umbral: Number(input?.umbral ?? 0),
+        ces: Array.isArray(input?.ces) ? input.ces : [],
+      },
+      { headerTitle: "Actividad evaluativa" }
+    );
+
+    const pdfBuffer = await renderHTMLtoPDF(html);
+
+    const baseName = (suggestedFileName || "Informe_actividad.pdf")
+      .replace(/[\/\\:*?"<>|]+/g, "_");
+
+    // 👉 Guardar siempre en ~/Documents/ForgeSkillsPDF
+    const outDir = path.join(app.getPath("documents"), "ForgeSkillsPDF");
+    await fs.promises.mkdir(outDir, { recursive: true });
+
+    const outPath = path.join(outDir, baseName);
+
+    await fs.promises.writeFile(outPath, pdfBuffer);
+
+    console.log("[PDF-HTML] ✅ guardado:", outPath);
+    return { ok: true, path: outPath };
+  } catch (err: any) {
+    console.error("[informe:generar-html] error:", err);
+    return { ok: false, error: err?.message || "Error generando PDF" };
+  }
+});
+

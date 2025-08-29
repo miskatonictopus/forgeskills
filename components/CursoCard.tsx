@@ -7,14 +7,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { Users, SquarePen, PlusCircle, ClipboardList } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Users, SquarePen, PlusCircle, ClipboardList, ChevronDown } from "lucide-react";
 import { DialogAsignaturas } from "@/components/DialogAsignaturas";
 import { DialogCrearActividad } from "@/components/actividades/DialogCrearActividad";
 import { asignaturasPorCurso, setAsignaturasCurso } from "@/store/asignaturasPorCurso";
 import type { Asignatura } from "@/models/asignatura";
 
 /* ================= helpers color ================= */
-
 
 const normalizeHex = (v?: string | null) => {
   if (!v) return "";
@@ -60,15 +60,14 @@ type Curso = {
   nivel: string;
 };
 
-
-
 type Props = { curso: Curso };
 
 export function CursoCard({ curso }: Props) {
   const [openAdd, setOpenAdd] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
-
   const [openCrear, setOpenCrear] = useState(false);
+  const [openAsignaturas, setOpenAsignaturas] = useState(false);
+
   const [asigSeleccionada, setAsigSeleccionada] = useState<{ id: string; nombre: string } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -76,27 +75,22 @@ export function CursoCard({ curso }: Props) {
   const asignaturas = asignaturasPorCurso[curso.id] || [];
   const tieneAsignaturas = asignaturas.length > 0;
 
-  /* 🔧 MOVER ARRIBA: estado usado por efectos siguientes */
+  /* 🔧 color state */
   const [colorByAsig, setColorByAsig] = useState<Record<string, string>>({});
   const asigHash = useMemo(() => {
     return (asignaturas || [])
       .map(a => `${a.id}:${normalizeHex(pickColorProp(a)) || ""}`)
       .join("|");
   }, [asignaturas]);
-  
-  /* listener de cambios de color (dep solo curso.id) */
+
+  /* listener cambios color */
   useEffect(() => {
     const onColor = (e: any) => {
       const { asignaturaId, color } = e?.detail || {};
       if (!asignaturaId) return;
 
-      // 1) pinta el círculo inmediatamente
-      setColorByAsig(prev => {
-        if (prev[asignaturaId] === color) return prev;
-        return { ...prev, [asignaturaId]: color };
-      });
+      setColorByAsig(prev => (prev[asignaturaId] === color ? prev : { ...prev, [asignaturaId]: color }));
 
-      // 2) sincroniza el store SOLO si hace falta
       try {
         const lista = (asignaturasPorCurso[curso.id] || []) as Array<Asignatura & { color?: string }>;
         const idx = lista.findIndex(a => String(a.id) === String(asignaturaId));
@@ -108,54 +102,45 @@ export function CursoCard({ curso }: Props) {
             setAsignaturasCurso(curso.id, nueva as any);
           }
         }
-      } catch {
-        /* noop */
-      }
+      } catch { /* noop */ }
     };
 
     window.addEventListener("asignatura:color:actualizado", onColor);
     return () => window.removeEventListener("asignatura:color:actualizado", onColor);
   }, [curso.id]);
 
-  // carga asignaturas base
+  // carga asignaturas
   useEffect(() => {
     window.electronAPI.asignaturasDeCurso(curso.id).then((asigs) => {
       setAsignaturasCurso(curso.id, asigs);
     });
   }, [curso.id, refreshKey]);
 
-
-  // resuelve colores (usa lo que venga y completa con API si falta)
+  // resolver colores
   useEffect(() => {
     if (!tieneAsignaturas) {
-      // solo si hace falta
       if (Object.keys(colorByAsig).length) setColorByAsig({});
       return;
     }
-  
-    // 1) Colores que ya vienen en cada item
+
     const initial: Record<string, string> = {};
     for (const a of asignaturas) {
       const c = normalizeHex(pickColorProp(a));
       if (c) initial[a.id] = c;
     }
-  
-    // ✅ aplicar solo si hay diferencias reales con el estado actual
+
     if (Object.keys(initial).length) {
       let changed = false;
       for (const [id, col] of Object.entries(initial)) {
         if (colorByAsig[id] !== col) { changed = true; break; }
       }
-      if (changed) {
-        setColorByAsig(prev => ({ ...prev, ...initial }));
-      }
+      if (changed) setColorByAsig(prev => ({ ...prev, ...initial }));
     }
-  
+
     (async () => {
       try {
         const api = (window as any).electronAPI;
-  
-        // 2) Batch
+
         if (api?.leerColoresAsignaturas) {
           const arr = await api.leerColoresAsignaturas(curso.id);
           const updates: Record<string, string> = {};
@@ -163,17 +148,16 @@ export function CursoCard({ curso }: Props) {
             const id = String(it?.id ?? it?.asignaturaId ?? "");
             const col = normalizeHex(pickColorProp(it));
             if (!id || !col) continue;
-            if (colorByAsig[id] !== col) updates[id] = col; // ✅ sólo diferencias
+            if (colorByAsig[id] !== col) updates[id] = col;
           }
           if (Object.keys(updates).length) {
             setColorByAsig(prev => ({ ...prev, ...updates }));
             return;
           }
         }
-  
-        // 3) Fallback por asignatura (sólo si falta y cambia)
+
         for (const a of asignaturas) {
-          if (initial[a.id]) continue; // ya lo teníamos del paso 1
+          if (initial[a.id]) continue;
           let det: any = null;
           if (api?.leerAsignatura) det = await api.leerAsignatura(a.id);
           else if (api?.getAsignatura) det = await api.getAsignatura(a.id);
@@ -184,16 +168,20 @@ export function CursoCard({ curso }: Props) {
         }
       } catch { /* noop */ }
     })();
-  
-  // 👇 deps ESTABLES: el hash y el curso, no el array entero ni el objeto de colores sin control
   }, [asigHash, curso.id]); 
-  
-
 
   const abrirCrearActividad = (asig: { id: string; nombre: string }) => {
     setAsigSeleccionada(asig);
     setOpenCrear(true);
   };
+
+  // resumen compacto cuando el desplegable está cerrado
+  const resumenAsignaturas = useMemo(() => {
+    if (!tieneAsignaturas) return "Sin asignaturas";
+    const tops = asignaturas.slice(0, 2).map(a => a.nombre);
+    const resto = Math.max(0, asignaturas.length - 2);
+    return resto > 0 ? `${tops.join(", ")} +${resto}` : tops.join(", ");
+  }, [tieneAsignaturas, asignaturas]);
 
   return (
     <>
@@ -255,77 +243,85 @@ export function CursoCard({ curso }: Props) {
               Añadir asignatura/s
             </Button>
           ) : (
-            <div className="pt-2 space-y-2 text-xs leading-tight pb-2">
-              <ul className="pl-0 space-y-2">
-                {asignaturas.map((a) => {
-                  const color = colorByAsig[a.id];
-                  const hasColor = !!color;
-                  const borderTone = hasColor && isVeryLight(color) ? "border-black/30" : "border-white/20";
+            <Collapsible open={openAsignaturas} onOpenChange={setOpenAsignaturas} className="pt-2 pb-2">
+              {/* Trigger con resumen y chevron */}
+              <CollapsibleTrigger asChild>
+                <button
+                  className="w-full -mx-2 px-2 py-2 rounded-md hover:bg-zinc-800/40 transition-colors flex items-center justify-between text-left"
+                  aria-label={openAsignaturas ? "Ocultar asignaturas" : "Mostrar asignaturas"}
+                >
+                  <div className="min-w-0">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Asignaturas ({asignaturas.length})</p>
+                    {!openAsignaturas && (
+                      <p className="truncate text-xs text-zinc-200">{resumenAsignaturas}</p>
+                    )}
+                  </div>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 transition-transform ${openAsignaturas ? "rotate-180" : ""}`}
+                  />
+                </button>
+              </CollapsibleTrigger>
 
-                  return (
-                    <li key={a.id} className="list-none -mx-2 p-2 rounded-md hover:bg-zinc-800/40 transition-colors">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2">
-                          <span className="font-mono text-muted-foreground mt-[2px]">0{a.id}</span>
+              <CollapsibleContent className="space-y-2 text-xs leading-tight pt-2">
+                <ul className="pl-0 space-y-2">
+                  {asignaturas.map((a) => {
+                    const color = colorByAsig[a.id];
+                    const hasColor = !!color;
+                    const borderTone = hasColor && isVeryLight(color) ? "border-black/30" : "border-white/20";
 
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span
-                                className={`mt-[3px] h-3.5 w-3.5 rounded-full border shrink-0 ${hasColor ? borderTone : "border-zinc-600"}`}
-                                style={{ backgroundColor: hasColor ? color : "transparent" }}
-                                aria-label={hasColor ? `Color ${color}` : "Sin color"}
-                                title={hasColor ? color : "Sin color"}
-                              />
-                            </TooltipTrigger>
-                            {hasColor && <TooltipContent side="top">{color}</TooltipContent>}
-                          </Tooltip>
+                    return (
+                      <li key={a.id} className="list-none -mx-2 p-2 rounded-md hover:bg-zinc-800/40 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2 min-w-0">
+                            <span className="font-mono text-muted-foreground mt-[2px] shrink-0">0{a.id}</span>
 
-                          <span className="text-white">{a.nombre}</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className={`mt-[3px] h-3.5 w-3.5 rounded-full border shrink-0 ${hasColor ? borderTone : "border-zinc-600"}`}
+                                  style={{ backgroundColor: hasColor ? color : "transparent" }}
+                                  aria-label={hasColor ? `Color ${color}` : "Sin color"}
+                                  title={hasColor ? color : "Sin color"}
+                                />
+                              </TooltipTrigger>
+                              {hasColor && <TooltipContent side="top">{color}</TooltipContent>}
+                            </Tooltip>
+
+                            <span className="text-white truncate">{a.nombre}</span>
+                          </div>
+
+                          {/* Si quieres reactivar el botón de crear actividad: */}
+                          {/* <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Crear actividad para ${a.nombre}`}
+                            className="h-7 text-emerald-200 hover:text-emerald-200 hover:bg-emerald-900/20 gap-1 text-xs"
+                            onClick={() => abrirCrearActividad(a)}
+                          >
+                            <PlusCircle className="w-4 h-4" />
+                            Crear actividad
+                          </Button> */}
                         </div>
+                      </li>
+                    );
+                  })}
+                </ul>
 
-                        {/* <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Crear actividad para ${a.nombre}`}
-                          className="h-7 text-emerald-200 hover:text-emerald-200 hover:bg-emerald-900/20 gap-1 text-xs"
-                          onClick={() => abrirCrearActividad(a)}
-                        >
-                          <PlusCircle className="w-4 h-4" />
-                          Crear actividad
-                        </Button> */}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-
-              <Button
-                size="sm"
-                aria-label="Modificar asignaturas"
-                className="mt-2 inline-flex items-center gap-2 bg-white text-black hover:bg-gray-100 px-3 py-2 text-xs rounded-md shadow-sm"
-                onClick={() => setOpenEdit(true)}
-              >
-                <SquarePen className="w-4 h-4" />
-                Modificar asignaturas
-              </Button> 
-            </div>
+                <Button
+                  size="sm"
+                  aria-label="Modificar asignaturas"
+                  className="mt-2 inline-flex items-center gap-2 bg-white text-black hover:bg-gray-100 px-3 py-2 text-xs rounded-md shadow-sm"
+                  onClick={() => setOpenEdit(true)}
+                >
+                  <SquarePen className="w-4 h-4" />
+                  Modificar asignaturas
+                </Button>
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
           <Separator className="my-4" />
         </CardContent>
-
-        {/* <div className="p-3 pt-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs font-medium uppercase text-muted-foreground hover:text-white inline-flex items-center gap-1 transition-colors"
-            onClick={() => router.push(`/cursos/${curso.id}/actividades`)}
-          >
-            <ClipboardList className="w-4 h-4" />
-            Ver actividades
-            <span className="text-xs text-zinc-400 ml-1">(0)</span>
-          </Button>
-        </div> */}
       </Card>
 
       <DialogAsignaturas cursoId={curso.id} open={openAdd} onOpenChange={setOpenAdd} mode="add" />

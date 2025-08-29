@@ -2,18 +2,29 @@
 <link rel="stylesheet" href="styles.css">
 
 <style>
-  .ftr { font-family:"Geist",sans-serif; font-size:9pt; color:#666; width:100%; padding:0 10mm; }
-  .flex { display:flex; justify-content:space-between; align-items:center; }
-  .line { position:absolute; left:18mm; right:18mm; bottom:20mm; height:0.5pt; background:#e6e6e6; }
-  .container { position:relative; width:100%; }
+  .ftr {
+    font-family: "Geist", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    font-size: 9pt;
+    color: #666;
+    padding: 0 18mm 8mm 18mm;
+  }
+  .ftr .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .ftr-line {
+    position: fixed;
+    left: 18mm; right: 18mm; bottom: 20mm;
+    height: 0.5pt; background: #e6e6e6;
+  }
 </style>
 
-<div class="container">
-  <div class="line"></div>
-  <div class="ftr">
-    <div class="flex">
-      <span>SkillForge · Informe de Actividad</span>
-      <span><span class="pageNumber"></span>/<span class="totalPages"></span></span>
-    </div>
+<div class="ftr-line"></div>
+<footer class="ftr">
+  <div class="row">
+    <span>SkillForge · Informe</span>
+    <span><span class="pageNumber"></span>/<span class="totalPages"></span></span>
   </div>
-</div>
+</footer>
+

@@ -8,8 +8,13 @@ import type { Metadata } from "next"
 const geist = localFont({
   src: [
     {
-      path: "../fonts/Geist/Geist-VariableFont_wght.ttf",
-      weight: "100 900",
+      path: "../fonts/Geist/Geist-Bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../fonts/Geist/Geist-Regular.ttf",
+      weight: "400",
       style: "normal",
     },
   ],
