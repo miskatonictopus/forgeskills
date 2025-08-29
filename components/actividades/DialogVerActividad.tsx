@@ -714,24 +714,36 @@ export function DialogVerActividad({
     return `Informe_${base}.pdf`;
   }, [actividad?.nombre]);
 
-  // === Exportar PDF ===
- // === Exportar PDF (jsPDF + Geist) ===
- const handleExportPDF_HTML = async () => {
+// === Exportar PDF (HTML → PDF) ===
+const handleExportPDF_HTML = async () => {
   if (!actividad || !pdfData) return;
 
-  // Enviamos HTML (no texto plano). Usa el htmlLocal ya saneado/maquetado.
+  // Convierte Map → objeto plano para el IPC (por si raByCe es un Map)
+  const raByCeObj =
+    raByCe instanceof Map ? Object.fromEntries(raByCe) : (raByCe ?? {});
+
+  // ceDescByCode ya es Record<string,string> en tu estado; deja fallback
+  const ceDescDict = ceDescByCode ?? {};
+
+  // Prepara los CE tal y como los usas en el dialog (mantén 'texto' y 'similitud')
+  const cesParaPDF = (pdfData.ces ?? []).map((c: any) => ({
+    codigo: c.codigo,
+    ra: raOf(c.codigo),
+    // ⬇️ no fuerces "—"; deja vacío para permitir fallback
+    texto: (c.descripcion || c.texto || "").trim() || undefined,
+    similitud: Number(c.similitud ?? c.puntuacion ?? 0),
+  }));
+
+  // Input para el handler "informe:generar-html" (coincide con main.ts)
   const input = {
     titulo: pdfData.titulo ?? "Actividad",
     fechaISO: pdfData.fechaISO ?? new Date().toISOString(),
     asignatura: pdfData.asignatura ?? "—",
-    descripcionHtml: pdfData.html || "<p>Sin contenido</p>",  // 👈 HTML
+    descripcionHtml: pdfData.html || "<p>Sin contenido</p>", // HTML saneado/maquetado
     umbral,
-    ces: (pdfData.ces ?? []).map((c: any) => ({
-      codigo: c.codigo,
-      ra: raOf(c.codigo),
-      texto: (c.descripcion || c.texto || "—").trim(),
-      similitud: Number(c.similitud ?? 0),
-    })),
+    ces: cesParaPDF,
+    raByCe: raByCeObj,          // 👈 añade los mapas
+    ceDescByCode: ceDescDict,   // 👈 añade los mapas
   };
 
   try {
@@ -743,7 +755,7 @@ export function DialogVerActividad({
 
     const res = await (window as any).electronAPI.generarInformeActividadHTML(
       input,
-      suggestedFileName // reusa el nombre sugerido que ya calculas
+      suggestedFileName // reutiliza tu nombre sugerido
     );
 
     if (res?.ok) {
@@ -756,7 +768,6 @@ export function DialogVerActividad({
     toast.error("Error al generar el PDF.");
   }
 };
-
 
   const totalCE = cesDetectados.length;
   const visiblesCE = cesFiltrados.length;

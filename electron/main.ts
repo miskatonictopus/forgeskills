@@ -10,6 +10,7 @@ import Database from "better-sqlite3";
 import type BetterSqlite3 from "better-sqlite3";
 import { generarPDFInformeActividad } from "../lib/pdf/actividadInforme"; // ajusta la ruta si cambia
 
+
 import { execSync } from "child_process";
 import { writeFile } from "node:fs/promises";
 import * as crypto from "crypto";
@@ -2223,6 +2224,10 @@ function cargarGenerador(): (data: any, opts?: any) => ArrayBuffer {
   );
 }
 
+// main.ts
+import { buildActividadHTML } from "../lib/pdf/actividadInformeHTML";
+import { renderHTMLtoPDF } from "../lib/pdf/renderHTMLtoPDF";
+
 const CHANNEL = "pdf.generar-actividad";
 ipcMain.removeHandler(CHANNEL);
 
@@ -2230,12 +2235,22 @@ ipcMain.handle(CHANNEL, async (_e, data: any, fileName: string) => {
   try {
     console.log("[PDF] ▶︎ llamado con:", { titulo: data?.titulo, fileName });
 
-    const bytes = generarPDFInformeActividad(data ?? {}, {});
-    const buf = toBuffer(bytes);
-    console.log("[PDF] bytes:", buf.byteLength);
+    // 1) Construimos el HTML (misma lógica que el Dialog)
+    const html = buildActividadHTML({
+      titulo: data?.titulo,
+      fechaISO: data?.fechaISO,
+      asignatura: data?.asignatura,
+      descripcionHTML: data?.descripcionHTML ?? data?.descripcionHtml,
+      umbral: data?.umbral,
+      ces: data?.ces,
+      raByCe: data?.raByCe ?? {},
+      ceDescByCode: data?.ceDescByCode ?? {},
+    });
 
-    if (!buf.byteLength) throw new Error("Generador devolvió 0 bytes");
+    // 2) Render directo del HTML a PDF
+    const pdfBuffer = await renderHTMLtoPDF(html);
 
+    // 3) Guardado en Documentos/SkillForgePDF
     const outDir = path.join(app.getPath("documents"), "SkillForgePDF");
     await fs.promises.mkdir(outDir, { recursive: true });
 
@@ -2244,17 +2259,14 @@ ipcMain.handle(CHANNEL, async (_e, data: any, fileName: string) => {
       fileName?.endsWith(".pdf") ? fileName : `${fileName || "Informe"}.pdf`
     );
 
-    await fs.promises.writeFile(outPath, buf);
+    await fs.promises.writeFile(outPath, pdfBuffer);
     console.log("[PDF] ✅ guardado:", outPath);
     return { ok: true, path: outPath };
   } catch (err: any) {
-    console.error("❌ PDF jsPDF:", err?.stack || err);
+    console.error("❌ PDF (html→pdf):", err?.stack || err);
     return { ok: false, error: String(err?.message || err) };
   }
 });
-
-import { buildActividadHTML } from "../lib/pdf/actividadInformeHTML";
-import { renderHTMLtoPDF } from "../lib/pdf/renderHTMLtoPDF";
 
 ipcMain.handle("informe:generar-html", async (_e, payload) => {
   const { input, suggestedFileName } = payload || {};
@@ -2264,9 +2276,11 @@ ipcMain.handle("informe:generar-html", async (_e, payload) => {
         titulo: String(input?.titulo ?? "Actividad"),
         fechaISO: String(input?.fechaISO ?? new Date().toISOString()),
         asignatura: String(input?.asignatura ?? "—"),
-        descripcion: String(input?.descripcionHtml ?? "<p>Sin contenido</p>"),
+        descripcionHtml: String(input?.descripcionHtml ?? "<p>Sin contenido</p>"),
         umbral: Number(input?.umbral ?? 0),
         ces: Array.isArray(input?.ces) ? input.ces : [],
+        raByCe: input?.raByCe ?? {},
+        ceDescByCode: input?.ceDescByCode ?? {},
       },
       { headerTitle: "Actividad evaluativa" }
     );
@@ -2276,7 +2290,7 @@ ipcMain.handle("informe:generar-html", async (_e, payload) => {
     const baseName = (suggestedFileName || "Informe_actividad.pdf")
       .replace(/[\/\\:*?"<>|]+/g, "_");
 
-    // 👉 Guardar siempre en ~/Documents/ForgeSkillsPDF
+    // Guardar siempre en ~/Documents/ForgeSkillsPDF
     const outDir = path.join(app.getPath("documents"), "ForgeSkillsPDF");
     await fs.promises.mkdir(outDir, { recursive: true });
 
@@ -2291,4 +2305,3 @@ ipcMain.handle("informe:generar-html", async (_e, payload) => {
     return { ok: false, error: err?.message || "Error generando PDF" };
   }
 });
-
