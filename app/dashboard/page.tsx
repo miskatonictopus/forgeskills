@@ -15,7 +15,8 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { GraduationCap, BookA, User, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
-import { ThemeToggle } from "@/components/theme-toggle";
+import ThemeToggle from "@/components/theme-toggle";
+
 
 import { cursoStore } from "@/store/cursoStore";
 import { CursoCard } from "@/components/CursoCard";

@@ -63,7 +63,7 @@ export function NavCursos({ setCursoAEliminar }: Props) {
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Cursos</SidebarGroupLabel>
+      <SidebarGroupLabel className="mb-4">Cursos</SidebarGroupLabel>
       <SidebarMenu>
         {snap.cursos.map((curso) => {
           const asignaturas = asignaturasPorCurso[curso.id] ?? [];
@@ -89,10 +89,11 @@ export function NavCursos({ setCursoAEliminar }: Props) {
                       asChild
                       onMouseEnter={() => setOpenCursoId(curso.id)}
                       onFocus={() => setOpenCursoId(curso.id)}
+                      className="-mt-2"
                     >
                       <Link href={`/cursos/${curso.id}`}>
-                        <GraduationCap className="h-4 w-4" />
-                        <span className="truncate">
+                        <GraduationCap className="h-4 w-4 " />
+                        <span className="truncate font-bold">
                           {curso.acronimo}
                           {curso.nivel ? ` ${curso.nivel}` : ""}
                         </span>

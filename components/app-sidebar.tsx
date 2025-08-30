@@ -1,20 +1,22 @@
 "use client"
 
 import skillforge_black from "@/public/images/logo-white.png"
+import skillforge_white from "@/public/images/logo-black.png"
 
 import * as React from "react"
-import Link from "next/link" // 👈 nuevo
+import Link from "next/link"
+import { useTheme } from "next-themes"
 import {
   ChartColumnBig,
   Settings,
   PlusCircle,
   CalendarDays,
-  ListTodo, // 👈 nuevo
+  ListTodo,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
-import { NavUser } from "@/components/nav-user"
+// import { NavUser } from "@/components/nav-user"
 import { TeamSwitcher } from "@/components/team-switcher"
 import {
   Sidebar,
@@ -54,6 +56,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [openNuevaActividad, setOpenNuevaActividad] = React.useState(false)
   const [fechaPreseleccionada, setFechaPreseleccionada] = React.useState<Date | undefined>(undefined)
 
+  // ⬇️ Tema para alternar logo
+  const { theme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => setMounted(true), [])
+  const isDark = (theme ?? resolvedTheme) === "dark"
+
   const handleOpenNuevaActividad = () => {
     setFechaPreseleccionada(nowRounded30())
     setOpenNuevaActividad(true)
@@ -62,8 +70,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <img src={skillforge_black.src} alt="SkillForge" className="h-15 mx-auto" />
-        <p className="text-right text-zinc-400 text-xs">alpha version 1.0</p>
+        {/* 
+          Nota: el usuario pidió "en tema LIGHT → skillforge_white".
+          Por eso, cuando NO es dark, usamos `skillforge_white`.
+          (Aunque los nombres de variables y ficheros estén cruzados en los imports.)
+        */}
+        {mounted ? (
+          <img
+            src={isDark ? skillforge_black.src : skillforge_white.src}
+            alt="SkillForge"
+            className="h-15 mx-auto transition-opacity duration-200"
+          />
+        ) : (
+          // Evita FOUC de logo antes de montar
+          <div className="h-15" />
+        )}
+        <p className="text-center text-zinc-400 text-xs">alpha version 1.0 // 2025 release 1.1</p>
       </SidebarHeader>
 
       <SidebarContent>
@@ -80,9 +102,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             Crear actividad
           </Button>
 
-          {/* 👇 Nuevo botón: Ver actividades (todas) */}
+          {/* Ver actividades (todas) */}
           <Button asChild variant="default" className="w-full justify-start gap-2">
-          <Link href="/cursos/actividades/todas">
+            <Link href="/cursos/actividades/todas">
               <ListTodo className="w-4 h-4" />
               Ver actividades
             </Link>

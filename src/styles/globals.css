@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body, #__next {
+  transition: background-color 2s ease, color 2s ease, border-color 2s ease, outline-color 2 ease, fill 2 ease, stroke 2 ease;
+}
+
+/* Evita animaciones excesivas si el usuario prefiere reducir motion */
+@media (prefers-reduced-motion: reduce) {
+  html, body, #__next {
+    transition: none !important;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
