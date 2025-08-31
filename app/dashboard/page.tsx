@@ -16,6 +16,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from "@/co
 import { GraduationCap, BookA, User, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
 import ThemeToggle from "@/components/theme-toggle";
+import { TimerTray } from "@/components/TimerTray";
 
 
 import { cursoStore } from "@/store/cursoStore";
@@ -197,6 +198,7 @@ export default function Page() {
               </BreadcrumbList>
             </Breadcrumb>
             <span className="text-xl text-white font-bold tabular-nums">{fechaActual}</span>
+            <TimerTray />
             <ThemeToggle />
           </div>
         </header>
