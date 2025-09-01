@@ -79,7 +79,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 items-center gap-2 px-4">
+        <header className="flex h-16 items-center gap-2 px-4 bg-zinc-900">
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4 mx-2" />
           <div className="flex items-center justify-between w-full px-4 py-2">

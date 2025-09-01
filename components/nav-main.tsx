@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/collapsible"
 import {
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -34,24 +33,31 @@ export function NavMain({
 }) {
   return (
     <SidebarGroup>
-      {/* <SidebarGroupLabel>Platform</SidebarGroupLabel> */}
       <SidebarMenu>
         {items.map((item) => {
-          // Si el ítem NO tiene subitems → render directo
+          const Icon = item.icon
+
+          // Ítem sin subitems
           if (!item.items || item.items.length === 0) {
             return (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild tooltip={item.title}>
-                  <a href={item.url} className="flex items-center gap-2">
-                    {item.icon && <item.icon />}
-                    <span>{item.title}</span>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={item.title}
+                  className="gap-2 justify-start group-data-[collapsible=icon]:justify-center"
+                >
+                  <a href={item.url} className="flex items-center">
+                    {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                    <span className="ml-2 group-data-[collapsible=icon]:hidden">
+                      {item.title}
+                    </span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )
           }
 
-          // Si tiene subitems → render como desplegable
+          // Ítem con subitems (desplegable)
           return (
             <Collapsible
               key={item.title}
@@ -61,13 +67,20 @@ export function NavMain({
             >
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                  <SidebarMenuButton tooltip={item.title}>
-                    {item.icon && <item.icon />}
-                    <span>{item.title}</span>
-                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    className="gap-2 justify-start group-data-[collapsible=icon]:justify-center"
+                  >
+                    {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                    <span className="ml-2 group-data-[collapsible=icon]:hidden">
+                      {item.title}
+                    </span>
+                    <ChevronRight
+                      className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[collapsible=icon]:hidden"
+                    />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
-                <CollapsibleContent>
+                <CollapsibleContent className="group-data-[collapsible=icon]:hidden">
                   <SidebarMenuSub>
                     {item.items.map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>

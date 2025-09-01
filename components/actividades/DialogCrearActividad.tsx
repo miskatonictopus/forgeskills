@@ -33,6 +33,7 @@ type Props = {
   setRefreshKey?: React.Dispatch<React.SetStateAction<number>>;
   asignaturaId?: string;
   asignaturaNombre?: string;
+  fechaInicial?: Date;
 };
 
 const containerVariants = {
@@ -52,6 +53,7 @@ export function DialogCrearActividad({
   onOpenChange,
   cursoId,
   setRefreshKey,
+  fechaInicial,
   asignaturaId: asignaturaIdProp,
   asignaturaNombre,
 }: Props) {

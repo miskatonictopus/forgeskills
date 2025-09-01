@@ -1,23 +1,14 @@
 "use client"
 
-import skillforge_black from "@/public/images/logo-white.png"
-import skillforge_white from "@/public/images/logo-black.png"
-
 import * as React from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useTheme } from "next-themes"
-import {
-  ChartColumnBig,
-  Settings,
-  PlusCircle,
-  CalendarDays,
-  ListTodo,
-} from "lucide-react"
+import { ChartColumnBig, Settings, PlusCircle, CalendarDays, ListTodo } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
-// import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
+import { TeamSwitcher } from "@/components/team-switcher" // si lo usas
 import {
   Sidebar,
   SidebarContent,
@@ -28,17 +19,20 @@ import {
 import { Button } from "@/components/ui/button"
 import { DialogCrearActividad } from "@/components/actividades/DialogCrearActividad"
 
-// Sample data.
+// ── IMPORTA TUS LOGOS ──────────────────────────────────────────────
+// Horizontal (ancho)
+import logoLight from "@/public/images/logo-black.png"  // para tema LIGHT
+import logoDark from "@/public/images/logo-white.png"   // para tema DARK
+// Mark (cuadrado). Si no los tienes aún, puedes apuntar a los mismos.
+import markLight from "@/public/images/mark-black.png"
+import markDark from "@/public/images/mark-white.png"
+// ───────────────────────────────────────────────────────────────────
+
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   navMain: [
-    { title: "PanelControl", url: "/", icon: ChartColumnBig, isActive: true },
-    { title: "Configuración", url: "/configuracion", icon: Settings, isActive: true },
-    { title: "Calendario", url: "/calendario", icon: CalendarDays, isActive: true },
+    { title: "PanelControl",   url: "/dashboard",   icon: ChartColumnBig, isActive: true },
+    { title: "Configuración",  url: "/configuracion", icon: Settings },
+    { title: "Calendario",     url: "/calendario",  icon: CalendarDays },
   ],
 }
 
@@ -52,11 +46,11 @@ function nowRounded30() {
   return d
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const [openNuevaActividad, setOpenNuevaActividad] = React.useState(false)
   const [fechaPreseleccionada, setFechaPreseleccionada] = React.useState<Date | undefined>(undefined)
 
-  // ⬇️ Tema para alternar logo
+  // Tema para alternar logo
   const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => setMounted(true), [])
@@ -68,45 +62,64 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   return (
+    // ⬇️ clave para tener data-attrs de colapso
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        {/* 
-          Nota: el usuario pidió "en tema LIGHT → skillforge_white".
-          Por eso, cuando NO es dark, usamos `skillforge_white`.
-          (Aunque los nombres de variables y ficheros estén cruzados en los imports.)
-        */}
-        {mounted ? (
-          <img
-            src={isDark ? skillforge_black.src : skillforge_white.src}
-            alt="SkillForge"
-            className="h-15 mx-auto transition-opacity duration-200"
-          />
-        ) : (
-          // Evita FOUC de logo antes de montar
-          <div className="h-15" />
-        )}
-        <p className="text-center text-zinc-400 text-xs">alpha version 1.0 // 2025 release 1.1</p>
+      <SidebarHeader className="px-3">
+        <div className="flex h-12 items-center gap-2">
+          {/* Logo horizontal (visible cuando NO está colapsado) */}
+          {mounted && (
+            <Image
+              src={isDark ? logoDark : logoLight}
+              alt="ForgeSkills"
+              priority
+              className="block h-15 w-auto group-data-[collapsible=icon]:hidden"
+            />
+          )}
+          {/* Logomark cuadrado (visible en colapsado) */}
+          {mounted && (
+            <Image
+              src={isDark ? markDark : markLight}
+              alt="FS"
+              priority
+              className="hidden h-6 w-6 shrink-0 rounded-md group-data-[collapsible=icon]:block"
+            />
+          )}
+        </div>
+
+        {/* Texto de versión: oculto en colapsado */}
+        <p className="text-center text-zinc-400 text-xs group-data-[collapsible=icon]:hidden">
+          alpha version 1.0 // 2025 release 1.1
+        </p>
       </SidebarHeader>
 
       <SidebarContent>
+        {/* Si usas selector de equipo, ponlo aquí
+        <div className="px-3 pb-2 group-data-[collapsible=icon]:hidden">
+          <TeamSwitcher />
+        </div>
+        */}
+
         <NavMain items={data.navMain} />
 
-        {/* Botón global: Crear actividad (debajo de Calendario) */}
+        {/* Acciones rápidas */}
         <div className="px-3 mt-2 space-y-2">
           <Button
             variant="default"
-            className="w-full justify-start gap-2"
+            className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center"
             onClick={handleOpenNuevaActividad}
           >
-            <PlusCircle className="w-4 h-4" />
-            Crear actividad
+            <PlusCircle className="w-4 h-4 shrink-0" />
+            <span className="group-data-[collapsible=icon]:hidden">Crear actividad</span>
           </Button>
 
-          {/* Ver actividades (todas) */}
-          <Button asChild variant="default" className="w-full justify-start gap-2">
+          <Button
+            asChild
+            variant="default"
+            className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center"
+          >
             <Link href="/cursos/actividades/todas">
-              <ListTodo className="w-4 h-4" />
-              Ver actividades
+              <ListTodo className="w-4 h-4 shrink-0" />
+              <span className="group-data-[collapsible=icon]:hidden">Ver actividades</span>
             </Link>
           </Button>
         </div>
@@ -114,10 +127,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavProjects />
       </SidebarContent>
 
-      <SidebarFooter>{/* opcional: <NavUser /> */}</SidebarFooter>
+      <SidebarFooter>
+        {/* Aquí tu NavUser si lo tienes; oculta el nombre en colapsado si quieres */}
+      </SidebarFooter>
+
       <SidebarRail />
 
-      {/* Dialog en modo GLOBAL: sin curso/asignatura preseleccionados */}
+      {/* Dialog global (sin curso/asignatura preseleccionados) */}
       <DialogCrearActividad
         open={openNuevaActividad}
         onOpenChange={setOpenNuevaActividad}

@@ -178,9 +178,9 @@ export default function Page() {
   }, [snap.cursos, cursoIdNuevaAsig]);
 
   return (
-        <main className="grid grid-cols-1 md:grid-cols-2 grid-rows-2 gap-4 pl-4 pr-4 pt-1 pb-4 h-[calc(100vh-4rem)] overflow-y-auto">
+        <main className="grid grid-cols-1 md:grid-cols-2 grid-rows-2 gap-4 pl-4 pr-4 pt-1 pb-4 h-[calc(100vh-4rem)] overflow-y-auto bg-z bg-zinc-900">
           {/* MIS CURSOS */}
-          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+          <section className="rounded-xl border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden bg-zinc-950">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <GraduationCap className="w-5 h-5" />
@@ -224,7 +224,7 @@ export default function Page() {
           </section>
 
           {/* MIS ASIGNATURAS */}
-          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+          <section className="rounded-xl border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden bg-zinc-950">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <BookA className="w-5 h-5" />
@@ -308,7 +308,7 @@ export default function Page() {
           </section>
 
           {/* MIS ALUMNOS */}
-          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+          <section className="rounded-xl border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden bg-zinc-950">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <User className="w-5 h-5" />
@@ -353,7 +353,7 @@ export default function Page() {
           </section>
 
           {/* MIS ACTIVIDADES */}
-          <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
+          <section className="rounded-xl border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden bg-zinc-950">
             <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
               <Pencil className="w-5 h-5" />
               Mis Actividades
