@@ -22,22 +22,11 @@ export function NavProjects() {
         />
       )}
 
-      {/* Botón para abrir el timer */}
-      <div className="px-3 mb-2">
-        <Button
-          variant="default"
-          className="w-full justify-start gap-2"
-          onClick={() => setOpenTimer(true)}
-        >
-          <AlarmClock className="w-4 h-4" />
-          Abrir timer de clase
-        </Button>
-      </div>
+      
 
       <NavCursos setCursoAEliminar={setCursoAEliminar} />
 
-      {/* Dialog del timer a pantalla completa */}
-      <FullscreenTimer open={openTimer} onOpenChange={setOpenTimer} />
+      
     </>
   )
 }

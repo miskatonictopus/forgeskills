@@ -41,36 +41,9 @@ export default function AlumnosCursoPage() {
   }, [cursoId]);
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        {/* Header con breadcrumb */}
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
-            />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/alumnos">Alumnos</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbLink href={`/alumnos/${cursoId}`}>
-                    Curso {cursoId}
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
+
+
+        <main>
 
         {/* Contenido principal */}
         <div className="p-6 space-y-4">
@@ -144,7 +117,6 @@ export default function AlumnosCursoPage() {
             </TableBody>
           </Table>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+</main>
   );
 }

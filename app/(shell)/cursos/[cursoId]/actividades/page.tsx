@@ -181,27 +181,11 @@ export default function ActividadesCursoPage() {
   };
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="flex items-center justify-between px-4 py-4">
-          <div>
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/panel">Panel</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbLink href={`/cursos/${cursoId}`}>{cursoId}</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>Actividades</BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
+    <main>
+     
             <h1 className="text-3xl font-bold mt-2">Actividades del curso {cursoId}</h1>
-          </div>
-        </div>
+
+
 
         <TooltipProvider delayDuration={200}>
           <div className="px-4 pb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -371,7 +355,6 @@ export default function ActividadesCursoPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </SidebarInset>
-    </SidebarProvider>
+   </main>
   );
 }

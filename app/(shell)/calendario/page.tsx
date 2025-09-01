@@ -430,28 +430,11 @@ export default function CalendarioGlobalPage() {
   );
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        {/* Header */}
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/calendario">Calendario</BreadcrumbLink>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
+   
 
+
+        
+      <main>
         {/* Contenido */}
         <div className="p-6 space-y-4">
           <div className="flex items-center justify-between">
@@ -501,7 +484,7 @@ export default function CalendarioGlobalPage() {
           .fc .presencial-bg    { background: rgba(120, 160, 255, 0.12); }
           .fc .fct-bg           { background: rgba(200, 120, 255, 0.16); } /* ⬅️ NUEVO */
         `}</style>
-      </SidebarInset>
-    </SidebarProvider>
+
+</main>
   );
 }

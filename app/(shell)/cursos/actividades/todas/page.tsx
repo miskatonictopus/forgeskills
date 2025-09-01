@@ -155,17 +155,10 @@ export default function ActividadesTodosLosCursosPage() {
   }, [snapCursos.cursos, snapActividades, filtroEstado, ordenPorCurso]);
   
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-4">
-  <div>
-    {/* ... breadcrumb + título como ya tienes ... */}
-    <p className="text-2xl text-white mt-1 font-bold">
-      Vista global de actividades
-    </p>
-  </div>
+    
+  <main>
+    
+
 
   {/* Filtro por estado */}
   <div className="min-w-[220px]">
@@ -187,7 +180,7 @@ export default function ActividadesTodosLosCursosPage() {
       </SelectContent>
     </Select>
   </div>
-</div>
+
 
 
         {/* Grid de cursos */}
@@ -370,7 +363,7 @@ export default function ActividadesTodosLosCursosPage() {
               : undefined
           }
         />
-      </SidebarInset>
-    </SidebarProvider>
+        
+        </main>
   );
 }

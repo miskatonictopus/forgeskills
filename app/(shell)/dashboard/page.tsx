@@ -10,13 +10,9 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from "@/components/ui/breadcrumb";
 import { GraduationCap, BookA, User, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
-import ThemeToggle from "@/components/theme-toggle";
-import { TimerTray } from "@/components/TimerTray";
+
 
 
 import { cursoStore } from "@/store/cursoStore";
@@ -182,28 +178,6 @@ export default function Page() {
   }, [snap.cursos, cursoIdNuevaAsig]);
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        {/* HEADER */}
-        <header className="flex h-16 items-center gap-2 px-4">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="h-4 mx-2" />
-          <div className="flex items-center justify-between w-full px-4 py-2">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="#">Panel de Control</BreadcrumbLink>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <span className="text-xl text-white font-bold tabular-nums">{fechaActual}</span>
-            <TimerTray />
-            <ThemeToggle />
-          </div>
-        </header>
-
-        {/* LAYOUT 2x2 */}
         <main className="grid grid-cols-1 md:grid-cols-2 grid-rows-2 gap-4 pl-4 pr-4 pt-1 pb-4 h-[calc(100vh-4rem)] overflow-y-auto">
           {/* MIS CURSOS */}
           <section className="rounded border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden">
@@ -445,7 +419,6 @@ export default function Page() {
             </div>
           </section>
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+
   );
 }
