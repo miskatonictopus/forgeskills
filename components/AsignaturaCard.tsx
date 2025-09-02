@@ -12,13 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 type Horario = { dia: string; horaInicio: string; horaFin: string; cursoId?: string };
-type Descripcion = { duracion: string; centro: string; empresa: string; creditos?: string | number };
 type RA = { codigo: string; descripcion: string; CE: any[] };
+type Descripcion = { duracion?: string; centro?: string; empresa?: string; creditos?: string | number };
+
 type Asignatura = {
   id: string;
   nombre: string;
   creditos?: number | string;
-  descripcion: Descripcion;
+  descripcion?: Descripcion | string; // puede venir objeto o string
   RA: RA[];
   color?: string | null;
 };
@@ -30,6 +31,24 @@ type AsignaturaCardProps = {
   onReload: () => void;
 };
 
+// helper para normalizar descripcion
+function normalizeDescripcion(d: unknown): Partial<Descripcion> | null {
+  if (!d) return null;
+
+  if (typeof d === "string") {
+    try {
+      const parsed = JSON.parse(d);
+      if (parsed && typeof parsed === "object") return parsed as Partial<Descripcion>;
+      return { duracion: d };
+    } catch {
+      return { duracion: d };
+    }
+  }
+
+  if (typeof d === "object") return d as Partial<Descripcion>;
+  return null;
+}
+
 /* ====== color helpers ====== */
 const DEFAULT_PALETTE = [
   "#ef4444","#f97316","#f59e0b","#eab308","#84cc16",
@@ -38,6 +57,7 @@ const DEFAULT_PALETTE = [
   "#0ea5e9","#0891b2","#e11d48","#dc2626","#059669",
   "#737373","#525252","#111827","#ffffff","#000000",
 ];
+
 const isValidHex = (v: string) => /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.test((v || "").trim());
 const normalizeHex = (v: string) => {
   let s = (v || "").trim();
@@ -81,6 +101,10 @@ export function AsignaturaCard(props: AsignaturaCardProps) {
   const [colorActual, setColorActual] = useState<string>(asignatura.color || "");
   const [hexInput, setHexInput] = useState<string>(asignatura.color || "");
 
+  // normalizar descripcion aquí dentro
+  const desc = normalizeDescripcion(asignatura.descripcion);
+  const duracion = desc?.duracion ?? (desc as any)?.["duración"] ?? "—";
+
   useEffect(() => {
     setColorActual(asignatura.color || "");
     setHexInput(asignatura.color || "");
@@ -91,7 +115,6 @@ export function AsignaturaCard(props: AsignaturaCardProps) {
       setColorActual(nuevoColor);
       await window.electronAPI.actualizarColorAsignatura(asignatura.id, nuevoColor);
 
-      // notifica a CursoCard y demás
       window.dispatchEvent(
         new CustomEvent("asignatura:color:actualizado", {
           detail: { asignaturaId: asignatura.id, color: nuevoColor },
@@ -251,7 +274,7 @@ export function AsignaturaCard(props: AsignaturaCardProps) {
             Créditos: <span className="text-white">{asignatura.creditos ?? "—"}</span>
           </p>
           <p className="text-zinc-300">
-            Horas: <span className="text-white">{asignatura.descripcion?.duracion}</span>
+            Horas: <span className="text-white">{duracion}</span>
           </p>
         </div>
 
