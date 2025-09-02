@@ -219,5 +219,13 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
     ) => ipcRenderer.invoke("informe:generar-html", { input, suggestedFileName }),
 
     invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+
+    calcularHorasReales: (opts?: {
+      cursoId?: string;
+      asignaturaId?: string;
+      desde?: string;
+      hasta?: string;
+      incluirFechas?: boolean;
+    }) => ipcRenderer.invoke("academico.calcular-horas-reales", opts),
   
 });

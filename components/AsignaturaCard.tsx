@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useParams } from "next/navigation";
 
 type Horario = { dia: string; horaInicio: string; horaFin: string; cursoId?: string };
 type RA = { codigo: string; descripcion: string; CE: any[] };
@@ -29,7 +30,18 @@ type AsignaturaCardProps = {
   horarios: Horario[];
   onOpenHorario: (id: string) => void;
   onReload: () => void;
+  cursoId?: string;
 };
+
+type CalcularHorasRes = {
+  items: Array<{
+    asignaturaId: string;
+    horas: number;
+    sesiones: number;
+  }>;
+};
+
+
 
 // helper para normalizar descripcion
 function normalizeDescripcion(d: unknown): Partial<Descripcion> | null {
@@ -92,19 +104,79 @@ const gradientForCard = (hex?: string | null): string | undefined => {
     rgba(${r},${g},${b}, 0) 100%
   )`;
 };
+
+
 /* ========================== */
 
 export function AsignaturaCard(props: AsignaturaCardProps) {
   const { asignatura, horarios, onOpenHorario, onReload } = props;
 
+  // ↓↓↓ TIPADO de la respuesta del IPC que usamos
+  type CalcularHorasRes = {
+    items: Array<{ asignaturaId: string; horas: number; sesiones: number }>;
+  };
+
+  // Resolver cursoId desde la URL: /cursos/[cursoId]/...
+  const params = useParams();
+  const cursoIdResolved =
+  // si el padre te lo pasa como prop (si lo usas):
+  (props as any)?.cursoId?.toString?.() ||
+  // si estás en /cursos/[cursoId]/...
+  (params?.cursoId ? String(params.cursoId) : undefined) ||
+  // fallback: tomarlo del primer horario mostrado en la card
+  (horarios?.[0]?.cursoId ? String(horarios[0].cursoId) : undefined);
+
   const [openColor, setOpenColor] = useState(false);
   const [colorActual, setColorActual] = useState<string>(asignatura.color || "");
   const [hexInput, setHexInput] = useState<string>(asignatura.color || "");
+
+  const [horasReales, setHorasReales] = useState<number | null>(null);
+  const [sesionesReales, setSesionesReales] = useState<number | null>(null);
+  const [loadingHorasReales, setLoadingHorasReales] = useState(false);
+  
 
   // normalizar descripcion aquí dentro
   const desc = normalizeDescripcion(asignatura.descripcion);
   const duracion = desc?.duracion ?? (desc as any)?.["duración"] ?? "—";
 
+  // Cálculo de horas reales (IPC)
+  useEffect(() => {
+    let cancelado = false;
+
+    async function fetchHorasReales() {
+      // Guardas por si renderiza fuera de Electron o faltan IDs
+      if (!window?.electronAPI?.calcularHorasReales) return;
+      if (!asignatura?.id || !cursoIdResolved) return;
+
+      setLoadingHorasReales(true);
+      try {
+        const res = (await window.electronAPI.calcularHorasReales({
+          cursoId: cursoIdResolved,
+          asignaturaId: asignatura.id,
+          incluirFechas: false,
+        })) as CalcularHorasRes;
+
+        if (cancelado) return;
+
+        const item = res.items.find((i) => i.asignaturaId === asignatura.id);
+        setHorasReales(item ? item.horas : 0);
+        setSesionesReales(item ? item.sesiones : 0);
+      } catch {
+        if (cancelado) return;
+        setHorasReales(null);
+        setSesionesReales(null);
+      } finally {
+        if (!cancelado) setLoadingHorasReales(false);
+      }
+    }
+
+    fetchHorasReales();
+    return () => {
+      cancelado = true;
+    };
+  }, [cursoIdResolved, asignatura?.id]);
+
+  // Sincronizar color local con el de la asignatura
   useEffect(() => {
     setColorActual(asignatura.color || "");
     setHexInput(asignatura.color || "");
@@ -276,6 +348,23 @@ export function AsignaturaCard(props: AsignaturaCardProps) {
           <p className="text-zinc-300">
             Horas: <span className="text-white">{duracion}</span>
           </p>
+          <p className="text-zinc-300">
+            Horas reales:{" "}
+            <span className="text-white">
+  {loadingHorasReales
+    ? "calculando…"
+    : horasReales !== null
+    ? (Number.isInteger(horasReales) 
+        ? horasReales 
+        : horasReales.toFixed(0))
+    : "—"}
+</span>
+            {sesionesReales !== null && !loadingHorasReales ? (
+              <span className="ml-2 text-xs text-zinc-400">
+                ({sesionesReales} sesiones)
+              </span>
+            ) : null}
+          </p>
         </div>
 
         <p className="text-xs font-bold text-white">
@@ -319,3 +408,4 @@ export function AsignaturaCard(props: AsignaturaCardProps) {
     </Card>
   );
 }
+

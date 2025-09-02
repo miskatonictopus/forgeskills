@@ -4,7 +4,6 @@
 import { openDbSingleton, closeDbSingleton, getDb } from "../src/main/db/singleton";
 import { BackupManager } from "../main/backup";
 
-
 import * as dotenv from "dotenv";
 dotenv.config();
 import { app, BrowserWindow, ipcMain, dialog } from "electron";
@@ -13,7 +12,6 @@ import * as fs from "fs";
 import Database from "better-sqlite3";
 import type BetterSqlite3 from "better-sqlite3";
 import { generarPDFInformeActividad } from "../lib/pdf/actividadInforme"; // ajusta la ruta si cambia
-
 
 import { execSync } from "child_process";
 import { writeFile } from "node:fs/promises";
@@ -65,7 +63,6 @@ try {
 } catch (e) {
   console.error("❌ Error listando tablas:", e);
 }
-
 
 const DB_PATH =
   app.isPackaged
@@ -262,6 +259,219 @@ db.prepare(
   )
 `
 ).run();
+
+/* ============================================================================
+ * HORAS LECTIVAS (nuevo): helpers + handler calcular-horas-reales
+ * ==========================================================================*/
+type CalcularHorasOpts = {
+  cursoId?: string;
+  asignaturaId?: string;
+  incluirFechas?: boolean;
+  desde?: string; // opcional: si lo pasas, ignora rango_lectivo
+  hasta?: string; // opcional
+};
+type CalcularHorasItem = {
+  cursoId: string | null;
+  asignaturaId: string;
+  asignaturaNombre: string;
+  sesiones: number;
+  minutos: number;
+  horas: number;
+  fechas?: string[];
+};
+type CalcularHorasRes = {
+  desde: string;
+  hasta: string;
+  festivos: Array<{ inicio: string; fin: string; descripcion?: string }>;
+  items: CalcularHorasItem[];
+  totalHoras: number;
+};
+
+function HR_toDate(ymd: string): Date {
+  const [y, m, d] = (ymd || "").split("-").map((n) => parseInt(n, 10));
+  const dt = new Date((y || 1970), (m || 1) - 1, (d || 1));
+  if (Number.isNaN(dt.getTime())) throw new Error(`Fecha inválida: ${ymd}`);
+  return dt;
+}
+function HR_formatYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function HR_addDays(d: Date, n: number): Date {
+  const nd = new Date(d);
+  nd.setDate(nd.getDate() + n);
+  return nd;
+}
+function HR_weekdayISO(d: Date): number {
+  const w = d.getDay(); // 0=dom..6=sab
+  return w === 0 ? 7 : w;
+}
+function HR_firstDateForWeekday(start: Date, weekdayIso: number): Date {
+  let cur = new Date(start);
+  while (HR_weekdayISO(cur) !== weekdayIso) cur = HR_addDays(cur, 1);
+  return cur;
+}
+function HR_timeToMinutes(hhmm: string): number {
+  const [h, m] = (hhmm || "").split(":").map((n) => parseInt(n, 10));
+  return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
+}
+function HR_diaToIso(dia: string | number): number {
+  if (typeof dia === "number" && dia >= 1 && dia <= 7) return dia;
+  const s = String(dia ?? "").trim().toLowerCase();
+  const map: Record<string, number> = {
+    "1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,
+    lunes:1,monday:1,mon:1,
+    martes:2,tuesday:2,tue:2,
+    miércoles:3,miercoles:3,wednesday:3,wed:3,
+    jueves:4,thursday:4,thu:4,
+    viernes:5,friday:5,fri:5,
+    sábado:6,sabado:6,saturday:6,sat:6,
+    domingo:7,sunday:7,sun:7,
+  };
+  return map[s] ?? 1;
+}
+
+function calcularHorasLectivas(dbx: BetterSqlite3.Database, opts: CalcularHorasOpts = {}): CalcularHorasRes {
+  // 1) Rango: opts.desde/hasta o tabla rango_lectivo (id=1 con columnas start/end)
+  let desdeStr = opts.desde;
+  let hastaStr = opts.hasta;
+
+  if (!desdeStr || !hastaStr) {
+    const rango = dbx
+      .prepare(`SELECT start, end FROM rango_lectivo WHERE id = 1`)
+      .get() as { start?: string; end?: string } | undefined;
+    if (!rango?.start || !rango?.end) {
+      throw new Error("No hay rango lectivo definido (tabla rango_lectivo, fila id=1). O pasa {desde,hasta}.");
+    }
+    desdeStr = desdeStr || rango.start;
+    hastaStr = hastaStr || rango.end;
+  }
+
+  const desde = HR_toDate(desdeStr!);
+  const hasta = HR_toDate(hastaStr!);
+  if (hasta < desde) throw new Error("Rango inválido: hasta < desde");
+
+  // 2) Festivos que solapan el rango (usando tu esquema start/end/title)
+  const festivos = dbx
+    .prepare(
+      `SELECT start AS inicio, COALESCE(end,start) AS fin, title AS descripcion
+       FROM festivos
+       WHERE date(COALESCE(end,start)) >= date(?)
+         AND date(start) <= date(?)`
+    )
+    .all(HR_formatYMD(desde), HR_formatYMD(hasta)) as Array<{ inicio: string; fin: string; descripcion?: string }>;
+
+  const festivoRangos = festivos.map((f) => ({ ini: HR_toDate(f.inicio), fin: HR_toDate(f.fin) }));
+  const esFestivo = (d: Date) => festivoRangos.some((r) => d >= r.ini && d <= r.fin);
+
+  // 3) Horarios (filtrando opcionalmente por curso/asignatura) + nombre de asignatura
+  const horarios = dbx
+    .prepare(
+      `SELECT
+         h.id,
+         h.dia,
+         h.hora_inicio   AS horaInicio,
+         h.hora_fin      AS horaFin,
+         h.curso_id      AS cursoId,
+         h.asignatura_id AS asignaturaId,
+         a.nombre        AS asignaturaNombre
+       FROM horarios h
+       JOIN asignaturas a ON a.id = h.asignatura_id
+       WHERE (? IS NULL OR h.curso_id = ?)
+         AND (? IS NULL OR h.asignatura_id = ?)`
+    )
+    .all(
+      opts.cursoId ?? null, opts.cursoId ?? null,
+      opts.asignaturaId ?? null, opts.asignaturaId ?? null
+    ) as Array<{
+      id: string | number;
+      dia: string;
+      horaInicio: string;
+      horaFin: string;
+      cursoId: string | null;
+      asignaturaId: string;
+      asignaturaNombre: string;
+    }>;
+
+  type Acum = {
+    asignaturaId: string;
+    asignaturaNombre: string;
+    cursoId: string | null;
+    sesiones: number;
+    minutos: number;
+    fechas?: string[];
+  };
+  const acum = new Map<string, Acum>();
+
+  // 4) Expandir semanas dentro del rango, excluyendo festivos
+  for (const h of horarios) {
+    const weekday = HR_diaToIso(h.dia);
+    const inicioMin = HR_timeToMinutes(h.horaInicio);
+    const finMin = HR_timeToMinutes(h.horaFin);
+    const duracionMin = Math.max(0, finMin - inicioMin);
+    if (duracionMin <= 0) continue;
+
+    let d = HR_firstDateForWeekday(desde, weekday);
+    while (d <= hasta) {
+      if (!esFestivo(d)) {
+        const key = `${h.cursoId ?? ""}|${h.asignaturaId}`;
+        const prev =
+          acum.get(key) ??
+          ({
+            asignaturaId: h.asignaturaId,
+            asignaturaNombre: h.asignaturaNombre,
+            cursoId: h.cursoId ?? null,
+            sesiones: 0,
+            minutos: 0,
+            ...(opts.incluirFechas ? { fechas: [] as string[] } : {}),
+          } as Acum);
+
+        prev.sesiones += 1;
+        prev.minutos += duracionMin;
+        if (opts.incluirFechas) prev.fechas!.push(HR_formatYMD(d));
+
+        acum.set(key, prev);
+      }
+      d = HR_addDays(d, 7);
+    }
+  }
+
+  const items = Array.from(acum.values())
+    .map((r) => ({
+      cursoId: r.cursoId,
+      asignaturaId: r.asignaturaId,
+      asignaturaNombre: r.asignaturaNombre,
+      sesiones: r.sesiones,
+      minutos: r.minutos,
+      horas: +(r.minutos / 60).toFixed(2),
+      ...(opts.incluirFechas ? { fechas: r.fechas } : {}),
+    }))
+    .sort((a, b) => (a.asignaturaNombre || "").localeCompare(b.asignaturaNombre || ""));
+
+  const totalHoras = +(items.reduce((acc, it) => acc + it.minutos, 0) / 60).toFixed(2);
+
+  return {
+    desde: HR_formatYMD(desde),
+    hasta: HR_formatYMD(hasta),
+    festivos,
+    items,
+    totalHoras,
+  };
+}
+
+// Handler IPC público
+ipcMain.removeHandler("academico.calcular-horas-reales");
+ipcMain.handle("academico.calcular-horas-reales", (_e, opts: CalcularHorasOpts = {}) => {
+  try {
+    const res = calcularHorasLectivas(db as BetterSqlite3.Database, opts);
+    return res;
+  } catch (err: any) {
+    console.error("[academico.calcular-horas-reales] error:", err?.message || err);
+    throw err;
+  }
+});
 
 /* ------------------------------- Ventana ------------------------------- */
 
@@ -536,7 +746,7 @@ ipcMain.handle("leer-asignaturas", () => {
   return rows.map((row) => ({
     id: row.id,
     nombre: row.nombre,
-    creditos: row.creditos,
+    creditos: row.creditos ?? null,
     descripcion: row.descripcion, // ← texto plano, NO JSON.parse
     RA: JSON.parse(row.RA), // ← JSON real con RA y CE
     color: row.color,
@@ -969,7 +1179,7 @@ ipcMain.handle("actividad.leer-analisis", (_e, actividadId: string) => {
       `
     SELECT ce_codigo AS codigo, puntuacion, razon, evidencias
     FROM actividad_ce
-    WHERE actividad_id = ? AND incluido = 1
+    WHERE actividad_id = ? Y AND incluido = 1
     ORDER BY puntuacion DESC
   `
     )
@@ -1415,6 +1625,7 @@ ipcMain.handle(
           dt = null;
         }
       }
+
 
       console.log("[Programar] startISO crudo:", raw);
       if (dt) {

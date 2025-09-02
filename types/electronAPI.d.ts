@@ -242,6 +242,28 @@ evaluarActividad: (
     alumnos: { id: string; nombre: string; apellidos: string; mail?: string | null }[];
     mediaMap: Record<string, Record<string, number>>;
   }>;
+
+  calcularHorasReales: (opts?: {
+    cursoId?: string;
+    asignaturaId?: string;
+    desde?: string; // YYYY-MM-DD
+    hasta?: string; // YYYY-MM-DD
+    incluirFechas?: boolean;
+  }) => Promise<{
+    desde: string;
+    hasta: string;
+    festivos: { inicio: string; fin: string; descripcion?: string }[];
+    items: Array<{
+      cursoId: string | null;
+      asignaturaId: string;
+      asignaturaNombre: string;
+      sesiones: number;
+      minutos: number;
+      horas: number;
+      fechas?: string[];
+    }>;
+    totalHoras: number;
+  }>;
   
 }
 
