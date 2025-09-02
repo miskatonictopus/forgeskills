@@ -1,0 +1,34 @@
+Plan técnico (resumen rápido)
+
+Extractor + Evaluador de CE (LLM)
+
+Entrada: texto de cada CE ( y aquí ya aplicamos contextos de RA/curso/contexto).
+
+Salimos en un JSON:
+dificultad (1–5) · minutos_estimados · prerequisitos · riesgo_de_atasco · notas_para_metodologia aplicada
+
+el JSON mode aplicado y lo podemos consumir desde el empaquetador
+
+Un Empaquetador de sesiones (determinista o no?)
+
+Objetivos: llenar el calendario de sesiones con CE respetando que cada RA tenga su sesión evaluativa
+inmediatamente después de su último CE si los CE, se han intercalado durante el curso 
+no se realiza la actividad evaluativa completa hasta tener todos los CE completados o no?
+
+Estrategias:
+
+Agrupa CE por RA, ordena CE dentro de cada RA (podemos usar el orden original o un “orden sugerido inteligente” 
+del LLM).
+
+First-Fit Decreasing por RA: mete CE en sesiones respetando minutos_estimados hasta agotar cada sesión; 
+cuando acabas los CE de una RA insertamos 1 sesión “evaluativa” justo después. 
+Si una evaluación “cae” sobre una sesión ya ocupada, desplazas hacia delante (cola). (HECHO POR LOGARITMO)
+
+Si nos quedamos sin sesiones posibles ⇒ el LLM "inteligente" vuelve a proponer combinaciones (p.ej. dos CE “fáciles” en 1 sesión) hasta hacer que no falten evaluaciones.
+
+SUGERENCIAS DE NUESTRA METODOLOGÍA (LLM)
+
+Entrada: parámetros del profe (modalidad, nº alumnos, tiempo por sesión, recursos disponibles, nivel Bloom deseado, inclusión, clase magistral, diapos, práctica, codeKata
+) + notas_para_metodologia que salió del análisis de cada CE.
+
+SALIDA: bloque por CE con estrategia de metología incluida (p.ej. ABP, clase magistral, actividad grupal, …), dinámica de aula, materiales y una rúbrica breve.
