@@ -122,6 +122,17 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
               <span className="group-data-[collapsible=icon]:hidden">Ver actividades</span>
             </Link>
           </Button>
+
+          <Button
+            asChild
+            variant="default"
+            className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center"
+          >
+            <Link href="/programacion">
+              <ListTodo className="w-4 h-4 shrink-0" />
+              <span className="group-data-[collapsible=icon]:hidden">Programación Didáctica</span>
+            </Link>
+          </Button>
         </div>
 
         <NavProjects />

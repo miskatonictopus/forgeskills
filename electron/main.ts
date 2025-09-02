@@ -2587,3 +2587,19 @@ app.whenReady().then(() => {
   startEvery(20, async () => { try { await backups.backup("INC"); } catch (e) { console.error("[INC]", e); } });
   startEvery(60, async () => { try { await backups.backup("FULL"); } catch (e) { console.error("[FULL]", e); } });
 });
+
+ipcMain.handle("programacion.guardar", async (_e, payload: any) => {
+  try {
+    const outDir = path.join(app.getPath("documents"), "SkillForgeProgramaciones");
+    await fs.promises.mkdir(outDir, { recursive: true });
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const outPath = path.join(outDir, `programacion_${stamp}.json`);
+
+    await fs.promises.writeFile(outPath, JSON.stringify(payload, null, 2), "utf-8");
+    return { ok: true, path: outPath };
+  } catch (err: any) {
+    console.error("[programacion.guardar] ❌", err);
+    return { ok: false, error: String(err?.message || err) };
+  }
+});

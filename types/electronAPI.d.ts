@@ -264,6 +264,10 @@ evaluarActividad: (
     }>;
     totalHoras: number;
   }>;
+
+  guardarProgramacionDidactica: (
+    payload: any
+  ) => Promise<{ ok: boolean; path?: string; error?: string }>;
   
 }
 
