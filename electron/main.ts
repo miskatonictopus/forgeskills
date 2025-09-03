@@ -821,54 +821,10 @@ ipcMain.handle("leer-alumnos", () => {
   return db.prepare("SELECT * FROM alumnos").all();
 });
 
-ipcMain.handle("alumnos.por-curso", (_e, arg: any) => {
-  // Acepta tanto invoke("…", cursoId) como invoke("…", { cursoId })
-  const cursoId =
-    (typeof arg === "string" && arg) ||
-    (arg && typeof arg === "object" && arg.cursoId) ||
-    "";
-
-  if (!cursoId) {
-    throw new RangeError(
-      "alumnos.por-curso: falta cursoId (usa invoke('alumnos.por-curso', cursoId) o {cursoId})"
-    );
-  }
-
-  // ¿tenemos tabla pivote?
-  const hasPivot = !!db
-    .prepare(
-      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='curso_alumno'"
-    )
-    .get();
-
-  // ¿o columna 1-N?
-  const cols = db.prepare("PRAGMA table_info('alumnos')").all() as Array<{name:string}>;
-  const hasCursoIdCol = cols.some((c) => c.name === "curso_id");
-
-  if (!hasPivot && !hasCursoIdCol) {
-    throw new Error(
-      "No existe 'curso_alumno' ni columna 'alumnos.curso_id'. Ajusta el esquema."
-    );
-  }
-
-  const sql = hasPivot
-    ? `
-      SELECT a.*
-      FROM alumnos a
-      JOIN curso_alumno ca ON ca.alumno_id = a.id
-      WHERE ca.curso_id = ?
-      ORDER BY a.apellidos, a.nombre
-    `
-    : `
-      SELECT *
-      FROM alumnos
-      WHERE curso_id = ?
-      ORDER BY apellidos, nombre
-    `;
-
-  // 👇 IMPORTANTE: pasar el parámetro
-  const rows = db.prepare(sql).all(cursoId);
-  return rows;
+ipcMain.handle("leer-alumnos-por-curso", (_event, cursoId: string) => {
+  const stmt = db.prepare(`SELECT * FROM alumnos WHERE curso = ?`);
+  const alumnos = stmt.all(cursoId);
+  return alumnos;
 });
 
 /* ---------------------------- IPC: HORARIOS CRUD --------------------------- */
@@ -2010,6 +1966,46 @@ ipcMain.handle("actividad.evaluar", (_e, { actividadId, notas }) => {
 
   tx(notas);
   return { ok: true };
+});
+
+ipcMain.handle("alumnos.por-curso", (_e, cursoId: string) => {
+  // ¿existe tabla pivote?
+  const hasPivot = !!db.prepare(`
+    SELECT 1 FROM sqlite_master WHERE type='table' AND name='curso_alumno'
+  `).get();
+
+  // ¿existe columna curso_id en alumnos? (modelo 1-N)
+  const alumnosInfo = db.prepare(`PRAGMA table_info('alumnos')`).all() as Array<{name:string}>;
+  const hasAlumnosCursoId = alumnosInfo.some(c => c.name === "curso_id");
+
+  if (!hasPivot && !hasAlumnosCursoId) {
+    throw new Error(
+      "No existe la tabla 'curso_alumno' ni la columna 'alumnos.curso_id'. " +
+      "Crea la tabla pivote (ver ensureSchema) o añade 'curso_id' a 'alumnos'."
+    );
+  }
+
+  let rows: any[] = [];
+  if (hasPivot) {
+    const stmt = db.prepare(`
+      SELECT a.*
+      FROM alumnos a
+      JOIN curso_alumno ca ON ca.alumno_id = a.id
+      WHERE ca.curso_id = ?
+      ORDER BY a.apellidos, a.nombre
+    `);
+    rows = stmt.all(cursoId);
+  } else {
+    const stmt = db.prepare(`
+      SELECT *
+      FROM alumnos
+      WHERE curso_id = ?
+      ORDER BY apellidos, nombre
+    `);
+    rows = stmt.all(cursoId);
+  }
+
+  return rows;
 });
 
 
