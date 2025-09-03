@@ -66,8 +66,8 @@ try {
 
 const DB_PATH =
   app.isPackaged
-    ? path.join(app.getPath("userData"), "forgeskills.sqlite") // PROD
-    : path.join(process.cwd(), "data", "forgeskills.sqlite");  // DEV
+    ? path.join(app.getPath("userData"), "db.sqlite") // PROD
+    : path.join(process.cwd(), "data", "db.sqlite");  // DEV
 
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
@@ -821,10 +821,54 @@ ipcMain.handle("leer-alumnos", () => {
   return db.prepare("SELECT * FROM alumnos").all();
 });
 
-ipcMain.handle("leer-alumnos-por-curso", (_event, cursoId: string) => {
-  const stmt = db.prepare(`SELECT * FROM alumnos WHERE curso = ?`);
-  const alumnos = stmt.all(cursoId);
-  return alumnos;
+ipcMain.handle("alumnos.por-curso", (_e, arg: any) => {
+  // Acepta tanto invoke("…", cursoId) como invoke("…", { cursoId })
+  const cursoId =
+    (typeof arg === "string" && arg) ||
+    (arg && typeof arg === "object" && arg.cursoId) ||
+    "";
+
+  if (!cursoId) {
+    throw new RangeError(
+      "alumnos.por-curso: falta cursoId (usa invoke('alumnos.por-curso', cursoId) o {cursoId})"
+    );
+  }
+
+  // ¿tenemos tabla pivote?
+  const hasPivot = !!db
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='curso_alumno'"
+    )
+    .get();
+
+  // ¿o columna 1-N?
+  const cols = db.prepare("PRAGMA table_info('alumnos')").all() as Array<{name:string}>;
+  const hasCursoIdCol = cols.some((c) => c.name === "curso_id");
+
+  if (!hasPivot && !hasCursoIdCol) {
+    throw new Error(
+      "No existe 'curso_alumno' ni columna 'alumnos.curso_id'. Ajusta el esquema."
+    );
+  }
+
+  const sql = hasPivot
+    ? `
+      SELECT a.*
+      FROM alumnos a
+      JOIN curso_alumno ca ON ca.alumno_id = a.id
+      WHERE ca.curso_id = ?
+      ORDER BY a.apellidos, a.nombre
+    `
+    : `
+      SELECT *
+      FROM alumnos
+      WHERE curso_id = ?
+      ORDER BY apellidos, nombre
+    `;
+
+  // 👇 IMPORTANTE: pasar el parámetro
+  const rows = db.prepare(sql).all(cursoId);
+  return rows;
 });
 
 /* ---------------------------- IPC: HORARIOS CRUD --------------------------- */
@@ -1162,46 +1206,51 @@ ipcMain.handle(
 );
 
 ipcMain.handle("actividad.leer-analisis", (_e, actividadId: string) => {
-  const meta = db
-    .prepare(
-      `
+  // Meta del análisis
+  const meta = db.prepare(
+    `
     SELECT umbral_aplicado, analisis_fecha
     FROM actividades
     WHERE id = ?
-  `
-    )
-    .get(actividadId) as
+    `
+  ).get(actividadId) as
     | { umbral_aplicado: number | null; analisis_fecha: string | null }
     | undefined;
 
-  const ces = db
-    .prepare(
-      `
+  // CE detectados para la actividad
+  const ces = db.prepare(
+    `
     SELECT ce_codigo AS codigo, puntuacion, razon, evidencias
     FROM actividad_ce
-    WHERE actividad_id = ? Y AND incluido = 1
+    WHERE actividad_id = ? AND incluido = 1
     ORDER BY puntuacion DESC
-  `
-    )
-    .all(actividadId) as {
+    `
+  ).all(actividadId) as Array<{
     codigo: string;
-    puntuacion: number;
-    razon?: string;
+    puntuacion: number | null;
+    razon?: string | null;
     evidencias?: string | null;
-  }[];
+  }>;
+
+  // Parseo seguro de evidencias (JSON opcional)
+  const parseJSON = (s?: string | null) => {
+    if (!s) return undefined;
+    try { return JSON.parse(s); } catch { return undefined; }
+  };
 
   return {
     umbral: meta?.umbral_aplicado ?? 0,
     fecha: meta?.analisis_fecha ?? null,
     ces: ces.map((c) => ({
       codigo: c.codigo,
-      descripcion: "",
-      puntuacion: c.puntuacion,
-      reason: (c.razon as any) ?? undefined,
-      evidencias: c.evidencias ? JSON.parse(c.evidencias) : undefined,
+      descripcion: "", // si quieres, complétalo aguas arriba
+      puntuacion: c.puntuacion ?? 0,
+      reason: c.razon ?? undefined,
+      evidencias: parseJSON(c.evidencias),
     })),
   };
 });
+
 
 /* ------------------- BORRAR ACTIVIDAD (con validación estado) ---------------- */
 
@@ -1963,39 +2012,7 @@ ipcMain.handle("actividad.evaluar", (_e, { actividadId, notas }) => {
   return { ok: true };
 });
 
-ipcMain.handle("alumnos.por-curso", (_e, { cursoId }: { cursoId: string }) => {
-  const db = (globalThis as any).db as Database.Database;
 
-  // ¿Existe la tabla curso_alumno?
-  const hasCursoAlumno = !!db
-    .prepare(
-      `SELECT 1 FROM sqlite_master WHERE type='table' AND name='curso_alumno'`
-    )
-    .get();
-
-  if (hasCursoAlumno) {
-    // Versión normalizada (si algún día usas curso_alumno)
-    return db
-      .prepare(
-        `SELECT a.id, a.nombre, a.apellidos
-           FROM curso_alumno ca
-           JOIN alumnos a ON a.id = ca.alumno_id
-           WHERE ca.curso_id = ?
-           ORDER BY a.apellidos COLLATE NOCASE, a.nombre COLLATE NOCASE`
-      )
-      .all(cursoId);
-  }
-
-  // Versión actual (campo curso en alumnos)
-  return db
-    .prepare(
-      `SELECT id, nombre, apellidos
-         FROM alumnos
-         WHERE curso = ?
-         ORDER BY apellidos COLLATE NOCASE, nombre COLLATE NOCASE`
-    )
-    .all(cursoId);
-});
 
 ipcMain.handle(
   "actividad.alumnos",
