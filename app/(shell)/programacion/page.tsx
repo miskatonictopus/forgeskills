@@ -13,37 +13,34 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ScrollText, Check, ListChecks } from "lucide-react";
+import { Loader2, ScrollText, Check, ListChecks, GripVertical, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
-/* =========== Tipos locales (UI) =========== */
+/* ========= Planificador / Helper de mapeo ========= */
+import type { Plan, Sesion as SesionSlot } from "@/lib/planificadorCE";
+import { planToUI, type SesionUI } from "@/lib/plan-ui";
 
-type ItemCEUI = {
-  tipo: "ce";
-  raCodigo: string;
-  ceCodigo: string;
-  ceDescripcion: string;
-  dificultad?: number;
-  minutos?: number;
-};
-type ItemEvalUI = { tipo: "eval"; raCodigo: string; titulo: string };
-type SesionUI = { indice: number; fecha?: string; items: Array<ItemCEUI | ItemEvalUI> };
+/* ========= DnD Kit ========= */
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  useDroppable,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
-type GuardarProgramacionPayload = {
-  asignaturaId: string;
-  cursoId: string;
-  generadoEn: string;
-  totalSesiones: number;
-  sesiones: SesionUI[];
-  planLLM?: any; // o LLMPlan | null
-  meta?: { asignaturaNombre?: string; cursoNombre?: string };
-  modeloLLM?: "gpt-4o" | "gpt-4o-mini" | null;
-  replacePrev?: boolean;
-  materializarActividades?: boolean;
-};
-
-
-type CE = { codigo: string; descripcion: string };
+/* =========================
+ * Tipos locales / API
+ * ========================= */
+type CE = { codigo: string; descripcion: string; id?: string };
 type RA = { codigo: string; descripcion: string; CE: CE[] };
 
 type AsignaturaLite = {
@@ -52,24 +49,7 @@ type AsignaturaLite = {
   cursoId: string;
   cursoNombre?: string;
 };
-
 type AsignaturaConRA = AsignaturaLite & { RA: RA[] };
-
-type ItemCE = {
-  tipo: "ce";
-  raCodigo: string;
-  ceCodigo: string;
-  ceDescripcion: string;
-  dificultad?: number;   // NUEVO: badge D1..D5
-  minutos?: number;      // NUEVO: tooltip con minutos sugeridos
-};
-type ItemEval = { tipo: "eval"; raCodigo: string; titulo: string };
-
-// type SesionUI = {
-//   indice: number;       // 1..N
-//   fecha?: string;
-//   items: Array<ItemCE | ItemEval>;
-// };
 
 /* ===== Tipos del endpoint /api/planificar-ce ===== */
 type LLMSesion = { id: string; fechaISO?: string; minutos: number };
@@ -77,32 +57,194 @@ type LLMCE = { id: string; codigo: string; descripcion: string; raCodigo: string
 type LLMItem = { sesionId: string; tipo: "CE" | "EVALUACION_RA"; ceId?: string; raCodigo?: string; minutosOcupados: number };
 type LLMPlan = { items: LLMItem[]; cesNoUbicados: string[]; metaCE: Record<string, { dificultad: number; minutos: number }> };
 
+/* ===== Persistencia para tu main.ts (ojo: no incluimos "libre") ===== */
+type ItemCEPersist = {
+  tipo: "ce";
+  raCodigo: string;
+  ceCodigo: string;
+  ceDescripcion: string;
+  dificultad?: number;
+  minutos?: number;
+};
+type ItemEvalPersist = { tipo: "eval"; raCodigo: string; titulo: string };
+type SesionPersist = { indice: number; fecha?: string; items: Array<ItemCEPersist | ItemEvalPersist> };
+
+type GuardarProgramacionPayload = {
+  asignaturaId: string;
+  cursoId: string;
+  generadoEn: string;
+  totalSesiones: number;
+  sesiones: SesionPersist[];
+  planLLM?: LLMPlan | null;
+  meta?: { asignaturaNombre?: string; cursoNombre?: string };
+  modeloLLM?: "gpt-4o" | "gpt-4o-mini" | null;
+  replacePrev?: boolean;
+  materializarActividades?: boolean;
+};
+
+/* =========
+ * DnD + bloques libres
+ * ========= */
+type UIItem = (SesionUI["items"][number] | { tipo: "libre"; titulo?: string }) & { _uid: string };
+type UISesion = { indice: number; fecha?: string; items: UIItem[] };
+
+function uid() {
+  return (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2));
+}
+function withUID(ses: SesionUI[]): UISesion[] {
+  return ses.map(s => ({
+    indice: s.indice,
+    fecha: s.fecha,
+    items: s.items.map(it => ({ ...it, _uid: uid() })),
+  }));
+}
+function findContainerIndex(sesiones: UISesion[], id: string): number {
+  return sesiones.findIndex(s => s.items.some(it => it._uid === id));
+}
+function findItemIndex(ses: UISesion, id: string): number {
+  return ses.items.findIndex(it => it._uid === id);
+}
+
+/* ========= Droppable (para poder soltar en sesiones vacías) ========= */
+function DroppableCell({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`min-h-[44px] p-2 rounded-md transition-colors ${
+        isOver ? "ring-2 ring-primary/40 bg-primary/5" : ""
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ========= Item ordenable + editable si es "libre" ========= */
+function SortableItem({
+  item,
+  onLibreChange,
+  onDelete,
+}: {
+  item: UIItem;
+  onLibreChange?: (title: string) => void;
+  onDelete?: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item._uid });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  const isEval = item.tipo === "eval";
+  const isLibre = item.tipo === "libre";
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 rounded-md border px-2 py-1 text-sm bg-background group`}
+    >
+      {/* handle */}
+      <span
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-muted-foreground"
+        title="Arrastrar"
+      >
+        <GripVertical className="w-3.5 h-3.5" />
+      </span>
+
+      {isEval ? (
+        <>
+          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium">
+            Evaluación
+          </span>
+          <span className="font-medium">{(item as any).raCodigo}</span>
+          <span>— {(item as any).titulo}</span>
+        </>
+      ) : isLibre ? (
+        <>
+          <input
+            className="flex-1 bg-transparent outline-none border-none text-sm"
+            placeholder="Escribe tu texto (repaso, práctica, proyecto, etc.)…"
+            value={(item as any).titulo ?? ""}
+            onChange={(e) => onLibreChange?.(e.target.value)}
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={onDelete}
+            title="Eliminar bloque"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </>
+      ) : (
+        <>
+          <span className="font-medium">{(item as any).raCodigo}</span>
+          <span>·</span>
+          <span className="font-mono">{(item as any).ceCodigo}</span>
+          <span>— {(item as any).ceDescripcion}</span>
+          {typeof (item as any).dificultad === "number" && (
+            <Badge
+              variant="secondary"
+              className={
+                (item as any).dificultad >= 5 ? "bg-red-500/15 text-red-600 border-red-500/30" :
+                (item as any).dificultad === 4 ? "bg-orange-500/15 text-orange-600 border-orange-500/30" :
+                (item as any).dificultad === 3 ? "bg-amber-500/15 text-amber-600 border-amber-500/30" :
+                (item as any).dificultad === 2 ? "bg-green-500/15 text-green-600 border-green-500/30" :
+                                                  "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+              }
+              title={
+                (item as any).minutos
+                  ? `Dificultad ${(item as any).dificultad} · ${(item as any).minutos}′ sugeridos`
+                  : `Dificultad ${(item as any).dificultad}`
+              }
+            >
+              D{(item as any).dificultad}
+            </Badge>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* =========================
+ * Página
+ * ========================= */
 export default function PageProgramacion() {
   const router = useRouter();
 
   const [cargando, setCargando] = useState(true);
   const [asignaturas, setAsignaturas] = useState<AsignaturaLite[]>([]);
-  const [asigSeleccionada, setAsigSeleccionada] = useState<string>(""); // `${cursoId}:${asignaturaId}`
+  const [asigSeleccionada, setAsigSeleccionada] = useState<string>("");
   const [detalleAsig, setDetalleAsig] = useState<AsignaturaConRA | null>(null);
   const [sesionesFuente, setSesionesFuente] = useState<string[] | number>(0);
-  const [preprogramacion, setPreprogramacion] = useState<SesionUI[]>([]);
+  const [preprogramacion, setPreprogramacion] = useState<UISesion[]>([]);
   const [saving, setSaving] = useState(false);
   const [planLLM, setPlanLLM] = useState<LLMPlan | null>(null);
 
-  /* ===== Helpers que usan TU electronAPI ===== */
+  /* ===== DnD sensors ===== */
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
+  );
 
-  // 1) Solo asignaturas “en uso” (vinculadas a cursos en tu BD)
+  /* ===== Electron helpers ===== */
   async function listarAsignaturasEnUso(): Promise<AsignaturaLite[]> {
     const cursos = await window.electronAPI.leerCursos();
     const result: AsignaturaLite[] = [];
-
     for (const curso of cursos) {
       const cursoId: string = (curso as any).id;
       const cursoNombre: string = (curso as any).acronimo || (curso as any).nombre || "Curso";
-      const asigs = await window.electronAPI.leerAsignaturasCurso(cursoId); // [{ id, nombre }]
+      const asigs = await window.electronAPI.leerAsignaturasCurso(cursoId);
       for (const a of asigs) result.push({ id: a.id, nombre: a.nombre, cursoId, cursoNombre });
     }
-
     return result.sort(
       (x, y) =>
         (x.cursoNombre || "").localeCompare(y.cursoNombre || "") ||
@@ -110,24 +252,21 @@ export default function PageProgramacion() {
     );
   }
 
-  // 2) Detalle con RA/CE (asignatura global) + mantener cursoId
   async function getAsignaturaConRAyCE(asignaturaId: string, cursoId: string): Promise<AsignaturaConRA | null> {
     const [asig, raRows] = await Promise.all([
       window.electronAPI.leerAsignatura?.(asignaturaId),
       window.electronAPI.obtenerRAPorAsignatura(asignaturaId),
     ]);
-
     const RAconCE: RA[] = await Promise.all(
       raRows.map(async (ra: any) => {
         const ceRows = await window.electronAPI.obtenerCEPorRA(ra.id);
         return {
           codigo: ra.codigo,
           descripcion: ra.descripcion,
-          CE: ceRows.map((c: any) => ({ codigo: c.codigo, descripcion: c.descripcion })),
+          CE: ceRows.map((c: any) => ({ codigo: c.codigo, descripcion: c.descripcion, id: c.id })),
         };
       })
     );
-
     return {
       id: asignaturaId,
       nombre: asig?.nombre ?? "",
@@ -137,7 +276,6 @@ export default function PageProgramacion() {
     };
   }
 
-  // 3) Sesiones reales (por curso + asignatura)
   async function obtenerSesionesDeAsignatura(params: { cursoId: string; asignaturaId: string }) {
     const res = await window.electronAPI.calcularHorasReales({
       cursoId: params.cursoId,
@@ -148,7 +286,7 @@ export default function PageProgramacion() {
     return { fechas: it?.fechas ?? [], count: it?.sesiones ?? 0 };
   }
 
-  /* ===== Cargar asignaturas en BD ===== */
+  /* ===== Cargar asignaturas ===== */
   useEffect(() => {
     (async () => {
       setCargando(true);
@@ -194,11 +332,11 @@ export default function PageProgramacion() {
         const sesionesValue = (fechas.length > 0 ? fechas : count) || 0;
         setSesionesFuente(sesionesValue);
 
-        // ==== 1) Preparar payload para /api/planificar-ce ====
         const defaultMinutos = 55;
+
         const ces: LLMCE[] = (detalle.RA ?? []).flatMap((ra) =>
           (ra.CE ?? []).map((ce) => ({
-            id: `${ra.codigo}::${ce.codigo}`, // id estable para mapear metaCE
+            id: `${ra.codigo}::${ce.codigo}`,
             codigo: ce.codigo,
             descripcion: ce.descripcion,
             raCodigo: ra.codigo,
@@ -229,14 +367,19 @@ export default function PageProgramacion() {
           return;
         }
 
-        // ==== 2) Llamar al endpoint ====
         const resp = await fetch("/api/planificar-ce", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ces,
             sesiones,
-            opts: { usarLLM: true, insertarEvaluacionRA: true, penalizarSaltosTema: true, resolverFaltaHueco: "recortar" },
+            opts: {
+              usarLLM: true,
+              insertarEvaluacionRA: true,
+              resolverFaltaHueco: "recortar",
+              estrategia: "intercalado-estricto",
+              maxCEporSesion: 3,
+            },
           }),
         });
 
@@ -251,64 +394,20 @@ export default function PageProgramacion() {
         const plan: LLMPlan = data.plan;
         setPlanLLM(plan);
 
-        // ==== 3) Transformar plan → preprogramación UI ====
-        const ceInfo = new Map(
-          (detalle.RA ?? [])
-            .flatMap((ra) => (ra.CE ?? []).map((ce) => [ `${ra.codigo}::${ce.codigo}`, { raCodigo: ra.codigo, ceCodigo: ce.codigo, ceDescripcion: ce.descripcion } ]))
-        );
+        const catalogo: Record<string, { raCodigo: string; ceCodigo: string; ceDescripcion: string }> = {};
+        (detalle.RA ?? []).forEach((ra) => {
+          (ra.CE ?? []).forEach((ce) => {
+            const ceId = `${ra.codigo}::${ce.codigo}`;
+            catalogo[ceId] = { raCodigo: ra.codigo, ceCodigo: ce.codigo, ceDescripcion: ce.descripcion };
+          });
+        });
 
-        const sesMap = new Map<string, { indice: number; fecha?: string }>();
-        if (Array.isArray(sesionesValue)) {
-          (sesionesValue as string[]).forEach((fecha, i) => sesMap.set(`S${i + 1}`, { indice: i + 1, fecha }));
-        } else {
-          for (let i = 0; i < Number(sesionesValue); i++) sesMap.set(`S${i + 1}`, { indice: i + 1 });
-        }
+        const slots: SesionSlot[] = Array.isArray(sesionesValue)
+          ? (sesionesValue as string[]).map((fechaISO, i) => ({ id: `S${i + 1}`, fechaISO, minutos: defaultMinutos }))
+          : Array.from({ length: Number(sesionesValue) }).map((_, i) => ({ id: `S${i + 1}`, minutos: defaultMinutos }));
 
-        const porSesion = new Map<number, SesionUI>();
-
-        for (const item of plan.items) {
-          const sesMeta = sesMap.get(item.sesionId);
-          if (!sesMeta) continue;
-          if (!porSesion.has(sesMeta.indice)) porSesion.set(sesMeta.indice, { indice: sesMeta.indice, fecha: sesMeta.fecha, items: [] });
-
-          if (item.tipo === "CE" && item.ceId) {
-            const info = ceInfo.get(item.ceId);
-            const meta = plan.metaCE?.[item.ceId]; // dificultad/minutos
-            if (info) {
-              porSesion.get(sesMeta.indice)!.items.push({
-                tipo: "ce",
-                raCodigo: info.raCodigo,
-                ceCodigo: info.ceCodigo,
-                ceDescripcion: info.ceDescripcion,
-                dificultad: meta?.dificultad,
-                minutos: meta?.minutos,
-              });
-            }
-          } else if (item.tipo === "EVALUACION_RA" && item.raCodigo) {
-            porSesion.get(sesMeta.indice)!.items.push({
-              tipo: "eval",
-              raCodigo: item.raCodigo,
-              titulo: `Actividad evaluativa del ${item.raCodigo}`,
-            });
-          }
-        }
-
-        const totalSes = Array.isArray(sesionesValue) ? (sesionesValue as string[]).length : Number(sesionesValue || 0);
-        const sesionesUI = Array.from({ length: totalSes }, (_, i) => {
-          const idx = i + 1;
-          const exist = porSesion.get(idx);
-          const fecha = Array.isArray(sesionesValue) ? (sesionesValue as string[])[i] : undefined;
-          return exist ?? { indice: idx, fecha, items: [] };
-        }).sort((a, b) => a.indice - b.indice);
-
-        setPreprogramacion(sesionesUI);
-
-        // avisos de hueco
-        if (plan.cesNoUbicados?.length) {
-          toast.warning(`No caben ${plan.cesNoUbicados.length} CE; se intentó compactar y aún faltan.`);
-        } else {
-          // si quisieras: podrías detectar si hubo compactación comparando minutos metaCE con los originales
-        }
+        const sesionesUI = planToUI(slots, plan as unknown as Plan, catalogo);
+        setPreprogramacion(withUID(sesionesUI));
       } catch (e) {
         console.error(e);
         toast.error("Error al preparar la programación");
@@ -319,22 +418,103 @@ export default function PageProgramacion() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asigSeleccionada]);
 
-  /* ===== Guardar programación ===== */
+  /* ===== Añadir / editar / borrar bloques libres ===== */
+  const addLibre = (indice: number) => {
+    setPreprogramacion((prev) => {
+      const clone = prev.map(s => ({ ...s, items: [...s.items] }));
+      const s = clone.find(x => x.indice === indice);
+      if (!s) return prev;
+      s.items.push({ tipo: "libre", titulo: "", _uid: uid() });
+      return clone;
+    });
+  };
+
+  const updateLibre = (uid: string, title: string) => {
+    setPreprogramacion(prev => prev.map(s => ({
+      ...s,
+      items: s.items.map(it => it._uid === uid ? { ...it, titulo: title } : it),
+    })));
+  };
+
+  const deleteItem = (uid: string) => {
+    setPreprogramacion(prev => prev.map(s => ({
+      ...s,
+      items: s.items.filter(it => it._uid !== uid),
+    })));
+  };
+  
+  /* ===== DnD ===== */
+
+
+  const onDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setPreprogramacion((prev) => {
+      const fromSessIdx = findContainerIndex(prev, String(active.id));
+      if (fromSessIdx < 0) return prev;
+      const fromItemIdx = findItemIndex(prev[fromSessIdx], String(active.id));
+      if (fromItemIdx < 0) return prev;
+
+      let toSessIdx = -1;
+      let toIndex = -1;
+
+      const overId = String(over.id);
+      if (overId.startsWith("sess-")) {
+        toSessIdx = prev.findIndex(s => `sess-${s.indice}` === overId);
+        toIndex = toSessIdx >= 0 ? prev[toSessIdx].items.length : -1;
+      } else {
+        toSessIdx = findContainerIndex(prev, overId);
+        if (toSessIdx >= 0) toIndex = Math.max(0, findItemIndex(prev[toSessIdx], overId));
+      }
+
+      if (toSessIdx < 0 || toIndex < 0) return prev;
+
+      const clone = prev.map(s => ({ ...s, items: [...s.items] }));
+      const [moved] = clone[fromSessIdx].items.splice(fromItemIdx, 1);
+      clone[toSessIdx].items.splice(toIndex, 0, moved);
+      return clone;
+    });
+  };
+
+  /* ===== Guardar ===== */
   const handleGuardar = async () => {
     if (!detalleAsig) return;
 
     try {
       setSaving(true);
 
-      const payload: Parameters<typeof window.electronAPI.guardarProgramacionDidactica>[0] = {
+      // ⚠️ Por compatibilidad: ignoramos "libre" en persistencia.
+      const sesionesPersist: SesionPersist[] = preprogramacion.map((s) => ({
+        indice: s.indice,
+        fecha: s.fecha,
+        items: s.items
+          .filter((it: any) => it.tipo === "ce" || it.tipo === "eval")
+          .map((it: any) =>
+            it.tipo === "ce"
+              ? {
+                  tipo: "ce",
+                  raCodigo: it.raCodigo,
+                  ceCodigo: it.ceCodigo,
+                  ceDescripcion: it.ceDescripcion,
+                  dificultad: typeof it.dificultad === "number" ? it.dificultad : undefined,
+                  minutos: typeof it.minutos === "number" ? it.minutos : undefined,
+                } as ItemCEPersist
+              : { tipo: "eval", raCodigo: it.raCodigo, titulo: it.titulo } as ItemEvalPersist
+          ),
+      }));
+
+      const payload: GuardarProgramacionPayload = {
         asignaturaId: detalleAsig.id,
         cursoId: detalleAsig.cursoId,
         generadoEn: new Date().toISOString(),
-        totalSesiones: Array.isArray(sesionesFuente) ? (sesionesFuente as string[]).length : Number(sesionesFuente || 0),
-        sesiones: preprogramacion,
+        totalSesiones: Array.isArray(sesionesFuente)
+          ? (sesionesFuente as string[]).length
+          : Number(sesionesFuente || 0),
+        sesiones: sesionesPersist,
         planLLM,
         meta: { asignaturaNombre: detalleAsig.nombre, cursoNombre: detalleAsig.cursoNombre },
-        modeloLLM: "gpt-4o-mini",     // ← ahora se mantiene como literal, no como string
+        modeloLLM: "gpt-4o-mini",
         replacePrev: true,
         materializarActividades: false,
       };
@@ -343,7 +523,8 @@ export default function PageProgramacion() {
         toast.error("Falta el handler guardarProgramacionDidactica");
         return;
       }
-      const res = await window.electronAPI.guardarProgramacionDidactica(payload);
+
+      const res = await window.electronAPI.guardarProgramacionDidactica(payload as any);
       if (res.ok) {
         toast.success("Programación didáctica guardada");
         router.push(`/programacion/${detalleAsig.id}`);
@@ -365,6 +546,7 @@ export default function PageProgramacion() {
     return { totalSes, totalRA, totalCE };
   }, [detalleAsig, sesionesFuente]);
 
+  /* ===== UI ===== */
   return (
     <div className="p-6">
       <div className="mb-4 flex items-center justify-between">
@@ -440,69 +622,67 @@ export default function PageProgramacion() {
             <p className="text-sm text-muted-foreground">No hay CE registrados o no hay sesiones. Comprueba el plan de horarios.</p>
           ) : (
             <div className="rounded-md border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-24">Sesión</TableHead>
-                    <TableHead className="w-40">Fecha</TableHead>
-                    <TableHead>Contenido</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {preprogramacion.map((s) => (
-                    <TableRow key={s.indice}>
-                      <TableCell className="font-medium">#{s.indice}</TableCell>
-                      <TableCell>{s.fecha ? new Date(s.fecha).toLocaleDateString() : "—"}</TableCell>
-                      <TableCell>
-                        {s.items.length === 0 ? (
-                          <span className="text-muted-foreground">Repaso / Práctica / Proyecto</span>
-                        ) : (
-                          <ul className="list-disc pl-5 space-y-1">
-                            {s.items.map((it, idx) => {
-                              if (it.tipo === "eval") {
-                                return (
-                                  <li key={idx} className="text-sm">
-                                    <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium mr-2">
-                                      Evaluación
-                                    </span>
-                                    <span className="font-medium">{it.raCodigo}</span> — {it.titulo}
-                                  </li>
-                                );
-                              }
-                              return (
-                                <li key={idx} className="text-sm flex items-center gap-2">
-                                  <span className="font-medium">{it.raCodigo}</span>
-                                  · <span className="font-mono">{it.ceCodigo}</span> — {it.ceDescripcion}
-                                  {typeof it.dificultad === "number" && (
-                                    <Badge
-                                      variant="secondary"
-                                      className={
-                                        it.dificultad >= 5 ? "bg-red-500/15 text-red-600 border-red-500/30" :
-                                        it.dificultad === 4 ? "bg-orange-500/15 text-orange-600 border-orange-500/30" :
-                                        it.dificultad === 3 ? "bg-amber-500/15 text-amber-600 border-amber-500/30" :
-                                        it.dificultad === 2 ? "bg-green-500/15 text-green-600 border-green-500/30" :
-                                                              "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
-                                      }
-                                      title={it.minutos ? `Dificultad ${it.dificultad} · ${it.minutos}′ sugeridos` : `Dificultad ${it.dificultad}`}
-                                    >
-                                      D{it.dificultad}
-                                    </Badge>
-                                  )}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        )}
-                      </TableCell>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-24">Sesión</TableHead>
+                      <TableHead className="w-40">Fecha</TableHead>
+                      <TableHead>Contenido (arrastra para reordenar o mover entre sesiones)</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {preprogramacion.map((s) => (
+                      <TableRow key={s.indice}>
+                        <TableCell className="font-medium">#{s.indice}</TableCell>
+                        <TableCell>{s.fecha ? new Date(s.fecha).toLocaleDateString() : "—"}</TableCell>
+                        <TableCell>
+                          <DroppableCell id={`sess-${s.indice}`}>
+                            <SortableContext
+                              items={s.items.map(it => it._uid)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              <div className="flex flex-col gap-1">
+                                {s.items.length === 0 && (
+                                  <div className="text-sm text-muted-foreground mb-1">
+                                    Suelta aquí para programar en esta sesión
+                                  </div>
+                                )}
+
+                                {s.items.map((it) => (
+                                  <SortableItem
+                                    key={it._uid}
+                                    item={it}
+                                    onLibreChange={it.tipo === "libre" ? (title) => updateLibre(it._uid, title) : undefined}
+                                    onDelete={it.tipo === "libre" ? () => deleteItem(it._uid) : undefined}
+                                  />
+                                ))}
+
+                                <div className="pt-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => addLibre(s.indice)}
+                                    className="h-7 px-2 text-xs"
+                                  >
+                                    <Plus className="h-3.5 w-3.5 mr-1" /> Añadir nota
+                                  </Button>
+                                </div>
+                              </div>
+                            </SortableContext>
+                          </DroppableCell>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </DndContext>
             </div>
           )}
 
           <p className="mt-2 text-xs text-muted-foreground">
-            Orden y evaluaciones optimizados por el planificador (prerequisitos, rampa de dificultad y evaluación al cerrar cada RA).
+            Orden y evaluaciones optimizados por el planificador; puedes ajustar manualmente arrastrando los elementos.
+            Los bloques libres son solo notas de planificación (ahora mismo no se guardan en BD).
           </p>
 
           <div className="mt-4 flex items-center gap-2">
