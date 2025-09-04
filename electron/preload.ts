@@ -229,6 +229,6 @@ onActividadesActualizadas: (cb: (p:{count:number}) => void) => {
     }) => ipcRenderer.invoke("academico.calcular-horas-reales", opts),
 
     guardarProgramacionDidactica: (payload: any) =>
-    ipcRenderer.invoke("programacion.guardar", payload),
+    ipcRenderer.invoke("guardarProgramacionDidactica", payload),
   
 });

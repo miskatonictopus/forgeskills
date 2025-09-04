@@ -264,10 +264,25 @@ evaluarActividad: (
     }>;
     totalHoras: number;
   }>;
-
-  guardarProgramacionDidactica: (
-    payload: any
-  ) => Promise<{ ok: boolean; path?: string; error?: string }>;
+  guardarProgramacionDidactica: (payload: {
+    asignaturaId: string;
+    cursoId: string;
+    generadoEn: string;
+    totalSesiones: number;
+    sesiones: Array<{
+      indice: number;
+      fecha?: string;
+      items: Array<
+        | { tipo: "ce"; raCodigo: string; ceCodigo: string; ceDescripcion: string; dificultad?: number; minutos?: number }
+        | { tipo: "eval"; raCodigo: string; titulo: string }
+      >;
+    }>;
+    planLLM?: any;
+    meta?: { asignaturaNombre?: string; cursoNombre?: string };
+    modeloLLM?: "gpt-4o" | "gpt-4o-mini" | null;
+    replacePrev?: boolean;
+    materializarActividades?: boolean;
+  }) => Promise<{ ok: boolean; id?: string; error?: string; resumen?: any }>;
   
 }
 

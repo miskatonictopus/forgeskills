@@ -4,6 +4,7 @@
 import { openDbSingleton, closeDbSingleton, getDb } from "../src/main/db/singleton";
 import { BackupManager } from "../main/backup";
 
+// asumiendo db singleton ya creado
 import * as dotenv from "dotenv";
 dotenv.config();
 import { app, BrowserWindow, ipcMain, dialog } from "electron";
@@ -260,6 +261,25 @@ db.prepare(
 `
 ).run();
 
+type ItemCE = {
+  tipo: "ce";
+  raCodigo: string;
+  ceCodigo: string;
+  ceDescripcion: string;
+};
+
+type ItemEval = {
+  tipo: "eval";
+  raCodigo: string;
+  titulo: string;
+};
+
+type SesionUI = {
+  indice: number;          // 1..N
+  fecha?: string;          // ISO opcional
+  items: Array<ItemCE | ItemEval>;
+};
+
 /* ============================================================================
  * HORAS LECTIVAS (nuevo): helpers + handler calcular-horas-reales
  * ==========================================================================*/
@@ -286,6 +306,20 @@ type CalcularHorasRes = {
   items: CalcularHorasItem[];
   totalHoras: number;
 };
+
+type GuardarProgramacionPayload = {
+  asignaturaId: string;
+  cursoId: string;
+  generadoEn: string;
+  totalSesiones: number;
+  sesiones: SesionUI[];
+  planLLM?: any;
+  meta?: { asignaturaNombre?: string; cursoNombre?: string };
+  modeloLLM?: "gpt-4o" | "gpt-4o-mini" | null;
+  materializarActividades?: boolean;
+  replacePrev?: boolean; // ← NUEVO: si true, borra programaciones previas de (cursoId, asignaturaId)
+};
+
 
 function HR_toDate(ymd: string): Date {
   const [y, m, d] = (ymd || "").split("-").map((n) => parseInt(n, 10));
@@ -331,6 +365,29 @@ function HR_diaToIso(dia: string | number): number {
     domingo:7,sunday:7,sun:7,
   };
   return map[s] ?? 1;
+}
+
+
+/* ================== Utils ================== */
+function toISOorNull(s?: string): string | null {
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function normCode(s: string) {
+  return (s || "").trim().replace(/\s+/g, "");
+}
+
+function validarSesiones(sesiones: SesionUI[], total: number) {
+  if (!Array.isArray(sesiones) || sesiones.length === 0) {
+    throw new Error("No hay sesiones para guardar.");
+  }
+  // índices esperados 1..total
+  const idxs = new Set(sesiones.map((s) => s.indice));
+  for (let i = 1; i <= total; i++) {
+    if (!idxs.has(i)) throw new Error(`Falta la sesión #${i} en la preprogramación.`);
+  }
 }
 
 function calcularHorasLectivas(dbx: BetterSqlite3.Database, opts: CalcularHorasOpts = {}): CalcularHorasRes {
@@ -2616,3 +2673,224 @@ ipcMain.handle("programacion.guardar", async (_e, payload: any) => {
     return { ok: false, error: String(err?.message || err) };
   }
 });
+
+/* ================== IPC: guardarProgramacionDidactica ================== */
+ipcMain.handle("guardarProgramacionDidactica", (_e, payload: GuardarProgramacionPayload) => {
+  const db = openDbSingleton(DB_PATH);  // ✅
+db.pragma("foreign_keys = ON");
+
+  // Por si acaso (si no lo activas globalmente en init)
+  db.pragma("foreign_keys = ON");
+
+  const {
+    asignaturaId,
+    cursoId,
+    generadoEn,
+    totalSesiones,
+    sesiones,
+    planLLM,
+    meta,
+    modeloLLM = null,
+    materializarActividades = false,
+    replacePrev = false,
+  } = payload || {};
+
+  // Validación básica del payload
+  if (!asignaturaId || !cursoId) {
+    return { ok: false, error: "Faltan asignaturaId o cursoId" };
+  }
+  if (!totalSesiones || typeof totalSesiones !== "number" || totalSesiones < 1) {
+    return { ok: false, error: "totalSesiones inválido" };
+  }
+  if (!Array.isArray(sesiones)) {
+    return { ok: false, error: "sesiones debe ser un array" };
+  }
+
+  try {
+    validarSesiones(sesiones, totalSesiones);
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Sesiones inválidas" };
+  }
+
+  // Preparar statements fuera de la tx para caching
+  const delPrevProgStmt = db.prepare(
+    `DELETE FROM programacion WHERE asignatura_id = ? AND curso_id = ?`
+  );
+  const delPrevSesionStmt = db.prepare(
+    `DELETE FROM programacion_sesion WHERE programacion_id IN (
+       SELECT id FROM programacion WHERE asignatura_id = ? AND curso_id = ?
+     )`
+  );
+
+  const insProgStmt = db.prepare(`
+    INSERT INTO programacion (
+      id, asignatura_id, curso_id, generado_en, modelo_llm, total_sesiones, plan_llm_json, meta_json
+    ) VALUES (
+      @id, @asignatura_id, @curso_id, @generado_en, @modelo_llm, @total_sesiones, @plan_llm_json, @meta_json
+    )
+  `);
+
+  const insSesionStmt = db.prepare(`
+    INSERT INTO programacion_sesion (id, programacion_id, indice, fecha, contenido_json)
+    VALUES (@id, @programacion_id, @indice, @fecha, @contenido_json)
+  `);
+
+  const tx = db.transaction(() => {
+    // (opcional) limpiar programaciones previas para no duplicar
+    if (replacePrev) {
+      // Borra primero sus sesiones (por ON DELETE CASCADE esto es redundante, pero seguro)
+      delPrevSesionStmt.run(asignaturaId, cursoId);
+      delPrevProgStmt.run(asignaturaId, cursoId);
+    }
+
+    const progId = randomUUID();
+
+    insProgStmt.run({
+      id: progId,
+      asignatura_id: asignaturaId,
+      curso_id: cursoId,
+      generado_en: toISOorNull(generadoEn) ?? new Date().toISOString(),
+      modelo_llm: modeloLLM,
+      total_sesiones: totalSesiones,
+      plan_llm_json: planLLM ? JSON.stringify(planLLM) : null,
+      meta_json: meta ? JSON.stringify(meta) : null,
+    });
+
+    let sesionesInsertadas = 0;
+    let ceContados = 0;
+    let evalContadas = 0;
+
+    for (const s of sesiones) {
+      const sesionId = randomUUID();
+      const fechaISO = toISOorNull(s.fecha);
+
+      // Sanitizar items: normaliza códigos y filtra vacíos
+      const contenido = (s.items || []).map((it) => {
+        if (it.tipo === "ce") {
+          return {
+            ...it,
+            raCodigo: normCode(it.raCodigo),
+            ceCodigo: normCode(it.ceCodigo),
+            ceDescripcion: (it.ceDescripcion || "").trim(),
+          };
+        }
+        if (it.tipo === "eval") {
+          return {
+            ...it,
+            raCodigo: normCode(it.raCodigo),
+            titulo: (it.titulo || "").trim(),
+          };
+        }
+        return it;
+      });
+
+      ceContados += contenido.filter((x: any) => x?.tipo === "ce").length;
+      evalContadas += contenido.filter((x: any) => x?.tipo === "eval").length;
+
+      insSesionStmt.run({
+        id: sesionId,
+        programacion_id: progId,
+        indice: s.indice,
+        fecha: fechaISO,
+        contenido_json: JSON.stringify(contenido),
+      });
+      sesionesInsertadas++;
+    }
+
+    // (OPCIONAL) materializar como actividades/actividad_ce
+    let materializadas = 0;
+    if (materializarActividades) {
+      materializadas = materializarProgramacionComoActividades(db, {
+        progId,
+        sesiones,
+        asignaturaId,
+        cursoId,
+      });
+    }
+
+    return {
+      progId,
+      resumen: {
+        sesionesInsertadas,
+        ceContados,
+        evalContadas,
+        actividadesMaterializadas: materializadas,
+      },
+    };
+  });
+
+  try {
+    const { progId, resumen } = tx();
+    return { ok: true, id: progId, resumen };
+  } catch (err: any) {
+    console.error("[guardarProgramacionDidactica] Error:", err?.stack || err);
+    return { ok: false, error: err?.message || "No se pudo guardar la programación" };
+  }
+});
+
+/* ========== opcional: crear actividades a partir de la programación ========== */
+function materializarProgramacionComoActividades(
+  db: Database.Database,
+  params: { progId: string; sesiones: SesionUI[]; asignaturaId: string; cursoId: string }
+): number {
+  const { sesiones, asignaturaId, cursoId } = params;
+
+  // Tablas asumidas:
+  //   actividades(id, nombre, fecha, curso_id, asignatura_id, tipo)
+  //   actividad_ce(actividad_id, ra_codigo, ce_codigo)
+  const insActividad = db.prepare(`
+    INSERT INTO actividades (id, nombre, fecha, curso_id, asignatura_id, tipo)
+    VALUES (@id, @nombre, @fecha, @curso_id, @asignatura_id, @tipo)
+  `);
+  const insActividadCE = db.prepare(`
+    INSERT INTO actividad_ce (actividad_id, ra_codigo, ce_codigo)
+    VALUES (@actividad_id, @ra_codigo, @ce_codigo)
+  `);
+
+  let count = 0;
+
+  for (const s of sesiones) {
+    const fechaISO = toISOorNull(s.fecha);
+
+    // 1) Impartición
+    const ces = (s.items || []).filter((x) => x.tipo === "ce") as ItemCE[];
+    if (ces.length) {
+      const actId = randomUUID();
+      insActividad.run({
+        id: actId,
+        nombre: `Sesión #${s.indice} · Impartición`,
+        fecha: fechaISO,
+        curso_id: cursoId,
+        asignatura_id: asignaturaId,
+        tipo: "imparticion",
+      });
+      for (const ce of ces) {
+        insActividadCE.run({
+          actividad_id: actId,
+          ra_codigo: normCode(ce.raCodigo),
+          ce_codigo: normCode(ce.ceCodigo),
+        });
+      }
+      count++;
+    }
+
+    // 2) Evaluaciones RA
+    const evals = (s.items || []).filter((x) => x.tipo === "eval") as ItemEval[];
+    for (const ev of evals) {
+      const actId = randomUUID();
+      insActividad.run({
+        id: actId,
+        nombre: `Sesión #${s.indice} · ${ev.titulo}`.trim(),
+        fecha: fechaISO,
+        curso_id: cursoId,
+        asignatura_id: asignaturaId,
+        tipo: "evaluacion",
+      });
+      // Si quieres vincular CE del RA aquí, puedes hacerlo leyendo CE del RA en tu BD
+      count++;
+    }
+  }
+
+  return count;
+}
+
