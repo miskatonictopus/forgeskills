@@ -3,6 +3,7 @@
 // Determinista; usa heurística y (opcional) LLM para puntuar dificultad y minutos.
 
 import { llmJson } from "./llm";
+import { evaluarDificultadLLM } from "./evaluadorDificultadLLM";
 
 /* =========================
  * Tipos base (ALGORITMO)
@@ -38,9 +39,19 @@ export type ItemPlan = {
 
 export type Plan = {
   items: ItemPlan[];
-  cesNoUbicados: string[];
+  cesNoUbicados: string[]; // CE con minutos asignados < minutos requeridos
   metaCE: Record<string, { dificultad: number; minutos: number }>;
 };
+
+/* =========================
+ * Utilidades comunes
+ * ========================= */
+const clamp5 = (n: number) => Math.round(n / 5) * 5;
+const clampMinutos = (n: number) => Math.min(120, Math.max(20, clamp5(n)));
+
+function capacidadRestante(sesion: Sesion, ocupados: number) {
+  return Math.max(0, sesion.minutos - ocupados);
+}
 
 /* =========================
  * Heurística determinista
@@ -84,29 +95,164 @@ function heuristicaCE(ce: CE): CEEvaluado {
  * Scoring con LLM (opcional)
  * ========================= */
 async function evaluarConLLM(ces: CE[]): Promise<CEEvaluado[]> {
-  type Out = { items: CEEvaluado[] };
+  if (!ces.length) return [];
 
-  const system = `Eres un evaluador pedagógico. Devuelves SOLO JSON válido.
-Puntúa DIFICULTAD 1..5 (5=más complejo) considerando Bloom, pasos implícitos y dependencias.
-Sugiere "minutosSugeridos" en múltiplos de 5 (20..120) pensando en sesiones de 55':
-- Guía: D1≈20, D2≈25, D3≈40, D4≈55, D5≈70.
-Indica prerequisitos por CÓDIGO cuando proceda. No inventes CE.`;
+  type RawItem = {
+    ceId?: string;
+    codigo?: string;
+    subscores: {
+      pasos: number;         // 1..5
+      transferencia: number; // 1..5
+      autonomia: number;     // 1..5
+      complejidad: number;   // 1..5
+    };
+    minutos?: number;        // sugerencia libre
+    prereqs?: string[];
+    nota?: string;           // explicación breve
+  };
+  type Out = { items: RawItem[] };
 
+  const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+  const round5 = (v: number) => Math.round(v / 5) * 5;
+  const mapaMin: Record<number, number> = { 1: 20, 2: 25, 3: 40, 4: 55, 5: 70 };
+
+  // ===== 1) LLM: pide SUB-SCORES (analista) =====
+  const system = `Eres un analista pedagógico. Devuelves SOLO JSON válido con:
+{
+  "items":[
+    {
+      "ceId": "<id recibido>",
+      "subscores": {
+        "pasos": 1..5,          // nº de pasos encadenados y dependencia secuencial
+        "transferencia": 1..5,  // necesidad de trasladar a contextos nuevos
+        "autonomia": 1..5,      // grado de guía vs. autonomía
+        "complejidad": 1..5     // dificultad intrínseca del dominio/herramientas
+      },
+      "minutos": 20..120,       // sugerencia libre, no hace falta múltiplos de 5
+      "prereqs": ["CE?.?"],     // por CÓDIGO si procede
+      "nota": "justificación breve"
+    }
+  ]
+}
+NO inventes CEs.`;
   const user = JSON.stringify({
-    ces: ces.map(c => ({ id: c.id, codigo: c.codigo, raCodigo: c.raCodigo, descripcion: c.descripcion })),
+    ces: ces.map((c) => ({
+      ceId: c.id,
+      codigo: c.codigo,
+      raCodigo: c.raCodigo,
+      descripcion: c.descripcion,
+    })),
   });
 
-  const out = await llmJson<Out>(system, user, { seed: 4242 });
-  return out.items.map(x => ({
-    ...x,
-    dificultad: Math.min(5, Math.max(1, Math.round(x.dificultad))),
-    minutosSugeridos: Math.min(120, Math.max(20, Math.round((x.minutosSugeridos ?? 35) / 5) * 5)),
-    prereqs: (x.prereqs ?? []).filter(Boolean),
-  }));
+  let out: Out;
+  try {
+    out = await llmJson<Out>(system, user, { seed: 4242 });
+  } catch {
+    // Si el LLM falla del todo, volvemos a la heurística pura
+    return ces.map(heuristicaCE);
+  }
+
+  // Índices auxiliares
+  const byId = new Map(ces.map((c) => [c.id, c]));
+  const byCodigo = new Map(ces.map((c) => [c.codigo, c.id]));
+
+  // ===== 2) Construye score continuo + mezcla con heurística =====
+  type Tmp = {
+    id: string;
+    rawScore: number;   // continuo 1..5 desde subscores
+    heur: number;       // desde heurística
+    blend: number;      // mezcla
+    minutosPropuestos: number | undefined;
+    prereqs: string[];
+    nota: string;
+  };
+
+  const tmp: Tmp[] = ces.map((c) => {
+    const ri =
+      out.items.find((x) => x.ceId === c.id) ||
+      out.items.find((x) => x.codigo && byCodigo.get(x.codigo) === c.id);
+
+    const subs = ri?.subscores;
+    const raw =
+      subs
+        ? (subs.pasos + subs.transferencia + subs.autonomia + subs.complejidad) / 4
+        : undefined;
+
+    const heur = heuristicaCE(c).dificultad;
+
+    // Mezcla: 60% LLM, 40% heurística. Nunca por debajo de la heurística.
+    let blend = raw ? 0.6 * raw + 0.4 * heur : heur;
+    blend = Math.max(blend, heur);
+
+    return {
+      id: c.id,
+      rawScore: clamp(raw ?? heur, 1, 5),
+      heur,
+      blend: clamp(blend, 1, 5),
+      minutosPropuestos: ri?.minutos,
+      prereqs: Array.isArray(ri?.prereqs) ? ri!.prereqs!.filter(Boolean) : [],
+      nota: ri?.nota || "LLM + heurística",
+    };
+  });
+
+  // ===== 3) Detecta colapso y expande por cuantiles si hace falta =====
+  const mean =
+    tmp.reduce((a, b) => a + b.blend, 0) / (tmp.length || 1);
+  const variance =
+    tmp.reduce((a, b) => a + Math.pow(b.blend - mean, 2), 0) / (tmp.length || 1);
+  const std = Math.sqrt(variance);
+
+  // Histograma por nivel redondeado
+  const hist = new Map<number, number>();
+  for (const t of tmp) {
+    const lvl = Math.round(t.blend);
+    hist.set(lvl, (hist.get(lvl) ?? 0) + 1);
+  }
+  const total = tmp.length;
+  let maxCount = 0;
+  for (const [, cnt] of hist) maxCount = Math.max(maxCount, cnt);
+  const colapso = std < 0.4 || maxCount / total > 0.7;
+
+  // Si colapsa, hacemos ranking→cuantiles a 1..5
+  if (colapso) {
+    const sorted = [...tmp].sort((a, b) => a.blend - b.blend);
+    const n = sorted.length;
+
+    const q = (i: number) => (i + 0.5) / n; // cuantiles
+    for (let i = 0; i < n; i++) {
+      const qi = q(i);
+      let lvl = 3;
+      if (qi <= 0.12) lvl = 1;
+      else if (qi <= 0.35) lvl = 2;
+      else if (qi <= 0.70) lvl = 3;
+      else if (qi <= 0.88) lvl = 4;
+      else lvl = 5;
+      sorted[i].blend = lvl; // reasigna nivel discreto
+    }
+  }
+
+  // ===== 4) Minutos finales y salida =====
+  const res: CEEvaluado[] = tmp.map((t) => {
+    const dif = clamp(Math.round(t.blend), 1, 5);
+    // Minutos: si el LLM dio minutos, ajusta a múltiplo de 5 y normaliza al rango
+    let mins = t.minutosPropuestos != null ? round5(t.minutosPropuestos) : mapaMin[dif];
+    mins = clamp(mins, 20, 120);
+
+    return {
+      ceId: t.id,
+      dificultad: dif,
+      minutosSugeridos: mins,
+      prereqs: t.prereqs,
+      justificacion: t.nota,
+    };
+  });
+
+  return res;
 }
 
+
 /* =========================
- * Utilidades
+ * Agrupados / prereqs
  * ========================= */
 function agruparPorRA(ces: CE[]) {
   const map = new Map<string, CE[]>();
@@ -116,10 +262,6 @@ function agruparPorRA(ces: CE[]) {
     map.set(ce.raCodigo, arr);
   }
   return map;
-}
-
-function capacidadRestante(sesion: Sesion, ocupados: number) {
-  return Math.max(0, sesion.minutos - ocupados);
 }
 
 function siguienteSesionLibre(ix: number, sesiones: Sesion[], ocupados: number[]): number | null {
@@ -135,9 +277,21 @@ function siguienteSesionLibre(ix: number, sesiones: Sesion[], ocupados: number[]
 export type PlanificarOpts = {
   usarLLM?: boolean;
   insertarEvaluacionRA?: boolean;
+  /** Cómo resolver desajuste cuando faltan minutos */
   resolverFaltaHueco?: "ninguno" | "recortar";
+  /** Estrategia de orden */
   estrategia?: "intercalado-estricto" | "rampa-mixta" | "por-ra";
+  /** Límite de CE por sesión */
   maxCEporSesion?: number;
+
+  /** Nuevo: objetivo de ocupación del total de minutos disponibles (0.6..0.98) */
+  objetivoOcupacion?: number;
+  /** Nuevo: ajustar minutos automáticamente para acercar la ocupación objetivo */
+  ajustarMinutos?: "auto" | "ninguno";
+  /** Nuevo: permitir partir un CE en varios trozos cuando no cabe entero */
+  partirCEsiNoCabe?: boolean;
+  /** Nuevo: tamaño mínimo de cada fragmento (múltiplos de 5) */
+  minBloque?: number;
 };
 
 export async function planificarCEs(
@@ -149,22 +303,62 @@ export async function planificarCEs(
     resolverFaltaHueco: "recortar",
     estrategia: "intercalado-estricto",
     maxCEporSesion: 3,
+    objetivoOcupacion: 0.92,
+    ajustarMinutos: "auto",
+    partirCEsiNoCabe: true,
+    minBloque: 20,
   }
 ): Promise<Plan> {
   if (!ces.length || !sesiones.length) {
     return { items: [], cesNoUbicados: ces.map(c => c.id), metaCE: {} };
   }
 
-  // 1) Dificultad + minutos
-  let evals: CEEvaluado[] = [];
-  if (opts.usarLLM) {
-    try { evals = await evaluarConLLM(ces); } catch { evals = ces.map(heuristicaCE); }
-  } else {
+  const objetivoOcupacion = Math.min(0.98, Math.max(0.6, opts.objetivoOcupacion ?? 0.92));
+  const permitirPartir = opts.partirCEsiNoCabe ?? true;
+  const minBloque = clamp5(opts.minBloque ?? 20);
+
+// 1) Dificultad + minutos
+let evals: CEEvaluado[] = [];
+if (opts.usarLLM) {
+  try {
+    evals = await evaluarConLLM(ces);
+  } catch {
     evals = ces.map(heuristicaCE);
   }
-  const evalById = new Map(evals.map(e => [e.ceId, e]));
-  const metaCE: Record<string, { dificultad: number; minutos: number }> = {};
-  for (const e of evals) metaCE[e.ceId] = { dificultad: e.dificultad, minutos: e.minutosSugeridos };
+} else {
+  evals = ces.map(heuristicaCE);
+}
+
+// ⚠️ Normalización y relleno defensivo: garantizamos 1 evaluación por CE
+const evalById = new Map<string, CEEvaluado>();
+
+for (const ce of ces) {
+  // busca por id (principal) y, si no, intenta por código
+  let e =
+    evals.find(x => x.ceId === ce.id) ??
+    evals.find(x => (x as any).codigo === ce.codigo);
+
+  if (!e) e = heuristicaCE(ce); // fallback
+
+  // saneo estricto
+  e = {
+    ceId: ce.id, // forzamos el id correcto
+    dificultad: Math.min(5, Math.max(1, Math.round(e.dificultad))),
+    minutosSugeridos: Math.min(120, Math.max(20, Math.round((e.minutosSugeridos ?? 35) / 5) * 5)),
+    prereqs: Array.isArray(e.prereqs) ? e.prereqs.filter(Boolean) : [],
+    justificacion: e.justificacion || "Heurística/LLM normalizado.",
+  };
+
+  evalById.set(ce.id, e);
+}
+
+// (opcional) Si sigues usando metaCE:
+const metaCE: Record<string, { dificultad: number; minutos: number }> = {};
+for (const ce of ces) {
+  const e = evalById.get(ce.id)!;
+  metaCE[ce.id] = { dificultad: e.dificultad, minutos: e.minutosSugeridos };
+}
+
 
   // 2) Prereqs inferidos por RA si faltan (D>=4)
   const porRA = agruparPorRA(ces);
@@ -246,67 +440,124 @@ export async function planificarCEs(
     for (const [, q] of colas) linea.push(...q); // fallback
   }
 
-  // --------- EMPAQUETADO EN SESIONES ----------
+  // --------- Ajuste previo de minutos para llenar capacidad ----------
+  const capacidadTotal = sesiones.reduce((acc, s) => acc + s.minutos, 0);
+  let demandaCE = linea.reduce((acc, n) => acc + n.mins, 0);
+  if ((opts.ajustarMinutos ?? "auto") === "auto" && demandaCE > 0) {
+    const target = Math.floor(capacidadTotal * objetivoOcupacion);
+    if (target > demandaCE) {
+      const factor = target / demandaCE;
+      for (const n of linea) {
+        n.mins = clampMinutos(n.mins * factor);
+        const e = evalById.get(n.id)!;
+        e.minutosSugeridos = n.mins;
+        metaCE[n.id].minutos = n.mins;
+      }
+      demandaCE = linea.reduce((acc, n) => acc + n.mins, 0);
+    }
+  }
+
+  // --------- EMPAQUETADO EN SESIONES (con particionado opcional) ----------
+  function contarCEenSesion(items: ItemPlan[], sesionId: string) {
+    return items.filter(it => it.sesionId === sesionId && it.tipo === "CE").length;
+  }
+
   function empaquetar(secs: Sesion[], orden: Nodo[]) {
     const items: ItemPlan[] = [];
     const ocupados = new Array(secs.length).fill(0);
-    const colocados = new Set<string>();
-
-    let idxSesion = 0;
+    const minutosAsignados = new Map<string, number>(); // por CE
+    const cola: Nodo[] = orden.map(n => ({ ...n }));    // copia mutable
     const cupo = Math.max(1, opts.maxCEporSesion ?? 3);
 
-    for (const n of orden) {
+    let idxSesion = 0;
+
+    while (cola.length) {
+      const n = cola.shift()!;
       const start = siguienteSesionLibre(idxSesion, secs, ocupados);
       if (start === null) break;
       idxSesion = start;
 
-      let puesto = false;
-      let intentos = 0;
+      let colocadoAlgunaParte = false;
 
-      for (let i = start; i < secs.length && intentos < secs.length; i++, intentos++) {
-        const enEsa = items.filter(it => it.sesionId === secs[i].id && it.tipo === "CE").length;
+      // 1) Intentar colocarlo entero
+      for (let i = start; i < secs.length; i++) {
         const libre = capacidadRestante(secs[i], ocupados[i]);
+        const enEsa = contarCEenSesion(items, secs[i].id);
         if (enEsa < cupo && n.mins <= libre) {
           items.push({ sesionId: secs[i].id, tipo: "CE", ceId: n.id, minutosOcupados: n.mins });
           ocupados[i] += n.mins;
-          colocados.add(n.id);
-          puesto = true;
+          minutosAsignados.set(n.id, (minutosAsignados.get(n.id) ?? 0) + n.mins);
+          colocadoAlgunaParte = true;
           break;
         }
       }
-      if (!puesto) break;
+
+      if (!colocadoAlgunaParte && permitirPartir) {
+        // 2) Partir en trozos cuando no cabe entero
+        for (let i = start; i < secs.length; i++) {
+          const enEsa = contarCEenSesion(items, secs[i].id);
+          if (enEsa >= cupo) continue;
+
+          let libre = capacidadRestante(secs[i], ocupados[i]);
+          if (libre < minBloque) continue;
+
+          const trozo = clamp5(Math.min(libre, Math.max(minBloque, Math.min(n.mins, 55))));
+          if (trozo <= 0) continue;
+
+          items.push({ sesionId: secs[i].id, tipo: "CE", ceId: n.id, minutosOcupados: trozo });
+          ocupados[i] += trozo;
+          minutosAsignados.set(n.id, (minutosAsignados.get(n.id) ?? 0) + trozo);
+          const restante = n.mins - trozo;
+
+          if (restante >= minBloque) {
+            cola.push({ ...n, mins: restante }); // lo reintentamos más adelante
+          }
+          colocadoAlgunaParte = true;
+          break;
+        }
+      }
+
+      // Si no hemos podido colocar ni entero ni en trozos, seguimos con el siguiente CE
+      // (no paramos el empaquetado, para evitar dejar la mitad del calendario sin usar)
     }
-    return { items, ocupados, colocados };
+
+    // CE con minutos asignados < requeridos
+    const noUbicados = new Set<string>();
+    for (const n of orden) {
+      const req = evalById.get(n.id)!.minutosSugeridos;
+      const asig = minutosAsignados.get(n.id) ?? 0;
+      if (asig < req) noUbicados.add(n.id);
+    }
+
+    return { items, ocupados, noUbicados };
   }
 
   // 1er pase
-  let { items, ocupados, colocados } = empaquetar(sesiones, linea);
-
-  // CE pendientes
-  let pendientes = linea.filter(n => !colocados.has(n.id)).map(n => n.id);
+  let { items, ocupados, noUbicados } = empaquetar(sesiones, linea);
 
   // --------- COMPACTACIÓN (recortar minutos si falta hueco) ----------
-  if (pendientes.length > 0 && opts.resolverFaltaHueco === "recortar") {
+  if (noUbicados.size > 0 && opts.resolverFaltaHueco === "recortar") {
     const capLibre = sesiones.reduce((acc, s, i) => acc + Math.max(0, s.minutos - ocupados[i]), 0);
-    const demanda = pendientes.map(id => evalById.get(id)!.minutosSugeridos).reduce((a, b) => a + b, 0);
+    const demandaPend = Array.from(noUbicados)
+      .map(id => evalById.get(id)!.minutosSugeridos)
+      .reduce((a, b) => a + b, 0);
 
-    if (capLibre > 0) {
-      const factor = Math.max(0.25, Math.min(1, capLibre / demanda));
-      for (const id of pendientes) {
+    if (capLibre > 0 && demandaPend > 0) {
+      const factor = Math.max(0.25, Math.min(1, capLibre / demandaPend));
+      for (const id of noUbicados) {
         const e = evalById.get(id)!;
-        const recorte = Math.max(15, Math.round((e.minutosSugeridos * factor) / 5) * 5);
+        const recorte = clampMinutos(e.minutosSugeridos * factor);
         e.minutosSugeridos = recorte;
         metaCE[id].minutos = recorte;
       }
       const nodosRe = linea.map(n => ({ ...n, mins: evalById.get(n.id)!.minutosSugeridos }));
       const re = empaquetar(sesiones, nodosRe);
-      items = re.items; ocupados = re.ocupados; colocados = re.colocados;
-      pendientes = linea.filter(n => !colocados.has(n.id)).map(n => n.id);
+      items = re.items; ocupados = re.ocupados; noUbicados = re.noUbicados;
     }
   }
 
   // --- helpers de reflow (NO mover CE de RAs evaluadas ni de la RA actual) ---
-  function contarCEenSesion(items: ItemPlan[], sesionId: string) {
+  function contarCEenSesionItems(items: ItemPlan[], sesionId: string) {
     return items.filter(it => it.sesionId === sesionId && it.tipo === "CE").length;
   }
   function moverCEaPosteriorSiCabe_BloqueandoRAs(
@@ -320,7 +571,7 @@ export async function planificarCEs(
     for (let j = fromIdx + 1; j < sesiones.length; j++) {
       const sesId = sesiones[j].id;
       const libre = Math.max(0, sesiones[j].minutos - ocupadosTmp[j]);
-      const ceCount = contarCEenSesion(itemsTmp, sesId);
+      const ceCount = contarCEenSesionItems(itemsTmp, sesId);
       if (ceCount < cupo && libre >= (ce.minutosOcupados || 0)) {
         ocupadosTmp[fromIdx] -= (ce.minutosOcupados || 0);
         ocupadosTmp[j]       += (ce.minutosOcupados || 0);
@@ -434,8 +685,15 @@ export async function planificarCEs(
     }
   }
 
+  // CE realmente no ubicados (por minutos)
+  const minutosPorCE = new Map<string, number>();
+  for (const it of items) {
+    if (it.tipo === "CE" && it.ceId) {
+      minutosPorCE.set(it.ceId, (minutosPorCE.get(it.ceId) ?? 0) + it.minutosOcupados);
+    }
+  }
   const cesNoUbicados = linea
-    .filter(n => !items.some(it => it.tipo === "CE" && it.ceId === n.id))
+    .filter(n => (minutosPorCE.get(n.id) ?? 0) < (evalById.get(n.id)!.minutosSugeridos))
     .map(n => n.id);
 
   return { items, cesNoUbicados, metaCE };
