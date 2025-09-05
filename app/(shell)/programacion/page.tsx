@@ -93,6 +93,94 @@ type GuardarProgramacionPayload = {
 };
 
 /* =========
+ * Metodologías: TIPOS + catálogo + helpers (autocontenido)
+ * ========= */
+
+type MetodologiaId =
+  | "abp" | "retos" | "flipped" | "gamificacion" | "estaciones"
+  | "magistral+practica" | "cooperativo" | "taller";
+
+  type FaseSugerida = {
+    titulo: string;
+    minutos: number;
+    descripcion: string;
+    evidencias?: string | string[];
+  };
+
+type SugerenciaSesion = {
+  sesionId: string;
+  metodologia: MetodologiaId;
+  fases: FaseSugerida[];
+  observaciones?: string;
+};
+
+type Recomendacion = { metodologia: MetodologiaId; score: number; motivo: string };
+
+const METODOLOGIAS: Record<MetodologiaId, { id: MetodologiaId; label: string }> = {
+  abp: { id: "abp", label: "ABP (proyectos)" },
+  retos: { id: "retos", label: "Retos" },
+  flipped: { id: "flipped", label: "Flipped" },
+  gamificacion: { id: "gamificacion", label: "Gamificación" },
+  estaciones: { id: "estaciones", label: "Estaciones" },
+  "magistral+practica": { id: "magistral+practica", label: "Magistral + práctica" },
+  cooperativo: { id: "cooperativo", label: "Cooperativo" },
+  taller: { id: "taller", label: "Taller" },
+};
+
+const etiquetaMetodologia: Record<MetodologiaId, string> = Object.fromEntries(
+  Object.values(METODOLOGIAS).map(m => [m.id, m.label])
+) as Record<MetodologiaId, string>;
+
+function toggleMetodologia(
+  setPreprogramacion: React.Dispatch<React.SetStateAction<UISesion[]>>,
+  sesionIndice: number,
+  metodo: MetodologiaId
+) {
+  setPreprogramacion(prev => prev.map(s => {
+    if (s.indice !== sesionIndice) return s;
+    const meta: any = (s as any)._meta ?? {};
+    const list: MetodologiaId[] = Array.isArray(meta.metodologias) ? [...meta.metodologias] : [];
+    const ix = list.indexOf(metodo);
+    if (ix >= 0) list.splice(ix, 1); else list.push(metodo);
+    return { ...s, _meta: { ...meta, metodologias: list } };
+  }));
+}
+
+/* =========
+ * Fallback local por si el endpoint LLM falla
+ * ========= */
+function fallbackSugerencia(metodologia: MetodologiaId, minutosTotal: number): FaseSugerida[] {
+  const m = (p: number) => Math.max(5, Math.round((minutosTotal * p) / 5) * 5);
+  switch (metodologia) {
+    case "magistral+practica":
+      return [
+        { titulo: "Activación", minutos: m(0.15), descripcion: "Activar previos con 2-3 preguntas clave." },
+        { titulo: "Modelado breve", minutos: m(0.15), descripcion: "Demostración guiada con ejemplo." },
+        { titulo: "Práctica guiada", minutos: m(0.5), descripcion: "Checklist de pasos y apoyo docente." },
+        { titulo: "Cierre y evidencias", minutos: minutosTotal - (m(0.15)+m(0.15)+m(0.5)), descripcion: "Ticket de salida / mini-rúbrica." },
+      ];
+    case "flipped":
+      return [
+        { titulo: "Chequeo de visionado", minutos: m(0.15), descripcion: "Verificar comprensión inicial (2 ítems)." },
+        { titulo: "Práctica aplicada", minutos: m(0.65), descripcion: "Resolución de casos en parejas con feedback." },
+        { titulo: "Cierre", minutos: minutosTotal - (m(0.15)+m(0.65)), descripcion: "Síntesis + próximos pasos." },
+      ];
+    case "abp":
+      return [
+        { titulo: "Lanzamiento del proyecto", minutos: m(0.2), descripcion: "Contexto y roles, criterios de éxito." },
+        { titulo: "Desarrollo", minutos: m(0.6), descripcion: "Hitos cortos, consulta de dudas." },
+        { titulo: "Cierre", minutos: minutosTotal - (m(0.2)+m(0.6)), descripcion: "Entrega parcial y feedback." },
+      ];
+    default:
+      return [
+        { titulo: "Activación", minutos: m(0.2), descripcion: "Explorar ideas previas." },
+        { titulo: "Desarrollo", minutos: m(0.6), descripcion: "Actividad principal." },
+        { titulo: "Cierre", minutos: minutosTotal - (m(0.2)+m(0.6)), descripcion: "Síntesis y evidencias." },
+      ];
+  }
+}
+
+/* =========
  * DnD + bloques libres
  * ========= */
 type UIItem = (SesionUI["items"][number] | { tipo: "libre"; titulo?: string }) & { _uid: string };
@@ -149,8 +237,8 @@ function SortableItem({
     opacity: isDragging ? 0.6 : 1,
   };
 
-  const isEval = item.tipo === "eval";
-  const isLibre = item.tipo === "libre";
+  const isEval = (item as any).tipo === "eval";
+  const isLibre = (item as any).tipo === "libre";
 
   return (
     <div
@@ -485,6 +573,94 @@ export default function PageProgramacion() {
     });
   };
 
+  /* ===== Metodologías: pedir sugerencia al LLM con fallback ===== */
+  async function sugerirParaSesion(s: UISesion) {
+    const seleccionadas: MetodologiaId[] = (s as any)._meta?.metodologias ?? [];
+    const cesDeSesion = s.items
+      .filter((it: any) => it.tipo === "ce")
+      .map((it: any) => ({
+        codigo: it.ceCodigo,
+        descripcion: it.ceDescripcion,
+        raCodigo: it.raCodigo,
+        minutos: it.minutos,
+        dificultad: it.dificultad,
+      }));
+
+    const minutosSesion = 55;
+
+    const aplicar = (sugs: SugerenciaSesion[], recs?: Recomendacion[], autoSelect = false) => {
+      setPreprogramacion(prev => prev.map(x => {
+        if (x.indice !== s.indice) return x;
+
+        let nextMeta: any = { ...(x as any)._meta, sugerencias: sugs, recomendadas: recs ?? (x as any)._meta?.recomendadas };
+        if (autoSelect && recs && (!((x as any)._meta?.metodologias)?.length)) {
+          nextMeta.metodologias = recs.map(r => r.metodologia).slice(0, 2);
+        }
+        return { ...x, _meta: nextMeta };
+      }));
+    };
+
+    const aplicarFallback = () => {
+      toast.message("Sugerencia generada (0). Usando heurística…");
+      // Podrías generar algo mínimo localmente si quieres:
+      const heur: SugerenciaSesion = {
+        sesionId: `S${s.indice}`,
+        metodologia: (seleccionadas[0] ?? "magistral+practica"),
+        fases: fallbackSugerencia(seleccionadas[0] ?? "magistral+practica", minutosSesion),
+      };
+      aplicar([heur], undefined, false);
+    };
+
+    try {
+      const resp = await fetch("/api/sugerir-sesion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sesion: { id: `S${s.indice}`, minutos: minutosSesion, metodologias: seleccionadas },
+          ces: cesDeSesion,
+        }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok || !data?.ok) throw new Error(data?.error || "Error HTTP");
+
+      const sugs: SugerenciaSesion[] = Array.isArray(data?.sugerencias) ? data.sugerencias : [];
+      const recs: Recomendacion[] | undefined = Array.isArray(data?.recomendadas) ? data.recomendadas : undefined;
+
+      if (sugs.length === 0) {
+        aplicarFallback();
+        return;
+      }
+
+      const autoSelect = seleccionadas.length === 0 && (recs?.length ?? 0) > 0;
+      aplicar(sugs, recs, autoSelect);
+
+      if (!resp.ok || !data?.ok) throw new Error(data?.error || "Error HTTP");
+
+const fuente = data.fuente as "llm" | "fallback";
+const modelo = data.modelo as string | null;
+
+if (fuente === "llm") {
+  toast.success(`Sugerencia LLM (${modelo ?? "desconocido"}) lista.`);
+} else {
+  toast.message("Sugerencia heurística (fallback).");
+}
+
+
+      if (recs?.length) {
+        const etiquetas = recs
+          .map(r => `${etiquetaMetodologia[r.metodologia]} (${Math.round(r.score*100)}%)`)
+          .join(", ");
+        toast.success(`Metodologías recomendadas: ${etiquetas}`);
+      } else {
+        toast.success(`Sugerencia generada (${sugs.length}).`);
+      }
+    } catch (err: any) {
+      console.warn("[sugerirParaSesion] error", err);
+      aplicarFallback();
+    }
+  }
+
   /* ===== Guardar ===== */
   const handleGuardar = async () => {
     if (!detalleAsig) return;
@@ -574,11 +750,10 @@ export default function PageProgramacion() {
         const dificultad = meta?.dificultad ?? 2;
         const minutos = meta?.minutos ?? 25;
 
-        // Si en tu /api ya guardas justificaciones por CE, léelas aquí:
         const justificacion =
-  meta?.justificacion ??
-  (planLLM as any).justificaciones?.[ceId] ?? // por si convive una transición
-  "Evaluación LLM con rúbrica (pasos, transferencia, autonomía, complejidad).";
+          meta?.justificacion ??
+          (planLLM as any).justificaciones?.[ceId] ??
+          "Evaluación LLM con rúbrica (pasos, transferencia, autonomía, complejidad).";
 
         rows.push({
           ceCodigo: ce.codigo,
@@ -620,7 +795,7 @@ export default function PageProgramacion() {
         3: { cellWidth: 60 },   // Minutos
         4: { cellWidth: 300 },  // Justificación
       },
-      didDrawPage: (data) => {
+      didDrawPage: () => {
         const page = String(doc.getCurrentPageInfo().pageNumber);
         doc.setFontSize(9);
         doc.text(
@@ -750,7 +925,7 @@ export default function PageProgramacion() {
                                   />
                                 ))}
 
-                                <div className="pt-1">
+                                <div className="pt-1 flex items-center gap-2">
                                   <Button
                                     size="sm"
                                     variant="ghost"
@@ -760,6 +935,80 @@ export default function PageProgramacion() {
                                     <Plus className="h-3.5 w-3.5 mr-1" /> Añadir nota
                                   </Button>
                                 </div>
+
+                                {/* ===== Selector de metodologías + botón de sugerencia ===== */}
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">Metodologías:</span>
+                                  {Object.values(METODOLOGIAS).map(m => {
+                                    const sel = Array.isArray((s as any)._meta?.metodologias)
+                                      ? (s as any)._meta.metodologias.includes(m.id)
+                                      : false;
+                                    return (
+                                      <button
+                                        key={m.id}
+                                        type="button"
+                                        onClick={() => toggleMetodologia(setPreprogramacion, s.indice, m.id)}
+                                        className={`text-xs px-2 py-1 rounded border transition ${
+                                          sel ? "bg-primary/10 border-primary text-primary" : "border-muted-foreground/20"
+                                        }`}
+                                        title={m.label}
+                                      >
+                                        {m.label}
+                                      </button>
+                                    );
+                                  })}
+
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs ml-2"
+                                    onClick={() => sugerirParaSesion(s)}
+                                  >
+                                    Sugerir metodología
+                                  </Button>
+                                </div>
+
+                                {/* ===== Render de sugerencias (si existen) ===== */}
+                                {(s as any)._meta?.sugerencias?.length > 0 && (
+                                  <div className="mt-2 rounded border p-2 bg-muted/30">
+                                    {(s as any)._meta.sugerencias.map((sug: SugerenciaSesion) => (
+                                      <div key={sug.metodologia} className="mb-2">
+                                        <div className="text-xs font-medium mb-1">
+                                          {etiquetaMetodologia[sug.metodologia]}
+                                        </div>
+                                        <ul className="text-xs list-disc pl-4 space-y-1">
+  {sug.fases.map((f, i) => {
+    let evid: string[] = [];
+
+    if (Array.isArray(f.evidencias)) {
+      evid = f.evidencias.filter((x): x is string => typeof x === "string");
+    } else if (typeof f.evidencias === "string") {
+      const trimmed = f.evidencias.trim();
+      if (trimmed) evid = [trimmed];
+    }
+
+    return (
+      <li key={i}>
+        <span className="font-medium">{f.titulo}</span> — {f.minutos}′. {f.descripcion}
+        {evid.length > 0 && (
+          <span className="block text-[11px] text-muted-foreground">
+            Evidencias: {evid.join("; ")}
+          </span>
+        )}
+      </li>
+    );
+  })}
+</ul>
+
+                                        {sug.observaciones && (
+                                          <p className="text-[11px] text-muted-foreground mt-1">
+                                            Observaciones: {sug.observaciones}
+                                          </p>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </SortableContext>
                           </DroppableCell>
