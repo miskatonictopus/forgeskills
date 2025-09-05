@@ -20,6 +20,10 @@ import { toast } from "sonner";
 import type { Plan, Sesion as SesionSlot } from "@/lib/planificadorCE";
 import { planToUI, type SesionUI } from "@/lib/plan-ui";
 
+/* ========= PDF ========= */
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 /* ========= DnD Kit ========= */
 import {
   DndContext,
@@ -55,7 +59,13 @@ type AsignaturaConRA = AsignaturaLite & { RA: RA[] };
 type LLMSesion = { id: string; fechaISO?: string; minutos: number };
 type LLMCE = { id: string; codigo: string; descripcion: string; raCodigo: string };
 type LLMItem = { sesionId: string; tipo: "CE" | "EVALUACION_RA"; ceId?: string; raCodigo?: string; minutosOcupados: number };
-type LLMPlan = { items: LLMItem[]; cesNoUbicados: string[]; metaCE: Record<string, { dificultad: number; minutos: number }> };
+type LLMPlan = {
+  items: LLMItem[];
+  cesNoUbicados: string[];
+  metaCE: Record<string, { dificultad: number; minutos: number; justificacion?: string }>;
+  /** opcional, por si en algún momento lo envías separado */
+  justificaciones?: Record<string, string>;
+};
 
 /* ===== Persistencia para tu main.ts (ojo: no incluimos "libre") ===== */
 type ItemCEPersist = {
@@ -444,8 +454,6 @@ export default function PageProgramacion() {
   };
   
   /* ===== DnD ===== */
-
-
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -545,6 +553,90 @@ export default function PageProgramacion() {
     const totalCE = (detalleAsig?.RA ?? []).reduce((acc, ra) => acc + (ra.CE?.length || 0), 0);
     return { totalSes, totalRA, totalCE };
   }, [detalleAsig, sesionesFuente]);
+
+  /* ===== Auditoría CE (UI + PDF) ===== */
+  type AuditoriaRow = {
+    ceCodigo: string;
+    raCodigo: string;
+    dificultad: number;
+    minutos: number;
+    justificacion: string;
+  };
+
+  const auditoriaRows: AuditoriaRow[] = useMemo(() => {
+    if (!detalleAsig || !planLLM) return [];
+    const rows: AuditoriaRow[] = [];
+
+    for (const ra of detalleAsig.RA ?? []) {
+      for (const ce of ra.CE ?? []) {
+        const ceId = `${ra.codigo}::${ce.codigo}`;
+        const meta = planLLM.metaCE?.[ceId];
+        const dificultad = meta?.dificultad ?? 2;
+        const minutos = meta?.minutos ?? 25;
+
+        // Si en tu /api ya guardas justificaciones por CE, léelas aquí:
+        const justificacion =
+  meta?.justificacion ??
+  (planLLM as any).justificaciones?.[ceId] ?? // por si convive una transición
+  "Evaluación LLM con rúbrica (pasos, transferencia, autonomía, complejidad).";
+
+        rows.push({
+          ceCodigo: ce.codigo,
+          raCodigo: ra.codigo,
+          dificultad,
+          minutos,
+          justificacion,
+        });
+      }
+    }
+    return rows;
+  }, [detalleAsig, planLLM]);
+
+  const exportAuditoriaPDF = () => {
+    if (!detalleAsig) return;
+
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const titulo = `Auditoría CE — ${detalleAsig.nombre}${detalleAsig.cursoNombre ? ` (${detalleAsig.cursoNombre})` : ""}`;
+
+    doc.setFontSize(16);
+    doc.text(titulo, 56, 56);
+
+    autoTable(doc, {
+      startY: 80,
+      head: [["CE", "RA", "Nivel", "Minutos", "Justificación"]],
+      body: auditoriaRows.map(r => [
+        r.ceCodigo,
+        r.raCodigo,
+        `D${Math.min(5, Math.max(1, Math.round(r.dificultad)))}`,
+        String(r.minutos),
+        r.justificacion,
+      ]),
+      styles: { fontSize: 10, cellPadding: 6, valign: "top" },
+      headStyles: { halign: "left" },
+      columnStyles: {
+        0: { cellWidth: 70 },   // CE
+        1: { cellWidth: 50 },   // RA
+        2: { cellWidth: 60 },   // Nivel
+        3: { cellWidth: 60 },   // Minutos
+        4: { cellWidth: 300 },  // Justificación
+      },
+      didDrawPage: (data) => {
+        const page = String(doc.getCurrentPageInfo().pageNumber);
+        doc.setFontSize(9);
+        doc.text(
+          `Página ${page}`,
+          doc.internal.pageSize.getWidth() - 56,
+          doc.internal.pageSize.getHeight() - 32,
+          { align: "right" }
+        );
+      },
+    });
+
+    const safeCourse = (detalleAsig.cursoNombre || "Curso").replace(/[^\w\- ]+/g, "");
+    const safeAsig = (detalleAsig.nombre || "Asignatura").replace(/[^\w\- ]+/g, "");
+    const fileName = `Auditoria_CE_${safeCourse}_${safeAsig}.pdf`;
+    doc.save(fileName);
+  };
 
   /* ===== UI ===== */
   return (
@@ -695,6 +787,49 @@ export default function PageProgramacion() {
               RA: {resumen.totalRA} · CE: {resumen.totalCE} · Sesiones: {resumen.totalSes}
             </span>
           </div>
+
+          {/* ===== Tabla de auditoría de CE + Exportar PDF ===== */}
+          {detalleAsig && planLLM && auditoriaRows.length > 0 && (
+            <div className="mt-8">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Auditoría de criterios de evaluación</h3>
+                <Button size="sm" onClick={exportAuditoriaPDF}>
+                  Exportar PDF
+                </Button>
+              </div>
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>CE</TableHead>
+                      <TableHead>RA</TableHead>
+                      <TableHead>Nivel</TableHead>
+                      <TableHead>Minutos</TableHead>
+                      <TableHead>Justificación (hover)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {auditoriaRows.map((r) => (
+                      <TableRow key={`${r.raCodigo}::${r.ceCodigo}`}>
+                        <TableCell className="font-mono">{r.ceCodigo}</TableCell>
+                        <TableCell>{r.raCodigo}</TableCell>
+                        <TableCell>{`D${Math.min(5, Math.max(1, Math.round(r.dificultad)))}`}</TableCell>
+                        <TableCell>{r.minutos}</TableCell>
+                        <TableCell className="truncate max-w-[520px]">
+                          <span title={r.justificacion} className="cursor-help text-muted-foreground">
+                            {r.justificacion}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                En pantalla la justificación se muestra abreviada con tooltip. En el PDF se imprime la justificación completa.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

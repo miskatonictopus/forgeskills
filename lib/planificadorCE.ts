@@ -3,7 +3,6 @@
 // Determinista; usa heurística y (opcional) LLM para puntuar dificultad y minutos.
 
 import { llmJson } from "./llm";
-import { evaluarDificultadLLM } from "./evaluadorDificultadLLM";
 
 /* =========================
  * Tipos base (ALGORITMO)
@@ -39,8 +38,8 @@ export type ItemPlan = {
 
 export type Plan = {
   items: ItemPlan[];
-  cesNoUbicados: string[]; // CE con minutos asignados < minutos requeridos
-  metaCE: Record<string, { dificultad: number; minutos: number }>;
+  cesNoUbicados: string[];
+  metaCE: Record<string, { dificultad: number; minutos: number; justificacion?: string }>;
 };
 
 /* =========================
@@ -100,7 +99,7 @@ async function evaluarConLLM(ces: CE[]): Promise<CEEvaluado[]> {
   type RawItem = {
     ceId?: string;
     codigo?: string;
-    subscores: {
+    subscores?: {
       pasos: number;         // 1..5
       transferencia: number; // 1..5
       autonomia: number;     // 1..5
@@ -123,13 +122,13 @@ async function evaluarConLLM(ces: CE[]): Promise<CEEvaluado[]> {
     {
       "ceId": "<id recibido>",
       "subscores": {
-        "pasos": 1..5,          // nº de pasos encadenados y dependencia secuencial
-        "transferencia": 1..5,  // necesidad de trasladar a contextos nuevos
-        "autonomia": 1..5,      // grado de guía vs. autonomía
-        "complejidad": 1..5     // dificultad intrínseca del dominio/herramientas
+        "pasos": 1..5,
+        "transferencia": 1..5,
+        "autonomia": 1..5,
+        "complejidad": 1..5
       },
-      "minutos": 20..120,       // sugerencia libre, no hace falta múltiplos de 5
-      "prereqs": ["CE?.?"],     // por CÓDIGO si procede
+      "minutos": 20..120,
+      "prereqs": ["CE?.?"],
       "nota": "justificación breve"
     }
   ]
@@ -148,12 +147,9 @@ NO inventes CEs.`;
   try {
     out = await llmJson<Out>(system, user, { seed: 4242 });
   } catch {
-    // Si el LLM falla del todo, volvemos a la heurística pura
     return ces.map(heuristicaCE);
   }
 
-  // Índices auxiliares
-  const byId = new Map(ces.map((c) => [c.id, c]));
   const byCodigo = new Map(ces.map((c) => [c.codigo, c.id]));
 
   // ===== 2) Construye score continuo + mezcla con heurística =====
@@ -196,13 +192,10 @@ NO inventes CEs.`;
   });
 
   // ===== 3) Detecta colapso y expande por cuantiles si hace falta =====
-  const mean =
-    tmp.reduce((a, b) => a + b.blend, 0) / (tmp.length || 1);
-  const variance =
-    tmp.reduce((a, b) => a + Math.pow(b.blend - mean, 2), 0) / (tmp.length || 1);
+  const mean = tmp.reduce((a, b) => a + b.blend, 0) / (tmp.length || 1);
+  const variance = tmp.reduce((a, b) => a + Math.pow(b.blend - mean, 2), 0) / (tmp.length || 1);
   const std = Math.sqrt(variance);
 
-  // Histograma por nivel redondeado
   const hist = new Map<number, number>();
   for (const t of tmp) {
     const lvl = Math.round(t.blend);
@@ -213,12 +206,10 @@ NO inventes CEs.`;
   for (const [, cnt] of hist) maxCount = Math.max(maxCount, cnt);
   const colapso = std < 0.4 || maxCount / total > 0.7;
 
-  // Si colapsa, hacemos ranking→cuantiles a 1..5
   if (colapso) {
     const sorted = [...tmp].sort((a, b) => a.blend - b.blend);
     const n = sorted.length;
-
-    const q = (i: number) => (i + 0.5) / n; // cuantiles
+    const q = (i: number) => (i + 0.5) / n;
     for (let i = 0; i < n; i++) {
       const qi = q(i);
       let lvl = 3;
@@ -227,14 +218,13 @@ NO inventes CEs.`;
       else if (qi <= 0.70) lvl = 3;
       else if (qi <= 0.88) lvl = 4;
       else lvl = 5;
-      sorted[i].blend = lvl; // reasigna nivel discreto
+      sorted[i].blend = lvl;
     }
   }
 
   // ===== 4) Minutos finales y salida =====
   const res: CEEvaluado[] = tmp.map((t) => {
     const dif = clamp(Math.round(t.blend), 1, 5);
-    // Minutos: si el LLM dio minutos, ajusta a múltiplo de 5 y normaliza al rango
     let mins = t.minutosPropuestos != null ? round5(t.minutosPropuestos) : mapaMin[dif];
     mins = clamp(mins, 20, 120);
 
@@ -249,7 +239,6 @@ NO inventes CEs.`;
 
   return res;
 }
-
 
 /* =========================
  * Agrupados / prereqs
@@ -277,20 +266,13 @@ function siguienteSesionLibre(ix: number, sesiones: Sesion[], ocupados: number[]
 export type PlanificarOpts = {
   usarLLM?: boolean;
   insertarEvaluacionRA?: boolean;
-  /** Cómo resolver desajuste cuando faltan minutos */
   resolverFaltaHueco?: "ninguno" | "recortar";
-  /** Estrategia de orden */
   estrategia?: "intercalado-estricto" | "rampa-mixta" | "por-ra";
-  /** Límite de CE por sesión */
   maxCEporSesion?: number;
 
-  /** Nuevo: objetivo de ocupación del total de minutos disponibles (0.6..0.98) */
   objetivoOcupacion?: number;
-  /** Nuevo: ajustar minutos automáticamente para acercar la ocupación objetivo */
   ajustarMinutos?: "auto" | "ninguno";
-  /** Nuevo: permitir partir un CE en varios trozos cuando no cabe entero */
   partirCEsiNoCabe?: boolean;
-  /** Nuevo: tamaño mínimo de cada fragmento (múltiplos de 5) */
   minBloque?: number;
 };
 
@@ -317,48 +299,44 @@ export async function planificarCEs(
   const permitirPartir = opts.partirCEsiNoCabe ?? true;
   const minBloque = clamp5(opts.minBloque ?? 20);
 
-// 1) Dificultad + minutos
-let evals: CEEvaluado[] = [];
-if (opts.usarLLM) {
-  try {
-    evals = await evaluarConLLM(ces);
-  } catch {
+  // 1) Dificultad + minutos
+  let evals: CEEvaluado[] = [];
+  if (opts.usarLLM) {
+    try {
+      evals = await evaluarConLLM(ces);
+    } catch {
+      evals = ces.map(heuristicaCE);
+    }
+  } else {
     evals = ces.map(heuristicaCE);
   }
-} else {
-  evals = ces.map(heuristicaCE);
-}
 
-// ⚠️ Normalización y relleno defensivo: garantizamos 1 evaluación por CE
-const evalById = new Map<string, CEEvaluado>();
+  // ⚠️ Normalización y relleno defensivo: garantizamos 1 evaluación por CE
+  const evalById = new Map<string, CEEvaluado>();
+  for (const ce of ces) {
+    let e =
+      evals.find(x => x.ceId === ce.id) ??
+      evals.find(x => (x as any).codigo === ce.codigo);
 
-for (const ce of ces) {
-  // busca por id (principal) y, si no, intenta por código
-  let e =
-    evals.find(x => x.ceId === ce.id) ??
-    evals.find(x => (x as any).codigo === ce.codigo);
+    if (!e) e = heuristicaCE(ce); // fallback
 
-  if (!e) e = heuristicaCE(ce); // fallback
+    e = {
+      ceId: ce.id,
+      dificultad: Math.min(5, Math.max(1, Math.round(e.dificultad))),
+      minutosSugeridos: Math.min(120, Math.max(20, Math.round((e.minutosSugeridos ?? 35) / 5) * 5)),
+      prereqs: Array.isArray(e.prereqs) ? e.prereqs.filter(Boolean) : [],
+      justificacion: e.justificacion || "Heurística/LLM normalizado.",
+    };
 
-  // saneo estricto
-  e = {
-    ceId: ce.id, // forzamos el id correcto
-    dificultad: Math.min(5, Math.max(1, Math.round(e.dificultad))),
-    minutosSugeridos: Math.min(120, Math.max(20, Math.round((e.minutosSugeridos ?? 35) / 5) * 5)),
-    prereqs: Array.isArray(e.prereqs) ? e.prereqs.filter(Boolean) : [],
-    justificacion: e.justificacion || "Heurística/LLM normalizado.",
-  };
+    evalById.set(ce.id, e);
+  }
 
-  evalById.set(ce.id, e);
-}
-
-// (opcional) Si sigues usando metaCE:
-const metaCE: Record<string, { dificultad: number; minutos: number }> = {};
-for (const ce of ces) {
-  const e = evalById.get(ce.id)!;
-  metaCE[ce.id] = { dificultad: e.dificultad, minutos: e.minutosSugeridos };
-}
-
+  // metaCE con justificación
+  const metaCE: Record<string, { dificultad: number; minutos: number; justificacion?: string }> = {};
+  for (const ce of ces) {
+    const e = evalById.get(ce.id)!;
+    metaCE[e.ceId] = { dificultad: e.dificultad, minutos: e.minutosSugeridos, justificacion: e.justificacion };
+  }
 
   // 2) Prereqs inferidos por RA si faltan (D>=4)
   const porRA = agruparPorRA(ces);
@@ -492,7 +470,7 @@ for (const ce of ces) {
         }
       }
 
-      if (!colocadoAlgunaParte && permitirPartir) {
+      if (!colocadoAlgunaParte && (opts.partirCEsiNoCabe ?? true)) {
         // 2) Partir en trozos cuando no cabe entero
         for (let i = start; i < secs.length; i++) {
           const enEsa = contarCEenSesion(items, secs[i].id);
@@ -510,15 +488,13 @@ for (const ce of ces) {
           const restante = n.mins - trozo;
 
           if (restante >= minBloque) {
-            cola.push({ ...n, mins: restante }); // lo reintentamos más adelante
+            cola.push({ ...n, mins: restante }); // reintentamos más adelante
           }
           colocadoAlgunaParte = true;
           break;
         }
       }
-
-      // Si no hemos podido colocar ni entero ni en trozos, seguimos con el siguiente CE
-      // (no paramos el empaquetado, para evitar dejar la mitad del calendario sin usar)
+      // Si no cabe, seguimos con el siguiente CE (no abortamos el empaquetado)
     }
 
     // CE con minutos asignados < requeridos
