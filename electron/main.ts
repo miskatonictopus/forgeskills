@@ -2891,6 +2891,85 @@ function materializarProgramacionComoActividades(
     }
   }
 
+  
+
   return count;
 }
 
+const BACKUP_DIR = path.join(app.getPath("documents"), "SkillForgeBackups");
+
+// ——— util: ¿p está dentro de BACKUP_DIR?
+const isInside = (p: string) => {
+  const rel = path.relative(BACKUP_DIR, p);
+  return !!rel && !rel.startsWith("..") && !path.isAbsolute(rel);
+};
+
+// ——— util: si el dir está vacío, lo borra (solo si está dentro de BACKUP_DIR)
+async function tryRmIfEmpty(dir: string) {
+  if (!isInside(dir)) return false;
+  try {
+    const items = await fs.promises.readdir(dir);
+    if (items.length === 0) {
+      // usar rm (rmdir está deprecado). No recursivo por seguridad.
+      await fs.promises.rm(dir, { recursive: false, force: false });
+      return true;
+    }
+  } catch {
+    /* no-op */
+  }
+  return false;
+}
+
+// ——— util: tras borrar un fichero, intenta limpiar su(s) carpeta(s) padre vacías
+// en tu estructura es BACKUP_DIR/YYYY-MM-DD, pero lo hacemos genérico por si acaso.
+async function cleanEmptyParents(fileAbsPath: string) {
+  let current = path.dirname(fileAbsPath);
+  // no subimos por encima de BACKUP_DIR
+  while (isInside(current)) {
+    const removed = await tryRmIfEmpty(current);
+    if (!removed) break; // si esta ya no está vacía, las superiores tampoco
+    current = path.dirname(current);
+  }
+}
+
+const resolveBackupPath = (fileOrPath: string) => {
+  if (path.isAbsolute(fileOrPath)) return fileOrPath;
+  return path.join(BACKUP_DIR, fileOrPath);
+};
+
+// —— borrar un backup
+ipcMain.handle("backup:delete", async (_e, file: string) => {
+  try {
+    const p = resolveBackupPath(file);
+    await fs.promises.unlink(p);
+    await cleanEmptyParents(p);
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+});
+
+// —— borrar varios backups
+ipcMain.handle("backup:deleteMany", async (_e, files: string[]) => {
+  const deleted: string[] = [];
+  const failed: Array<{ file: string; error: string }> = [];
+  const parents = new Set<string>();
+
+  for (const f of files || []) {
+    try {
+      const p = resolveBackupPath(f);
+      await fs.promises.unlink(p);
+      deleted.push(f);
+      parents.add(path.dirname(p));
+    } catch (err: any) {
+      failed.push({ file: f, error: err?.message || String(err) });
+    }
+  }
+
+  // limpia carpetas vacías afectadas
+  for (const dir of parents) {
+    await cleanEmptyParents(path.join(dir, "dummy.file")); // empieza a limpiar desde dir
+  }
+
+  return { ok: failed.length === 0, deleted, failed };
+});

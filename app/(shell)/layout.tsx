@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarTrigger } from "@/components/ui/sidebar"; // si tu trigger está aquí
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -15,11 +15,14 @@ import {
   BreadcrumbLink,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-
+import "@pqina/flip/dist/flip.min.css";
 import ThemeToggle from "@/components/theme-toggle";
 import { TimerTray } from "@/components/TimerTray";
+import PqinaFlipClock from "@/components/PqinaFlipClock"; // ✅ import normal
 
-// Etiquetas legibles por ruta
+// ⚠️ IMPORTA el CSS de @pqina/flip en el ROOT layout (app/layout.tsx) o en globals.css:
+// import "@pqina/flip/dist/flip.min.css";
+
 const LABELS: Record<string, string> = {
   dashboard: "Panel de Control",
   cursos: "Cursos",
@@ -27,7 +30,6 @@ const LABELS: Record<string, string> = {
   alumnos: "Alumnos",
   actividades: "Actividades",
   calendario: "Calendario",
-  // añade aquí más claves si las necesitas
 };
 
 function useBreadcrumbs() {
@@ -36,44 +38,38 @@ function useBreadcrumbs() {
 
   const items = parts.map((seg, idx) => {
     const href = "/" + parts.slice(0, idx + 1).join("/");
-    // Si es UUID/ID u otro slug, mostramos el propio valor.
-    // Para segmentos conocidos usamos LABELS.
     const label =
       LABELS[seg] ??
-      seg
-        .replace(/[-_]/g, " ")
-        .replace(/\b\w/g, (m) => m.toUpperCase());
+      seg.replace(/[-_]/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
     return { href, label };
   });
 
-  // Si no hay partes, mostramos Dashboard
-  if (items.length === 0) {
-    return [{ href: "/dashboard", label: "Panel de Control" }];
-  }
-  return items;
+  return items.length === 0
+    ? [{ href: "/dashboard", label: "Panel de Control" }]
+    : items;
 }
 
 export default function ShellLayout({ children }: { children: React.ReactNode }) {
-  // -------- Hora en header --------
-  const [fechaActual, setFechaActual] = React.useState("");
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      const ahora = new Date();
-      const txt = ahora.toLocaleString("es-ES", {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-      setFechaActual(txt);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   const crumbs = useBreadcrumbs();
+
+  // Fecha corta (ej: dom, 07 sept 2025)
+  const [fechaCorta, setFechaCorta] = React.useState("");
+  React.useEffect(() => {
+    const tick = () => {
+      const d = new Date();
+      setFechaCorta(
+        d.toLocaleDateString("es-ES", {
+          weekday: "short",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      );
+    };
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <SidebarProvider>
@@ -82,7 +78,9 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
         <header className="flex h-16 items-center gap-2 px-4 bg-zinc-900">
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4 mx-2" />
+
           <div className="flex items-center justify-between w-full px-4 py-2">
+            {/* Breadcrumbs */}
             <Breadcrumb>
               <BreadcrumbList>
                 {crumbs.map((c, i) => (
@@ -96,9 +94,18 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
               </BreadcrumbList>
             </Breadcrumb>
 
+            {/* Derecha: Reloj + Fecha + Timer + Tema */}
             <div className="flex items-center gap-3">
-              <span className="text-xl font-bold tabular-nums">
-                {fechaActual}
+              <PqinaFlipClock className="hidden sm:inline-flex
+             [--tick-fs:1.10rem]
+             [--tick-pad-y:.18em]   /* ↑ más altura */
+             [--tick-pad-x:.7ch]    /* ↑ más aire lateral */
+             [--tick-radius:.1rem]
+             [--tick-gap:.4rem]"
+/>
+
+              <span className="hidden md:inline text-sm text-muted-foreground tabular-nums">
+                {fechaCorta}
               </span>
               <TimerTray />
               <ThemeToggle />
@@ -106,7 +113,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
 
-        <main className="">{children}</main>
+        <main>{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );

@@ -65,15 +65,17 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     // ⬇️ clave para tener data-attrs de colapso
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="px-3">
-        <div className="flex h-12 items-center gap-2">
+        <div className="flex h-12 items-center gap-2 mt-2">
           {/* Logo horizontal (visible cuando NO está colapsado) */}
           {mounted && (
+             <div className="w-auto flex justify-center group-data-[collapsible=icon]:hidden ml-[auto] mr-[auto]">
             <Image
               src={isDark ? logoDark : logoLight}
               alt="ForgeSkills"
               priority
-              className="block h-15 w-auto group-data-[collapsible=icon]:hidden"
+              className="block h-14 w-auto group-data-[collapsible=icon]:hidden"
             />
+            </div>
           )}
           {/* Logomark cuadrado (visible en colapsado) */}
           {mounted && (
