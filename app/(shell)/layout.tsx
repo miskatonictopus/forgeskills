@@ -15,13 +15,12 @@ import {
   BreadcrumbLink,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import "@pqina/flip/dist/flip.min.css";
+
+import "@pqina/flip/dist/flip.min.css"; // ⚠️ idealmente en app/layout.tsx o globals.css
 import ThemeToggle from "@/components/theme-toggle";
 import { TimerTray } from "@/components/TimerTray";
-import PqinaFlipClock from "@/components/PqinaFlipClock"; // ✅ import normal
-
-// ⚠️ IMPORTA el CSS de @pqina/flip en el ROOT layout (app/layout.tsx) o en globals.css:
-// import "@pqina/flip/dist/flip.min.css";
+import PqinaFlipClock from "@/components/PqinaFlipClock";
+import TimerFullscreen from "@/components/TimerFullscreen"; // ⬅️ portal full-screen
 
 const LABELS: Record<string, string> = {
   dashboard: "Panel de Control",
@@ -96,13 +95,14 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
             {/* Derecha: Reloj + Fecha + Timer + Tema */}
             <div className="flex items-center gap-3">
-              <PqinaFlipClock className="hidden sm:inline-flex
-             [--tick-fs:1.10rem]
-             [--tick-pad-y:.18em]   /* ↑ más altura */
-             [--tick-pad-x:.7ch]    /* ↑ más aire lateral */
-             [--tick-radius:.1rem]
-             [--tick-gap:.4rem]"
-/>
+              <PqinaFlipClock
+                className="hidden sm:inline-flex
+                 [--tick-fs:1.10rem]
+                 [--tick-pad-y:.18em]
+                 [--tick-pad-x:.7ch]
+                 [--tick-radius:.1rem]
+                 [--tick-gap:.4rem]"
+              />
 
               <span className="hidden md:inline text-sm text-muted-foreground tabular-nums">
                 {fechaCorta}
@@ -115,6 +115,9 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
         <main>{children}</main>
       </SidebarInset>
+
+      {/* Portal de pantalla completa del temporizador */}
+      <TimerFullscreen />
     </SidebarProvider>
   );
 }

@@ -1,124 +1,107 @@
-// /store/timerStore.ts
-import { proxy } from "valtio";
+"use client";
 
-function clamp(n: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, n));
+import { proxy, subscribe } from "valtio";
+
+type TimerState = {
+  totalSeconds: number;   // duración configurada
+  remaining: number;      // segundos que quedan
+  running: boolean;       // si está en marcha
+  open: boolean;          // modal/ pantalla completa abierta
+  _intervalId: number | null; // interno para el tick
+  _lastTs: number | null;     // timestamp del último tick
+};
+
+// ---- Utilidad pura para formatear (HH:MM:SS) ----
+export function formatHMS(totalSeconds: number) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  const hh = h.toString().padStart(2, "0");
+  const mm = m.toString().padStart(2, "0");
+  const sss = ss.toString().padStart(2, "0");
+  return h > 0 ? `${hh}:${mm}:${sss}` : `${mm}:${sss}`;
 }
 
-// Milestones en segundos
-type MilestoneKey = 600 | 300 | 60 | 30 | 0;
-// Claves de audio (según tus ficheros)
-type AudioKey = "10" | "5" | "1" | "30s" | "bye";
-
-export const timerStore = proxy({
-  hours: 0,
-  minutes: 30,
-  get totalSeconds() {
-    return this.hours * 3600 + this.minutes * 60;
-  },
-
-  remaining: 30 * 60,
+export const timerStore = proxy<TimerState>({
+  totalSeconds: 25 * 60, // 25 min por defecto (ajústalo a lo que uses)
+  remaining: 25 * 60,
   running: false,
-  hiddenUI: false,
-  fullscreen: false,
-  soundOn: true,
   open: false,
-
-  milestones: {
-    600: false,
-    300: false,
-    60:  false,
-    30:  false,
-    0:   false,
-  } as Record<MilestoneKey, boolean>,
-
-  formatHMS(): string {
-    const s = Math.max(0, Math.floor(this.remaining));
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const ss = s % 60;
-    return `${h.toString().padStart(2, "0")}:${m
-      .toString()
-      .padStart(2, "0")}:${ss.toString().padStart(2, "0")}`;
-  },
+  _intervalId: null,
+  _lastTs: null,
 });
 
-function resetMilestones() {
-  (Object.keys(timerStore.milestones) as unknown as MilestoneKey[]).forEach(
-    (k) => (timerStore.milestones[k] = false)
-  );
+// ---- Acciones seguras ----
+function clearTick() {
+  if (timerStore._intervalId != null) {
+    clearInterval(timerStore._intervalId);
+    timerStore._intervalId = null;
+  }
+  timerStore._lastTs = null;
+}
+
+function tick() {
+  const now = Date.now();
+  if (timerStore._lastTs == null) {
+    timerStore._lastTs = now;
+    return;
+  }
+  const deltaSec = (now - timerStore._lastTs) / 1000;
+  timerStore._lastTs = now;
+
+  if (!timerStore.running) return;
+
+  const next = timerStore.remaining - deltaSec;
+  if (next <= 0) {
+    timerStore.remaining = 0;
+    timerStore.running = false;
+    clearTick();
+  } else {
+    timerStore.remaining = next;
+  }
 }
 
 export const timerActions = {
-  setDuration(h: number, m: number) {
-    timerStore.hours = clamp(h, 0, 12);
-    timerStore.minutes = clamp(m, 0, 59);
-    if (!timerStore.running) timerStore.remaining = timerStore.totalSeconds;
-    resetMilestones();
-  },
   start() {
-    if (timerStore.remaining <= 0) timerStore.remaining = timerStore.totalSeconds;
+    if (timerStore.running) return;
+    if (timerStore.remaining <= 0) {
+      // si está a cero, rearmar al total antes de arrancar
+      timerStore.remaining = timerStore.totalSeconds;
+    }
     timerStore.running = true;
+    timerStore._lastTs = null;
+    clearTick();
+    timerStore._intervalId = setInterval(tick, 250) as unknown as number;
   },
+
   pause() {
     timerStore.running = false;
+    clearTick();
   },
+
   reset() {
     timerStore.running = false;
     timerStore.remaining = timerStore.totalSeconds;
-    resetMilestones();
+    clearTick();
   },
+
+  setTotal(seconds: number) {
+    // si no está corriendo, también actualizamos remaining
+    timerStore.totalSeconds = Math.max(0, Math.floor(seconds));
+    if (!timerStore.running) {
+      timerStore.remaining = timerStore.totalSeconds;
+    }
+  },
+
   setOpen(v: boolean) {
     timerStore.open = v;
   },
-  setHidden(v: boolean) {
-    timerStore.hiddenUI = v;
-  },
-  toggleSound() {
-    timerStore.soundOn = !timerStore.soundOn;
-  },
-
-  // Tick con audios MP3
-  tick(opts?: {
-    play?: (which: AudioKey) => void; // "10" | "5" | "1" | "30s" | "bye"
-    beep?: () => void;
-  }) {
-    if (!timerStore.running) return;
-
-    const prev = timerStore.remaining;
-    const next = prev - 1;
-
-    const crossed = (t: MilestoneKey) =>
-      prev > t && next <= t && !timerStore.milestones[t];
-
-    if (crossed(600)) {
-      timerStore.milestones[600] = true;
-      if (timerStore.soundOn) opts?.play?.("10");
-    }
-    if (crossed(300)) {
-      timerStore.milestones[300] = true;
-      if (timerStore.soundOn) opts?.play?.("5");
-    }
-    if (crossed(60)) {
-      timerStore.milestones[60] = true;
-      if (timerStore.soundOn) opts?.play?.("1");
-    }
-    if (crossed(30)) {
-      timerStore.milestones[30] = true;
-      if (timerStore.soundOn) opts?.play?.("30s");
-    }
-
-    if (next <= 0) {
-      timerStore.remaining = 0;
-      timerStore.running = false;
-      if (!timerStore.milestones[0]) {
-        timerStore.milestones[0] = true;
-        if (timerStore.soundOn) opts?.play?.("bye");
-      }
-      if (timerStore.soundOn) opts?.beep?.(); // opcional
-      return;
-    }
-
-    timerStore.remaining = next;
-  },
 };
+
+// Limpieza defensiva si alguien hace hot-reload
+subscribe(timerStore, () => {
+  if (!timerStore.running && timerStore._intervalId != null) {
+    clearTick();
+  }
+});
