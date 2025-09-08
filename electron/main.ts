@@ -7,7 +7,7 @@ import { BackupManager } from "../main/backup";
 // asumiendo db singleton ya creado
 import * as dotenv from "dotenv";
 dotenv.config();
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
 import * as path from "path";
 import * as fs from "fs";
 import Database from "better-sqlite3";
@@ -261,18 +261,19 @@ db.prepare(
 `
 ).run();
 
+// ============================
+// Ítems de sesión (tus tipos)
+// ============================
 type ItemCE = {
   tipo: "ce";
   raCodigo: string;
   ceCodigo: string;
   ceDescripcion: string;
+  dificultad?: number;
+  minutos?: number;
 };
 
-type ItemEval = {
-  tipo: "eval";
-  raCodigo: string;
-  titulo: string;
-};
+type ItemEval = { tipo: "eval"; raCodigo: string; titulo: string };
 
 type SesionUI = {
   indice: number;          // 1..N
@@ -280,9 +281,9 @@ type SesionUI = {
   items: Array<ItemCE | ItemEval>;
 };
 
-/* ============================================================================
- * HORAS LECTIVAS (nuevo): helpers + handler calcular-horas-reales
- * ==========================================================================*/
+// ============================================================
+// HORAS LECTIVAS (tuyos): helpers + handler calcular-horas-reales
+// ============================================================
 type CalcularHorasOpts = {
   cursoId?: string;
   asignaturaId?: string;
@@ -290,6 +291,7 @@ type CalcularHorasOpts = {
   desde?: string; // opcional: si lo pasas, ignora rango_lectivo
   hasta?: string; // opcional
 };
+
 type CalcularHorasItem = {
   cursoId: string | null;
   asignaturaId: string;
@@ -299,6 +301,7 @@ type CalcularHorasItem = {
   horas: number;
   fechas?: string[];
 };
+
 type CalcularHorasRes = {
   desde: string;
   hasta: string;
@@ -307,18 +310,86 @@ type CalcularHorasRes = {
   totalHoras: number;
 };
 
+// ============================================================
+// Persistencia de Programación (añade metodologías/sugerencias)
+// ============================================================
+
+// Si prefieres no duplicar estructuras, reutilizamos tus tipos:
+type ItemCEPersist = ItemCE;
+type ItemEvalPersist = ItemEval;
+
+type MetodologiaId =
+  | "abp"
+  | "retos"
+  | "flipped"
+  | "gamificacion"
+  | "estaciones"
+  | "magistral+practica"
+  | "cooperativo"
+  | "taller";
+
+type FaseSugerida = {
+  titulo: string;
+  minutos: number;
+  descripcion: string;
+  evidencias?: string | string[];
+};
+
+type SugerenciaSesion = {
+  sesionId: string;
+  metodologia: MetodologiaId;
+  fases: FaseSugerida[];
+  observaciones?: string;
+};
+
+type Recomendacion = {
+  metodologia: MetodologiaId;
+  score: number;
+  motivo: string;
+};
+
+/** Metadatos didácticos que queremos guardar por sesión */
+type SesionMetaPersist = {
+  metodologias?: MetodologiaId[];          // seleccionadas en UI
+  sugerencias?: SugerenciaSesion[];        // sugerencias completas (con fases/evidencias)
+  recomendadas?: Recomendacion[];          // ranking de recomendaciones
+};
+
+type SesionPersist = {
+  indice: number;
+  fecha?: string;
+  items: Array<ItemCEPersist | ItemEvalPersist>;
+  _meta?: SesionMetaPersist;               // 👈 NUEVO: se guarda en el JSON
+};
+
+// —— El plan que te devuelve /api/planificar-ce (si ya lo tienes definido, usa el tuyo)
+type LLMSesion = { id: string; fechaISO?: string; minutos: number };
+type LLMCE = { id: string; codigo: string; descripcion: string; raCodigo: string };
+type LLMItem =
+  | { sesionId: string; tipo: "CE"; ceId: string; minutosOcupados: number }
+  | { sesionId: string; tipo: "EVALUACION_RA"; raCodigo: string; minutosOcupados: number };
+
+type LLMPlan = {
+  items: LLMItem[];
+  cesNoUbicados: string[];
+  metaCE: Record<string, { dificultad: number; minutos: number; justificacion?: string }>;
+  justificaciones?: Record<string, string>;
+};
+
+// —— Payload que enviamos al main para guardar
 type GuardarProgramacionPayload = {
   asignaturaId: string;
   cursoId: string;
   generadoEn: string;
   totalSesiones: number;
-  sesiones: SesionUI[];
-  planLLM?: any;
+  sesiones: SesionPersist[];
+  planLLM?: LLMPlan | null;
   meta?: { asignaturaNombre?: string; cursoNombre?: string };
   modeloLLM?: "gpt-4o" | "gpt-4o-mini" | null;
+  replacePrev?: boolean;
   materializarActividades?: boolean;
-  replacePrev?: boolean; // ← NUEVO: si true, borra programaciones previas de (cursoId, asignaturaId)
 };
+
 
 
 function HR_toDate(ymd: string): Date {
@@ -348,8 +419,8 @@ function HR_firstDateForWeekday(start: Date, weekdayIso: number): Date {
   return cur;
 }
 function HR_timeToMinutes(hhmm: string): number {
-  const [h, m] = (hhmm || "").split(":").map((n) => parseInt(n, 10));
-  return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
+  const [h, m] = (hhmm ?? "").split(":").map(n => Number.parseInt(n, 10));
+  return (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
 }
 function HR_diaToIso(dia: string | number): number {
   if (typeof dia === "number" && dia >= 1 && dia <= 7) return dia;
@@ -1890,10 +1961,6 @@ function alumnosDeCurso(cursoId: string) {
   }[];
 }
 
-/**
- * Crea (si faltan) las filas en ce_notas para: actividad × (todos los alumnos del curso) × (cada CE)
- * NO pisa notas existentes. Devuelve cuántas filas intentó crear.
- */
 ipcMain.handle(
   "ceNotas:seedActividad",
   (_evt, actividadId: string, ceCodigos: string[]) => {
@@ -2633,6 +2700,12 @@ ipcMain.handle("backup:now", async (_e, kind: "INC" | "FULL" = "INC") => {
 //   try {
 //     // 🔒 opcional: cierra tu DB singleton aquí
 //     // await closeDbSingleton();
+//     await backups.restore(filePath
+
+// ipcMain.handle("backup:restore", async (_e, filePath: string) => {
+//   try {
+//     // 🔒 opcional: cierra tu DB singleton aquí
+//     // await closeDbSingleton();
 //     await backups.restore(filePath);
 //     // await openDbSingleton();
 //     return { ok: true };
@@ -2675,169 +2748,79 @@ ipcMain.handle("programacion.guardar", async (_e, payload: any) => {
 });
 
 /* ================== IPC: guardarProgramacionDidactica ================== */
-ipcMain.handle("guardarProgramacionDidactica", (_e, payload: GuardarProgramacionPayload) => {
-  const db = openDbSingleton(DB_PATH);  // ✅
-db.pragma("foreign_keys = ON");
+function slug(s: string) {
+  return (s || "")
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9\- _()[\].]/g, "")
+    .trim().replace(/\s+/g, "_");
+}
+function ensureDir(p: string) {
+  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+}
+async function writeJSONAtomic(fullPath: string, data: unknown) {
+  const dir = path.dirname(fullPath);
+  ensureDir(dir);
+  const tmp = path.join(dir, `.${path.basename(fullPath)}.tmp`);
+  await fs.promises.writeFile(tmp, JSON.stringify(data, null, 2), "utf-8");
+  await fs.promises.rename(tmp, fullPath);
+}
 
-  // Por si acaso (si no lo activas globalmente en init)
-  db.pragma("foreign_keys = ON");
-
-  const {
-    asignaturaId,
-    cursoId,
-    generadoEn,
-    totalSesiones,
-    sesiones,
-    planLLM,
-    meta,
-    modeloLLM = null,
-    materializarActividades = false,
-    replacePrev = false,
-  } = payload || {};
-
-  // Validación básica del payload
-  if (!asignaturaId || !cursoId) {
-    return { ok: false, error: "Faltan asignaturaId o cursoId" };
-  }
-  if (!totalSesiones || typeof totalSesiones !== "number" || totalSesiones < 1) {
-    return { ok: false, error: "totalSesiones inválido" };
-  }
-  if (!Array.isArray(sesiones)) {
-    return { ok: false, error: "sesiones debe ser un array" };
-  }
-
+ipcMain.handle("prog:guardar", async (_evt, payload) => {
   try {
-    validarSesiones(sesiones, totalSesiones);
-  } catch (e: any) {
-    return { ok: false, error: e?.message || "Sesiones inválidas" };
-  }
+    const baseDir = path.join(app.getPath("documents"), "SkillForge", "Programaciones");
 
-  // Preparar statements fuera de la tx para caching
-  const delPrevProgStmt = db.prepare(
-    `DELETE FROM programacion WHERE asignatura_id = ? AND curso_id = ?`
-  );
-  const delPrevSesionStmt = db.prepare(
-    `DELETE FROM programacion_sesion WHERE programacion_id IN (
-       SELECT id FROM programacion WHERE asignatura_id = ? AND curso_id = ?
-     )`
-  );
+    const curso = slug(payload?.meta?.cursoNombre || "Curso");
+    const asig  = slug(payload?.meta?.asignaturaNombre || "Asignatura");
+    const fecha = payload?.generadoEn ?? new Date().toISOString();
+    const ymd   = fecha.slice(0,10).replace(/-/g, "");
+    const hm    = fecha.slice(11,16).replace(":", "");
+    const base  = `${curso}__${asig}`;
 
-  const insProgStmt = db.prepare(`
-    INSERT INTO programacion (
-      id, asignatura_id, curso_id, generado_en, modelo_llm, total_sesiones, plan_llm_json, meta_json
-    ) VALUES (
-      @id, @asignatura_id, @curso_id, @generado_en, @modelo_llm, @total_sesiones, @plan_llm_json, @meta_json
-    )
-  `);
+    const fileName = payload?.replacePrev
+      ? `${base}.programacion.json`
+      : `${base}__${ymd}_${hm}.programacion.json`;
 
-  const insSesionStmt = db.prepare(`
-    INSERT INTO programacion_sesion (id, programacion_id, indice, fecha, contenido_json)
-    VALUES (@id, @programacion_id, @indice, @fecha, @contenido_json)
-  `);
-
-  const tx = db.transaction(() => {
-    // (opcional) limpiar programaciones previas para no duplicar
-    if (replacePrev) {
-      // Borra primero sus sesiones (por ON DELETE CASCADE esto es redundante, pero seguro)
-      delPrevSesionStmt.run(asignaturaId, cursoId);
-      delPrevProgStmt.run(asignaturaId, cursoId);
-    }
-
-    const progId = randomUUID();
-
-    insProgStmt.run({
-      id: progId,
-      asignatura_id: asignaturaId,
-      curso_id: cursoId,
-      generado_en: toISOorNull(generadoEn) ?? new Date().toISOString(),
-      modelo_llm: modeloLLM,
-      total_sesiones: totalSesiones,
-      plan_llm_json: planLLM ? JSON.stringify(planLLM) : null,
-      meta_json: meta ? JSON.stringify(meta) : null,
-    });
-
-    let sesionesInsertadas = 0;
-    let ceContados = 0;
-    let evalContadas = 0;
-
-    for (const s of sesiones) {
-      const sesionId = randomUUID();
-      const fechaISO = toISOorNull(s.fecha);
-
-      // Sanitizar items: normaliza códigos y filtra vacíos
-      const contenido = (s.items || []).map((it) => {
-        if (it.tipo === "ce") {
-          return {
-            ...it,
-            raCodigo: normCode(it.raCodigo),
-            ceCodigo: normCode(it.ceCodigo),
-            ceDescripcion: (it.ceDescripcion || "").trim(),
-          };
-        }
-        if (it.tipo === "eval") {
-          return {
-            ...it,
-            raCodigo: normCode(it.raCodigo),
-            titulo: (it.titulo || "").trim(),
-          };
-        }
-        return it;
-      });
-
-      ceContados += contenido.filter((x: any) => x?.tipo === "ce").length;
-      evalContadas += contenido.filter((x: any) => x?.tipo === "eval").length;
-
-      insSesionStmt.run({
-        id: sesionId,
-        programacion_id: progId,
-        indice: s.indice,
-        fecha: fechaISO,
-        contenido_json: JSON.stringify(contenido),
-      });
-      sesionesInsertadas++;
-    }
-
-    // (OPCIONAL) materializar como actividades/actividad_ce
-    let materializadas = 0;
-    if (materializarActividades) {
-      materializadas = materializarProgramacionComoActividades(db, {
-        progId,
-        sesiones,
-        asignaturaId,
-        cursoId,
-      });
-    }
+    const fullPath = path.join(baseDir, fileName);
+    await writeJSONAtomic(fullPath, payload);
+    const stat = await fs.promises.stat(fullPath);
 
     return {
-      progId,
+      ok: true,
+      id: fileName,
       resumen: {
-        sesionesInsertadas,
-        ceContados,
-        evalContadas,
-        actividadesMaterializadas: materializadas,
+        path: fullPath,
+        carpeta: baseDir,
+        bytes: stat.size,
+        sesiones: payload?.totalSesiones ?? 0,
       },
     };
-  });
-
-  try {
-    const { progId, resumen } = tx();
-    return { ok: true, id: progId, resumen };
-  } catch (err: any) {
-    console.error("[guardarProgramacionDidactica] Error:", err?.stack || err);
-    return { ok: false, error: err?.message || "No se pudo guardar la programación" };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Error al guardar programación" };
   }
 });
 
+// Abrir la carpeta/archivo guardado
+ipcMain.handle("fs:reveal", async (_evt, fullPath: string) => {
+  try {
+    if (fullPath && fs.existsSync(fullPath)) {
+      shell.showItemInFolder(fullPath);
+      return { ok: true };
+    }
+    return { ok: false, error: "Ruta no existe" };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "No se pudo abrir el explorador" };
+  }
+});
+
+
 /* ========== opcional: crear actividades a partir de la programación ========== */
+// ⚠️ Usa el tipo correcto de better-sqlite3
 function materializarProgramacionComoActividades(
-  db: Database.Database,
+  db: BetterSqlite3.Database,
   params: { progId: string; sesiones: SesionUI[]; asignaturaId: string; cursoId: string }
 ): number {
   const { sesiones, asignaturaId, cursoId } = params;
 
-  // Tablas asumidas:
-  //   actividades(id, nombre, fecha, curso_id, asignatura_id, tipo)
-  //   actividad_ce(actividad_id, ra_codigo, ce_codigo)
   const insActividad = db.prepare(`
     INSERT INTO actividades (id, nombre, fecha, curso_id, asignatura_id, tipo)
     VALUES (@id, @nombre, @fecha, @curso_id, @asignatura_id, @tipo)
@@ -2853,7 +2836,7 @@ function materializarProgramacionComoActividades(
     const fechaISO = toISOorNull(s.fecha);
 
     // 1) Impartición
-    const ces = (s.items || []).filter((x) => x.tipo === "ce") as ItemCE[];
+    const ces = (s.items || []).filter((x) => (x as any).tipo === "ce") as any[];
     if (ces.length) {
       const actId = randomUUID();
       insActividad.run({
@@ -2875,7 +2858,7 @@ function materializarProgramacionComoActividades(
     }
 
     // 2) Evaluaciones RA
-    const evals = (s.items || []).filter((x) => x.tipo === "eval") as ItemEval[];
+    const evals = (s.items || []).filter((x) => (x as any).tipo === "eval") as any[];
     for (const ev of evals) {
       const actId = randomUUID();
       insActividad.run({
@@ -2886,48 +2869,42 @@ function materializarProgramacionComoActividades(
         asignatura_id: asignaturaId,
         tipo: "evaluacion",
       });
-      // Si quieres vincular CE del RA aquí, puedes hacerlo leyendo CE del RA en tu BD
       count++;
     }
   }
 
-  
-
   return count;
 }
 
+/* ========================== Backups: utilidades ========================== */
 const BACKUP_DIR = path.join(app.getPath("documents"), "SkillForgeBackups");
+ensureDir(BACKUP_DIR);
 
-// ——— util: ¿p está dentro de BACKUP_DIR?
+// ¿p está dentro de BACKUP_DIR?
 const isInside = (p: string) => {
   const rel = path.relative(BACKUP_DIR, p);
-  return !!rel && !rel.startsWith("..") && !path.isAbsolute(rel);
+  return !rel.startsWith("..") && !path.isAbsolute(rel); // incluye la base y subcarpetas
 };
 
-// ——— util: si el dir está vacío, lo borra (solo si está dentro de BACKUP_DIR)
+// si el dir está vacío, lo borra (solo si está dentro de BACKUP_DIR)
 async function tryRmIfEmpty(dir: string) {
   if (!isInside(dir)) return false;
   try {
     const items = await fs.promises.readdir(dir);
     if (items.length === 0) {
-      // usar rm (rmdir está deprecado). No recursivo por seguridad.
       await fs.promises.rm(dir, { recursive: false, force: false });
       return true;
     }
-  } catch {
-    /* no-op */
-  }
+  } catch { /* no-op */ }
   return false;
 }
 
-// ——— util: tras borrar un fichero, intenta limpiar su(s) carpeta(s) padre vacías
-// en tu estructura es BACKUP_DIR/YYYY-MM-DD, pero lo hacemos genérico por si acaso.
-async function cleanEmptyParents(fileAbsPath: string) {
-  let current = path.dirname(fileAbsPath);
-  // no subimos por encima de BACKUP_DIR
-  while (isInside(current)) {
+// tras borrar un fichero, intenta limpiar sus carpetas padre vacías (hasta BACKUP_DIR)
+async function cleanEmptyParents(startDir: string) {
+  let current = startDir;
+  while (isInside(current) && current !== BACKUP_DIR) {
     const removed = await tryRmIfEmpty(current);
-    if (!removed) break; // si esta ya no está vacía, las superiores tampoco
+    if (!removed) break;
     current = path.dirname(current);
   }
 }
@@ -2942,7 +2919,7 @@ ipcMain.handle("backup:delete", async (_e, file: string) => {
   try {
     const p = resolveBackupPath(file);
     await fs.promises.unlink(p);
-    await cleanEmptyParents(p);
+    await cleanEmptyParents(path.dirname(p));
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: err?.message || String(err) };
@@ -2966,10 +2943,128 @@ ipcMain.handle("backup:deleteMany", async (_e, files: string[]) => {
     }
   }
 
-  // limpia carpetas vacías afectadas
   for (const dir of parents) {
-    await cleanEmptyParents(path.join(dir, "dummy.file")); // empieza a limpiar desde dir
+    await cleanEmptyParents(dir);
   }
 
   return { ok: failed.length === 0, deleted, failed };
 });
+
+ipcMain.handle("pdf:exportFromHTML", async (_e, { html, fileName }: { html: string; fileName: string }) => {
+  try {
+    const pdfBuffer = await renderHTMLtoPDF(html);
+
+    const outDir = path.join(app.getPath("documents"), "SkillForgePDF");
+    await fs.promises.mkdir(outDir, { recursive: true });
+
+    const safe = (s: string) => (s || "").replace(/[\/\\:*?"<>|]+/g, "_").trim() || "programacion";
+    const outPath = path.join(outDir, safe(fileName).endsWith(".pdf") ? safe(fileName) : `${safe(fileName)}.pdf`);
+
+    await fs.promises.writeFile(outPath, pdfBuffer);
+    return { ok: true, path: outPath };
+  } catch (err: any) {
+    console.error("[pdf:exportFromHTML] ❌", err);
+    return { ok: false, error: String(err?.message || err) };
+  }
+});
+
+ipcMain.handle("pdf:exportProgramacion", async (_e, args: { html: string; jsonPath: string }) => {
+  try {
+    const { html, jsonPath } = args || ({} as any);
+    if (!html || !jsonPath) throw new Error("Faltan parámetros html/jsonPath");
+
+    const pdfBuffer = await renderHTMLtoPDF(html);
+
+    const outDir = path.dirname(jsonPath);
+    const base = path.basename(jsonPath, ".json");
+    const outPath = path.join(outDir, `${base}.pdf`);
+
+    await fs.promises.writeFile(outPath, pdfBuffer);
+    return { ok: true, path: outPath };
+  } catch (err: any) {
+    console.error("[pdf:exportProgramacion] ❌", err);
+    return { ok: false, error: String(err?.message || err) };
+  }
+});
+
+function buildPdfPathFromJson(jsonPath: string) {
+  // mismo nombre y carpeta que el JSON, pero con extensión .pdf
+  const dir  = path.dirname(jsonPath);
+  const base = path.basename(jsonPath).replace(/\.json$/i, "") + ".pdf";
+  return path.join(dir, base);
+}
+
+function loadHTMLandPrintToPDF(html: string): Promise<Buffer> {
+  return new Promise(async (resolve, reject) => {
+    let win: BrowserWindow | null = null;
+    try {
+      win = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          // no necesitas nodeIntegration para solo renderizar HTML
+          contextIsolation: true,
+        },
+      });
+
+      // Cargamos el HTML directamente (sin tocar disco)
+      const dataUrl = "data:text/html;charset=utf-8," + encodeURIComponent(html);
+      await win.loadURL(dataUrl);
+
+      // Importante: esperar a que termine de renderizar
+      await new Promise<void>((ok) => {
+        if (!win) return ok();
+        if (win.webContents.isLoading()) {
+          win.webContents.once("did-finish-load", () => ok());
+        } else {
+          ok();
+        }
+      });
+
+      const pdf = await win!.webContents.printToPDF({
+        printBackground: true,
+        pageSize: "A4",
+        landscape: false,
+        margins: {
+          top: 36,    // 0.5 inch ≈ 36 pt
+          bottom: 36,
+          left: 36,
+          right: 36,
+        },
+      });
+
+      resolve(pdf);
+    } catch (err) {
+      reject(err);
+    } finally {
+      if (win) {
+        win.close();
+        win = null;
+      }
+    }
+  });
+}
+
+// Invocado desde preload -> window.electronAPI.exportarProgramacionPDF(html, jsonPath)
+ipcMain.handle("prog:exportar-pdf", async (_evt, html: string, jsonPath: string) => {
+  try {
+    if (typeof html !== "string" || !html.trim()) {
+      return { ok: false as const, path: "", error: "HTML vacío" };
+    }
+    if (typeof jsonPath !== "string" || !jsonPath.trim()) {
+      return { ok: false as const, path: "", error: "Ruta JSON no válida" };
+    }
+
+    const pdfBuffer = await loadHTMLandPrintToPDF(html);
+    const outPdf = buildPdfPathFromJson(jsonPath);
+
+    // Asegura carpeta
+    await fs.promises.mkdir(path.dirname(outPdf), { recursive: true });
+    await fs.promises.writeFile(outPdf, pdfBuffer);
+
+    return { ok: true as const, path: outPdf };
+  } catch (err: any) {
+    console.error("[prog:exportar-pdf] ❌", err);
+    return { ok: false as const, path: "", error: String(err?.message || err) };
+  }
+});
+

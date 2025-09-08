@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import type { Plan, Sesion as SesionSlot } from "@/lib/planificadorCE";
 import { planToUI, type SesionUI } from "@/lib/plan-ui";
 
-/* ========= PDF ========= */
+/* ========= PDF (auditoría en cliente) ========= */
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -46,7 +46,7 @@ import { CSS } from "@dnd-kit/utilities";
  * ========================= */
 type CE = { codigo: string; descripcion: string; id?: string };
 type RA = { codigo: string; descripcion: string; CE: CE[] };
-
+type PdfResult = { ok: true; path: string } | { ok: false; error: string };
 type AsignaturaLite = {
   id: string;
   nombre: string;
@@ -58,16 +58,18 @@ type AsignaturaConRA = AsignaturaLite & { RA: RA[] };
 /* ===== Tipos del endpoint /api/planificar-ce ===== */
 type LLMSesion = { id: string; fechaISO?: string; minutos: number };
 type LLMCE = { id: string; codigo: string; descripcion: string; raCodigo: string };
-type LLMItem = { sesionId: string; tipo: "CE" | "EVALUACION_RA"; ceId?: string; raCodigo?: string; minutosOcupados: number };
+type LLMItem =
+  | { sesionId: string; tipo: "CE"; ceId: string; minutosOcupados: number }
+  | { sesionId: string; tipo: "EVALUACION_RA"; raCodigo: string; minutosOcupados: number };
+
 type LLMPlan = {
   items: LLMItem[];
   cesNoUbicados: string[];
   metaCE: Record<string, { dificultad: number; minutos: number; justificacion?: string }>;
-  /** opcional, por si en algún momento lo envías separado */
   justificaciones?: Record<string, string>;
 };
 
-/* ===== Persistencia para tu main.ts (ojo: no incluimos "libre") ===== */
+/* ===== Persistencia para main.ts (ignoramos "libre") ===== */
 type ItemCEPersist = {
   tipo: "ce";
   raCodigo: string;
@@ -93,19 +95,18 @@ type GuardarProgramacionPayload = {
 };
 
 /* =========
- * Metodologías: TIPOS + catálogo + helpers (autocontenido)
+ * Metodologías
  * ========= */
-
 type MetodologiaId =
   | "abp" | "retos" | "flipped" | "gamificacion" | "estaciones"
   | "magistral+practica" | "cooperativo" | "taller";
 
-  type FaseSugerida = {
-    titulo: string;
-    minutos: number;
-    descripcion: string;
-    evidencias?: string | string[];
-  };
+type FaseSugerida = {
+  titulo: string;
+  minutos: number;
+  descripcion: string;
+  evidencias?: string | string[];
+};
 
 type SugerenciaSesion = {
   sesionId: string;
@@ -147,7 +148,7 @@ function toggleMetodologia(
 }
 
 /* =========
- * Fallback local por si el endpoint LLM falla
+ * Fallback sugerencias
  * ========= */
 function fallbackSugerencia(metodologia: MetodologiaId, minutosTotal: number): FaseSugerida[] {
   const m = (p: number) => Math.max(5, Math.round((minutosTotal * p) / 5) * 5);
@@ -203,22 +204,18 @@ function findItemIndex(ses: UISesion, id: string): number {
   return ses.items.findIndex(it => it._uid === id);
 }
 
-/* ========= Droppable (para poder soltar en sesiones vacías) ========= */
 function DroppableCell({ id, children }: { id: string; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[44px] p-2 rounded-md transition-colors ${
-        isOver ? "ring-2 ring-primary/40 bg-primary/5" : ""
-      }`}
+      className={`min-h-[44px] p-2 rounded-md transition-colors ${isOver ? "ring-2 ring-primary/40 bg-primary/5" : ""}`}
     >
       {children}
     </div>
   );
 }
 
-/* ========= Item ordenable + editable si es "libre" ========= */
 function SortableItem({
   item,
   onLibreChange,
@@ -241,26 +238,14 @@ function SortableItem({
   const isLibre = (item as any).tipo === "libre";
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center gap-2 rounded-md border px-2 py-1 text-sm bg-background group`}
-    >
-      {/* handle */}
-      <span
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground"
-        title="Arrastrar"
-      >
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-md border px-2 py-1 text-sm bg-background group">
+      <span {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground" title="Arrastrar">
         <GripVertical className="w-3.5 h-3.5" />
       </span>
 
       {isEval ? (
         <>
-          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium">
-            Evaluación
-          </span>
+          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium">Evaluación</span>
           <span className="font-medium">{(item as any).raCodigo}</span>
           <span>— {(item as any).titulo}</span>
         </>
@@ -313,6 +298,75 @@ function SortableItem({
   );
 }
 
+/* ===== Helpers para PDF (programación) ===== */
+function safeName(s?: string) {
+  return (s || "").replace(/[^\w\- ]+/g, "_").replace(/\s+/g, " ").trim();
+}
+function programacionToHTML(payload: {
+  curso?: string | null;
+  asignatura?: string | null;
+  generadoEn: string;
+  sesiones: { indice: number; fecha?: string; items: Array<{ tipo: "ce" | "eval"; raCodigo: string; ceCodigo?: string; ceDescripcion?: string; titulo?: string; dificultad?: number; minutos?: number }> }[];
+}) {
+  const { curso, asignatura, generadoEn, sesiones } = payload;
+  const filas = sesiones.map(s => {
+    const items = s.items.length
+      ? s.items.map(it => {
+          if (it.tipo === "eval") {
+            return `<li><strong>Evaluación RA ${it.raCodigo}</strong>${it.titulo ? ` — ${it.titulo}` : ""}</li>`;
+          }
+          return `<li><code>${it.raCodigo} · ${it.ceCodigo}</code> — ${it.ceDescripcion || ""}${
+            typeof it.dificultad === "number" ? ` (D${it.dificultad})` : ""
+          }${typeof it.minutos === "number" ? ` — ${it.minutos}′` : ""}</li>`;
+        }).join("")
+      : `<li class="muted">[sin contenidos]</li>`;
+
+    return `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #eee;">#${s.indice}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;">${s.fecha ? new Date(s.fecha).toLocaleDateString() : "—"}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;">
+          <ul style="margin:0;padding-left:18px">${items}</ul>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Programación didáctica — ${asignatura || ""}</title>
+  <style>
+    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial; color:#111; line-height:1.35;}
+    h1{font-size:20px;margin:0 0 8px}
+    .meta{color:#666;font-size:12px;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse; font-size:12px}
+    thead th{background:#f7f7f8;text-align:left;padding:8px;border-bottom:1px solid #ddd}
+    .muted{color:#8a8a8a}
+  </style>
+</head>
+<body>
+  <h1>Programación didáctica</h1>
+  <div class="meta">
+    <div><strong>Curso:</strong> ${curso || "—"}</div>
+    <div><strong>Asignatura:</strong> ${asignatura || "—"}</div>
+    <div><strong>Generado:</strong> ${new Date(generadoEn).toLocaleString()}</div>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Sesión</th><th>Fecha</th><th>Contenidos / Evaluaciones</th></tr>
+    </thead>
+    <tbody>
+      ${filas}
+    </tbody>
+  </table>
+</body>
+</html>
+`;
+}
+
 /* =========================
  * Página
  * ========================= */
@@ -328,10 +382,17 @@ export default function PageProgramacion() {
   const [saving, setSaving] = useState(false);
   const [planLLM, setPlanLLM] = useState<LLMPlan | null>(null);
 
+  const resumen = useMemo(() => {
+    const totalSes = Array.isArray(sesionesFuente)
+      ? (sesionesFuente as string[]).length
+      : Number(sesionesFuente || 0);
+    const totalRA = (detalleAsig?.RA ?? []).length;
+    const totalCE = (detalleAsig?.RA ?? []).reduce((acc, ra) => acc + (ra.CE?.length || 0), 0);
+    return { totalSes, totalRA, totalCE };
+  }, [detalleAsig, sesionesFuente]);
+
   /* ===== DnD sensors ===== */
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   /* ===== Electron helpers ===== */
   async function listarAsignaturasEnUso(): Promise<AsignaturaLite[]> {
@@ -540,7 +601,7 @@ export default function PageProgramacion() {
       items: s.items.filter(it => it._uid !== uid),
     })));
   };
-  
+
   /* ===== DnD ===== */
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -573,7 +634,7 @@ export default function PageProgramacion() {
     });
   };
 
-  /* ===== Metodologías: pedir sugerencia al LLM con fallback ===== */
+  /* ===== Metodologías: sugerencia LLM con fallback ===== */
   async function sugerirParaSesion(s: UISesion) {
     const seleccionadas: MetodologiaId[] = (s as any)._meta?.metodologias ?? [];
     const cesDeSesion = s.items
@@ -591,7 +652,6 @@ export default function PageProgramacion() {
     const aplicar = (sugs: SugerenciaSesion[], recs?: Recomendacion[], autoSelect = false) => {
       setPreprogramacion(prev => prev.map(x => {
         if (x.indice !== s.indice) return x;
-
         let nextMeta: any = { ...(x as any)._meta, sugerencias: sugs, recomendadas: recs ?? (x as any)._meta?.recomendadas };
         if (autoSelect && recs && (!((x as any)._meta?.metodologias)?.length)) {
           nextMeta.metodologias = recs.map(r => r.metodologia).slice(0, 2);
@@ -602,7 +662,6 @@ export default function PageProgramacion() {
 
     const aplicarFallback = () => {
       toast.message("Sugerencia generada (0). Usando heurística…");
-      // Podrías generar algo mínimo localmente si quieres:
       const heur: SugerenciaSesion = {
         sesionId: `S${s.indice}`,
         metodologia: (seleccionadas[0] ?? "magistral+practica"),
@@ -635,22 +694,16 @@ export default function PageProgramacion() {
       const autoSelect = seleccionadas.length === 0 && (recs?.length ?? 0) > 0;
       aplicar(sugs, recs, autoSelect);
 
-      if (!resp.ok || !data?.ok) throw new Error(data?.error || "Error HTTP");
-
-const fuente = data.fuente as "llm" | "fallback";
-const modelo = data.modelo as string | null;
-
-if (fuente === "llm") {
-  toast.success(`Sugerencia LLM (${modelo ?? "desconocido"}) lista.`);
-} else {
-  toast.message("Sugerencia heurística (fallback).");
-}
-
+      const fuente = data.fuente as "llm" | "fallback";
+      const modelo = data.modelo as string | null;
+      if (fuente === "llm") {
+        toast.success(`Sugerencia LLM (${modelo ?? "desconocido"}) lista.`);
+      } else {
+        toast.message("Sugerencia heurística (fallback).");
+      }
 
       if (recs?.length) {
-        const etiquetas = recs
-          .map(r => `${etiquetaMetodologia[r.metodologia]} (${Math.round(r.score*100)}%)`)
-          .join(", ");
+        const etiquetas = recs.map(r => `${etiquetaMetodologia[r.metodologia]} (${Math.round(r.score*100)}%)`).join(", ");
         toast.success(`Metodologías recomendadas: ${etiquetas}`);
       } else {
         toast.success(`Sugerencia generada (${sugs.length}).`);
@@ -661,14 +714,13 @@ if (fuente === "llm") {
     }
   }
 
-  /* ===== Guardar ===== */
+  // ===== Guardar JSON + generar PDF junto al JSON =====
   const handleGuardar = async () => {
     if (!detalleAsig) return;
 
     try {
       setSaving(true);
 
-      // ⚠️ Por compatibilidad: ignoramos "libre" en persistencia.
       const sesionesPersist: SesionPersist[] = preprogramacion.map((s) => ({
         indice: s.indice,
         fecha: s.fecha,
@@ -703,34 +755,54 @@ if (fuente === "llm") {
         materializarActividades: false,
       };
 
-      if (!window.electronAPI.guardarProgramacionDidactica) {
-        toast.error("Falta el handler guardarProgramacionDidactica");
+      const res = await window.electronAPI.guardarProgramacionDidactica(payload);
+
+      if (!res?.ok) {
+        toast.message(res?.error ?? "Se generó la programación, pero no se pudo guardar.");
         return;
       }
 
-      const res = await window.electronAPI.guardarProgramacionDidactica(payload as any);
-      if (res.ok) {
-        toast.success("Programación didáctica guardada");
-        router.push(`/programacion/${detalleAsig.id}`);
-      } else {
-        toast.message(res.error ?? "Se generó la programación, pero no se pudo guardar.");
+      const jsonPath: string | undefined = res?.resumen?.path;
+      const jsonOkMsg = jsonPath ? `Programación guardada:\n${jsonPath}` : "Programación guardada.";
+      toast.success(jsonOkMsg, { duration: 4000 });
+
+      // === Construir HTML y pedir al main que guarde el PDF junto al JSON
+      if (jsonPath) {
+        const html = programacionToHTML({
+          curso: detalleAsig.cursoNombre ?? null,
+          asignatura: detalleAsig.nombre ?? null,
+          generadoEn: payload.generadoEn,
+          sesiones: sesionesPersist.map(s => ({
+            indice: s.indice,
+            fecha: s.fecha,
+            items: s.items.map((it) =>
+              it.tipo === "ce"
+                ? { tipo: "ce", raCodigo: it.raCodigo, ceCodigo: it.ceCodigo, ceDescripcion: it.ceDescripcion, dificultad: it.dificultad, minutos: it.minutos }
+                : { tipo: "eval", raCodigo: it.raCodigo, titulo: it.titulo }
+            ),
+          })),
+        });
+
+        const pdfRes = await window.electronAPI.exportarProgramacionPDF(html, jsonPath);
+        if (pdfRes.ok) {
+          toast.success(`PDF generado:\n${pdfRes.path}`, { duration: 5000 });
+          // abrir carpeta si tienes el helper expuesto
+          if (window.electronAPI.revelarEnCarpeta) {
+            await window.electronAPI.revelarEnCarpeta(pdfRes.path);
+          }
+        } else {
+          toast.message(pdfRes.error ?? "No se pudo generar el PDF.");
+        }
       }
     } catch (e) {
       console.error(e);
-      toast.error("No se pudo guardar la programación");
+      toast.error("No se pudo guardar/generar el PDF de la programación");
     } finally {
       setSaving(false);
     }
   };
 
-  const resumen = useMemo(() => {
-    const totalSes = Array.isArray(sesionesFuente) ? (sesionesFuente as string[]).length : Number(sesionesFuente || 0);
-    const totalRA = (detalleAsig?.RA ?? []).length;
-    const totalCE = (detalleAsig?.RA ?? []).reduce((acc, ra) => acc + (ra.CE?.length || 0), 0);
-    return { totalSes, totalRA, totalCE };
-  }, [detalleAsig, sesionesFuente]);
-
-  /* ===== Auditoría CE (UI + PDF) ===== */
+  /* ===== Auditoría CE (UI + PDF local) ===== */
   type AuditoriaRow = {
     ceCodigo: string;
     raCodigo: string;
@@ -755,13 +827,7 @@ if (fuente === "llm") {
           (planLLM as any).justificaciones?.[ceId] ??
           "Evaluación LLM con rúbrica (pasos, transferencia, autonomía, complejidad).";
 
-        rows.push({
-          ceCodigo: ce.codigo,
-          raCodigo: ra.codigo,
-          dificultad,
-          minutos,
-          justificacion,
-        });
+        rows.push({ ceCodigo: ce.codigo, raCodigo: ra.codigo, dificultad, minutos, justificacion });
       }
     }
     return rows;
@@ -788,13 +854,7 @@ if (fuente === "llm") {
       ]),
       styles: { fontSize: 10, cellPadding: 6, valign: "top" },
       headStyles: { halign: "left" },
-      columnStyles: {
-        0: { cellWidth: 70 },   // CE
-        1: { cellWidth: 50 },   // RA
-        2: { cellWidth: 60 },   // Nivel
-        3: { cellWidth: 60 },   // Minutos
-        4: { cellWidth: 300 },  // Justificación
-      },
+      columnStyles: { 0: { cellWidth: 70 }, 1: { cellWidth: 50 }, 2: { cellWidth: 60 }, 3: { cellWidth: 60 }, 4: { cellWidth: 300 } },
       didDrawPage: () => {
         const page = String(doc.getCurrentPageInfo().pageNumber);
         doc.setFontSize(9);
@@ -831,18 +891,9 @@ if (fuente === "llm") {
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-[200px_1fr] items-center">
             <Label htmlFor="asignatura">Asignatura</Label>
-            <Select
-              value={asigSeleccionada}
-              onValueChange={(v) => setAsigSeleccionada(v)}
-              disabled={cargando || asignaturas.length === 0}
-            >
+            <Select value={asigSeleccionada} onValueChange={(v) => setAsigSeleccionada(v)} disabled={cargando || asignaturas.length === 0}>
               <SelectTrigger id="asignatura" className="w-full">
-                <SelectValue
-                  placeholder={
-                    cargando ? "Cargando…" :
-                    asignaturas.length === 0 ? "No hay asignaturas vinculadas" : "Selecciona asignatura"
-                  }
-                />
+                <SelectValue placeholder={cargando ? "Cargando…" : asignaturas.length === 0 ? "No hay asignaturas vinculadas" : "Selecciona asignatura"} />
               </SelectTrigger>
               <SelectContent className="max-h-96">
                 {(() => {
@@ -905,15 +956,10 @@ if (fuente === "llm") {
                         <TableCell>{s.fecha ? new Date(s.fecha).toLocaleDateString() : "—"}</TableCell>
                         <TableCell>
                           <DroppableCell id={`sess-${s.indice}`}>
-                            <SortableContext
-                              items={s.items.map(it => it._uid)}
-                              strategy={verticalListSortingStrategy}
-                            >
+                            <SortableContext items={s.items.map(it => it._uid)} strategy={verticalListSortingStrategy}>
                               <div className="flex flex-col gap-1">
                                 {s.items.length === 0 && (
-                                  <div className="text-sm text-muted-foreground mb-1">
-                                    Suelta aquí para programar en esta sesión
-                                  </div>
+                                  <div className="text-sm text-muted-foreground mb-1">Suelta aquí para programar en esta sesión</div>
                                 )}
 
                                 {s.items.map((it) => (
@@ -926,12 +972,7 @@ if (fuente === "llm") {
                                 ))}
 
                                 <div className="pt-1 flex items-center gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => addLibre(s.indice)}
-                                    className="h-7 px-2 text-xs"
-                                  >
+                                  <Button size="sm" variant="ghost" onClick={() => addLibre(s.indice)} className="h-7 px-2 text-xs">
                                     <Plus className="h-3.5 w-3.5 mr-1" /> Añadir nota
                                   </Button>
                                 </div>
@@ -948,9 +989,7 @@ if (fuente === "llm") {
                                         key={m.id}
                                         type="button"
                                         onClick={() => toggleMetodologia(setPreprogramacion, s.indice, m.id)}
-                                        className={`text-xs px-2 py-1 rounded border transition ${
-                                          sel ? "bg-primary/10 border-primary text-primary" : "border-muted-foreground/20"
-                                        }`}
+                                        className={`text-xs px-2 py-1 rounded border transition ${sel ? "bg-primary/10 border-primary text-primary" : "border-muted-foreground/20"}`}
                                         title={m.label}
                                       >
                                         {m.label}
@@ -958,12 +997,7 @@ if (fuente === "llm") {
                                     );
                                   })}
 
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2 text-xs ml-2"
-                                    onClick={() => sugerirParaSesion(s)}
-                                  >
+                                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs ml-2" onClick={() => sugerirParaSesion(s)}>
                                     Sugerir metodología
                                   </Button>
                                 </div>
@@ -973,37 +1007,22 @@ if (fuente === "llm") {
                                   <div className="mt-2 rounded border p-2 bg-muted/30">
                                     {(s as any)._meta.sugerencias.map((sug: SugerenciaSesion) => (
                                       <div key={sug.metodologia} className="mb-2">
-                                        <div className="text-xs font-medium mb-1">
-                                          {etiquetaMetodologia[sug.metodologia]}
-                                        </div>
+                                        <div className="text-xs font-medium mb-1">{etiquetaMetodologia[sug.metodologia]}</div>
                                         <ul className="text-xs list-disc pl-4 space-y-1">
-  {sug.fases.map((f, i) => {
-    let evid: string[] = [];
-
-    if (Array.isArray(f.evidencias)) {
-      evid = f.evidencias.filter((x): x is string => typeof x === "string");
-    } else if (typeof f.evidencias === "string") {
-      const trimmed = f.evidencias.trim();
-      if (trimmed) evid = [trimmed];
-    }
-
-    return (
-      <li key={i}>
-        <span className="font-medium">{f.titulo}</span> — {f.minutos}′. {f.descripcion}
-        {evid.length > 0 && (
-          <span className="block text-[11px] text-muted-foreground">
-            Evidencias: {evid.join("; ")}
-          </span>
-        )}
-      </li>
-    );
-  })}
-</ul>
-
+                                          {sug.fases.map((f, i) => {
+                                            let evid: string[] = [];
+                                            if (Array.isArray(f.evidencias)) evid = f.evidencias.filter((x): x is string => typeof x === "string");
+                                            else if (typeof f.evidencias === "string") { const t = f.evidencias.trim(); if (t) evid = [t]; }
+                                            return (
+                                              <li key={i}>
+                                                <span className="font-medium">{f.titulo}</span> — {f.minutos}′. {f.descripcion}
+                                                {evid.length > 0 && <span className="block text-[11px] text-muted-foreground">Evidencias: {evid.join("; ")}</span>}
+                                              </li>
+                                            );
+                                          })}
+                                        </ul>
                                         {sug.observaciones && (
-                                          <p className="text-[11px] text-muted-foreground mt-1">
-                                            Observaciones: {sug.observaciones}
-                                          </p>
+                                          <p className="text-[11px] text-muted-foreground mt-1">Observaciones: {sug.observaciones}</p>
                                         )}
                                       </div>
                                     ))}
@@ -1042,9 +1061,7 @@ if (fuente === "llm") {
             <div className="mt-8">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Auditoría de criterios de evaluación</h3>
-                <Button size="sm" onClick={exportAuditoriaPDF}>
-                  Exportar PDF
-                </Button>
+                <Button size="sm" onClick={exportAuditoriaPDF}>Exportar PDF</Button>
               </div>
               <div className="rounded-md border overflow-hidden">
                 <Table>
