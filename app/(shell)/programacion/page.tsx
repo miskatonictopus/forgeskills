@@ -79,7 +79,15 @@ type ItemCEPersist = {
   minutos?: number;
 };
 type ItemEvalPersist = { tipo: "eval"; raCodigo: string; titulo: string };
-type SesionPersist = { indice: number; fecha?: string; items: Array<ItemCEPersist | ItemEvalPersist> };
+type SesionPersist = {
+  indice: number;
+  fecha?: string;
+  items: Array<ItemCEPersist | ItemEvalPersist>;
+  // NUEVO: lo que estaba en s._meta
+  metodologias?: MetodologiaId[];
+  sugerencias?: SugerenciaSesion[];
+  observaciones?: string;
+};
 
 type GuardarProgramacionPayload = {
   asignaturaId: string;
@@ -306,27 +314,97 @@ function programacionToHTML(payload: {
   curso?: string | null;
   asignatura?: string | null;
   generadoEn: string;
-  sesiones: { indice: number; fecha?: string; items: Array<{ tipo: "ce" | "eval"; raCodigo: string; ceCodigo?: string; ceDescripcion?: string; titulo?: string; dificultad?: number; minutos?: number }> }[];
+  sesiones: {
+    indice: number;
+    fecha?: string;
+    items: Array<{
+      tipo: "ce" | "eval";
+      raCodigo: string;
+      ceCodigo?: string;
+      ceDescripcion?: string;
+      titulo?: string;
+      dificultad?: number;
+      minutos?: number;
+    }>;
+    metodologias?: MetodologiaId[];     // ⬅️ NUEVO
+    sugerencias?: SugerenciaSesion[];   // ⬅️ NUEVO
+    observaciones?: string;             // ⬅️ NUEVO
+  }[];
 }) {
   const { curso, asignatura, generadoEn, sesiones } = payload;
-  const filas = sesiones.map(s => {
-    const items = s.items.length
-      ? s.items.map(it => {
-          if (it.tipo === "eval") {
-            return `<li><strong>Evaluación RA ${it.raCodigo}</strong>${it.titulo ? ` — ${it.titulo}` : ""}</li>`;
-          }
-          return `<li><code>${it.raCodigo} · ${it.ceCodigo}</code> — ${it.ceDescripcion || ""}${
-            typeof it.dificultad === "number" ? ` (D${it.dificultad})` : ""
-          }${typeof it.minutos === "number" ? ` — ${it.minutos}′` : ""}</li>`;
-        }).join("")
+
+  const filas = sesiones.map((s) => {
+    const itemsHtml = s.items.length
+      ? s.items
+          .map((it) => {
+            if (it.tipo === "eval") {
+              return `<li><strong>Evaluación RA ${escapeHtml(it.raCodigo)}</strong>${
+                it.titulo ? ` — ${escapeHtml(it.titulo)}` : ""
+              }</li>`;
+            }
+            return `<li><code>${escapeHtml(it.raCodigo)} · ${escapeHtml(it.ceCodigo || "")}</code> — ${escapeHtml(
+              it.ceDescripcion || ""
+            )}${
+              typeof it.dificultad === "number" ? ` (D${it.dificultad})` : ""
+            }${typeof it.minutos === "number" ? ` — ${it.minutos}′` : ""}</li>`;
+          })
+          .join("")
       : `<li class="muted">[sin contenidos]</li>`;
+
+    // Chips de metodologías seleccionadas
+    const metodologiasHtml = s.metodologias?.length
+      ? `<div class="meta-line"><strong>Metodologías:</strong> ${s.metodologias
+          .map((m) => `<span class="chip">${escapeHtml(etiquetaMetodologia[m])}</span>`)
+          .join(" ")}</div>`
+      : "";
+
+    // Bloques de sugerencias con fases y evidencias
+    const sugerenciasHtml = s.sugerencias?.length
+      ? s.sugerencias
+          .map((sug) => {
+            const fasesHtml = sug.fases
+              .map((f) => {
+                const evidencias =
+                  Array.isArray(f.evidencias)
+                    ? f.evidencias.filter((x): x is string => typeof x === "string")
+                    : typeof f.evidencias === "string"
+                    ? [f.evidencias]
+                    : [];
+                const evidHtml = evidencias.length
+                  ? `<div class="muted evid">Evidencias: ${evidencias.map(escapeHtml).join("; ")}</div>`
+                  : "";
+                return `<li><strong>${escapeHtml(f.titulo)}</strong> — ${f.minutos}′. ${escapeHtml(
+                  f.descripcion
+                )}${evidHtml}</li>`;
+              })
+              .join("");
+
+            const obs = sug.observaciones
+              ? `<div class="muted obs">Observaciones: ${escapeHtml(sug.observaciones)}</div>`
+              : "";
+
+            return `<div class="sug">
+              <div class="sug-title">${escapeHtml(etiquetaMetodologia[sug.metodologia])}</div>
+              <ul class="sug-list">${fasesHtml}</ul>
+              ${obs}
+            </div>`;
+          })
+          .join("")
+      : "";
+
+    const observHtml = s.observaciones
+      ? `<div class="meta-line"><strong>Notas:</strong> ${escapeHtml(s.observaciones)}</div>`
+      : "";
 
     return `
       <tr>
-        <td style="padding:8px;border-bottom:1px solid #eee;">#${s.indice}</td>
-        <td style="padding:8px;border-bottom:1px solid #eee;">${s.fecha ? new Date(s.fecha).toLocaleDateString() : "—"}</td>
-        <td style="padding:8px;border-bottom:1px solid #eee;">
-          <ul style="margin:0;padding-left:18px">${items}</ul>
+        <td class="cell">#${s.indice}</td>
+        <td class="cell">${s.fecha ? new Date(s.fecha).toLocaleDateString() : "—"}</td>
+        <td class="cell">
+          <ul class="items">${itemsHtml}</ul>
+          ${metodologiasHtml}
+          ${sugerenciasHtml}
+          ${observHtml}
         </td>
       </tr>
     `;
@@ -337,26 +415,35 @@ function programacionToHTML(payload: {
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>Programación didáctica — ${asignatura || ""}</title>
+  <title>Programación didáctica — ${escapeHtml(asignatura || "")}</title>
   <style>
-    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial; color:#111; line-height:1.35;}
+    body{font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial;color:#111;line-height:1.35;}
     h1{font-size:20px;margin:0 0 8px}
     .meta{color:#666;font-size:12px;margin-bottom:12px}
-    table{width:100%;border-collapse:collapse; font-size:12px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
     thead th{background:#f7f7f8;text-align:left;padding:8px;border-bottom:1px solid #ddd}
-    .muted{color:#8a8a8a}
+    .cell{padding:8px;border-bottom:1px solid #eee;vertical-align:top}
+    .muted{color:#6b7280}
+    .items{margin:0;padding-left:18px}
+    .chip{display:inline-block;padding:2px 6px;border:1px solid #ddd;border-radius:999px;font-size:11px;margin-right:6px;margin-top:4px}
+    .meta-line{margin-top:6px}
+    .sug{margin-top:8px;padding:8px;border:1px solid #eee;border-radius:8px;background:#fafafa}
+    .sug-title{font-weight:600;margin-bottom:4px}
+    .sug-list{margin:0;padding-left:18px}
+    .evid{margin-left:4px}
+    .obs{margin-top:4px}
   </style>
 </head>
 <body>
   <h1>Programación didáctica</h1>
   <div class="meta">
-    <div><strong>Curso:</strong> ${curso || "—"}</div>
-    <div><strong>Asignatura:</strong> ${asignatura || "—"}</div>
+    <div><strong>Curso:</strong> ${escapeHtml(curso || "—")}</div>
+    <div><strong>Asignatura:</strong> ${escapeHtml(asignatura || "—")}</div>
     <div><strong>Generado:</strong> ${new Date(generadoEn).toLocaleString()}</div>
   </div>
   <table>
     <thead>
-      <tr><th>Sesión</th><th>Fecha</th><th>Contenidos / Evaluaciones</th></tr>
+      <tr><th>Sesión</th><th>Fecha</th><th>Contenidos / Evaluaciones / Metodologías</th></tr>
     </thead>
     <tbody>
       ${filas}
@@ -365,6 +452,10 @@ function programacionToHTML(payload: {
 </body>
 </html>
 `;
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]!));
 }
 
 /* =========================
@@ -551,7 +642,62 @@ export default function PageProgramacion() {
         }
 
         const plan: LLMPlan = data.plan;
-        setPlanLLM(plan);
+setPlanLLM(plan);
+
+        // === AÑADE ESTO: garantiza 1 evaluación por RA ===
+// === Garantiza 1 evaluación por RA tras el último CE del RA ===
+function ensureEvaluacionesPorRA(
+  plan: LLMPlan,
+  slots: LLMSesion[],
+  catalogo: Record<string, { raCodigo: string; ceCodigo: string; ceDescripcion: string }>
+) {
+  const idxById = new Map(slots.map((s, i) => [s.id, i]));
+
+  // 1) Última sesión con CE por RA
+  const ultimoCEporRA = new Map<string, number>(); // ra -> idxSesion
+  for (const it of plan.items) {
+    if (it.tipo === "CE") {
+      const ra = catalogo[(it as any).ceId]?.raCodigo;
+      if (!ra) continue;
+      const idx = idxById.get(it.sesionId);
+      if (typeof idx === "number") {
+        const prev = ultimoCEporRA.get(ra);
+        if (prev == null || idx > prev) ultimoCEporRA.set(ra, idx);
+      }
+    }
+  }
+
+  // 2) RAs que ya tienen evaluación
+  const evalPorRA = new Set<string>();
+  for (const it of plan.items) {
+    if (it.tipo === "EVALUACION_RA") evalPorRA.add((it as any).raCodigo);
+  }
+
+  // 3) Insertar las que falten (misma sesión, al final)
+  const nuevos: LLMItem[] = [];
+  for (const [ra, lastIdx] of ultimoCEporRA.entries()) {
+    if (evalPorRA.has(ra)) continue;
+    const sesionId = slots[Math.min(lastIdx, slots.length - 1)].id;
+    nuevos.push({
+      sesionId,
+      tipo: "EVALUACION_RA",
+      raCodigo: ra,
+      minutosOcupados: 15,
+    } as any);
+  }
+
+  if (nuevos.length) plan.items = [...plan.items, ...nuevos];
+
+  // Debug
+  const resumen = Array.from(ultimoCEporRA.keys()).map(ra => ({
+    ra,
+    teniaEval: evalPorRA.has(ra),
+    ultimoIdx: ultimoCEporRA.get(ra),
+  }));
+  console.log("[ensureEvaluacionesPorRA] resumen:", resumen, "insertadas:", nuevos.length);
+}
+
+
 
         const catalogo: Record<string, { raCodigo: string; ceCodigo: string; ceDescripcion: string }> = {};
         (detalle.RA ?? []).forEach((ra) => {
@@ -560,13 +706,21 @@ export default function PageProgramacion() {
             catalogo[ceId] = { raCodigo: ra.codigo, ceCodigo: ce.codigo, ceDescripcion: ce.descripcion };
           });
         });
+        
 
         const slots: SesionSlot[] = Array.isArray(sesionesValue)
           ? (sesionesValue as string[]).map((fechaISO, i) => ({ id: `S${i + 1}`, fechaISO, minutos: defaultMinutos }))
           : Array.from({ length: Number(sesionesValue) }).map((_, i) => ({ id: `S${i + 1}`, minutos: defaultMinutos }));
 
-        const sesionesUI = planToUI(slots, plan as unknown as Plan, catalogo);
-        setPreprogramacion(withUID(sesionesUI));
+     console.log("[plan inicial] items:", plan.items.filter(i => i.tipo === "EVALUACION_RA"));
+
+ensureEvaluacionesPorRA(plan, slots, catalogo);
+
+console.log("[plan tras ensure] items:", plan.items.filter(i => i.tipo === "EVALUACION_RA"));
+
+// ahora sí, construir UI
+const sesionesUI = planToUI(slots, plan as unknown as Plan, catalogo);
+setPreprogramacion(withUID(sesionesUI));
       } catch (e) {
         console.error(e);
         toast.error("Error al preparar la programación");
@@ -715,92 +869,130 @@ export default function PageProgramacion() {
   }
 
   // ===== Guardar JSON + generar PDF junto al JSON =====
-  const handleGuardar = async () => {
-    if (!detalleAsig) return;
+ // ===== Guardar JSON + generar PDF junto al JSON =====
+const handleGuardar = async () => {
+  if (!detalleAsig) return;
 
-    try {
-      setSaving(true);
+  try {
+    setSaving(true);
 
-      const sesionesPersist: SesionPersist[] = preprogramacion.map((s) => ({
+    const sesionesPersist: SesionPersist[] = preprogramacion.map((s) => {
+      const meta = (s as any)._meta ?? {};
+      const metodologias: MetodologiaId[] | undefined =
+        Array.isArray(meta.metodologias) && meta.metodologias.length ? meta.metodologias : undefined;
+      const sugerencias: SugerenciaSesion[] | undefined =
+        Array.isArray(meta.sugerencias) && meta.sugerencias.length ? meta.sugerencias : undefined;
+      const observaciones: string | undefined =
+        typeof meta.observaciones === "string" && meta.observaciones.trim() ? meta.observaciones.trim() : undefined;
+
+      // 👀 Debug de cada sesión
+      console.log("[handleGuardar] Sesión", s.indice, {
+        fecha: s.fecha,
+        metodologias,
+        sugerencias: sugerencias?.map((sg) => sg.metodologia),
+        observaciones,
+        items: s.items.map((it: any) => it.tipo),
+      });
+
+      return {
         indice: s.indice,
         fecha: s.fecha,
         items: s.items
           .filter((it: any) => it.tipo === "ce" || it.tipo === "eval")
           .map((it: any) =>
             it.tipo === "ce"
-              ? {
+              ? ({
                   tipo: "ce",
                   raCodigo: it.raCodigo,
                   ceCodigo: it.ceCodigo,
                   ceDescripcion: it.ceDescripcion,
                   dificultad: typeof it.dificultad === "number" ? it.dificultad : undefined,
                   minutos: typeof it.minutos === "number" ? it.minutos : undefined,
-                } as ItemCEPersist
-              : { tipo: "eval", raCodigo: it.raCodigo, titulo: it.titulo } as ItemEvalPersist
+                } as ItemCEPersist)
+              : ({ tipo: "eval", raCodigo: it.raCodigo, titulo: it.titulo } as ItemEvalPersist)
           ),
-      }));
-
-      const payload: GuardarProgramacionPayload = {
-        asignaturaId: detalleAsig.id,
-        cursoId: detalleAsig.cursoId,
-        generadoEn: new Date().toISOString(),
-        totalSesiones: Array.isArray(sesionesFuente)
-          ? (sesionesFuente as string[]).length
-          : Number(sesionesFuente || 0),
-        sesiones: sesionesPersist,
-        planLLM,
-        meta: { asignaturaNombre: detalleAsig.nombre, cursoNombre: detalleAsig.cursoNombre },
-        modeloLLM: "gpt-4o-mini",
-        replacePrev: true,
-        materializarActividades: false,
+        metodologias,
+        sugerencias,
+        observaciones,
       };
+    });
 
-      const res = await window.electronAPI.guardarProgramacionDidactica(payload);
+    // 👀 Debug global
+    console.log("[handleGuardar] sesionesPersist final:", sesionesPersist);
 
-      if (!res?.ok) {
-        toast.message(res?.error ?? "Se generó la programación, pero no se pudo guardar.");
-        return;
-      }
+    const payload: GuardarProgramacionPayload = {
+      asignaturaId: detalleAsig.id,
+      cursoId: detalleAsig.cursoId,
+      generadoEn: new Date().toISOString(),
+      totalSesiones: Array.isArray(sesionesFuente)
+        ? (sesionesFuente as string[]).length
+        : Number(sesionesFuente || 0),
+      sesiones: sesionesPersist,
+      planLLM,
+      meta: { asignaturaNombre: detalleAsig.nombre, cursoNombre: detalleAsig.cursoNombre },
+      modeloLLM: "gpt-4o-mini",
+      replacePrev: true,
+      materializarActividades: false,
+    };
 
-      const jsonPath: string | undefined = res?.resumen?.path;
-      const jsonOkMsg = jsonPath ? `Programación guardada:\n${jsonPath}` : "Programación guardada.";
-      toast.success(jsonOkMsg, { duration: 4000 });
+    console.log("[handleGuardar] payload completo:", payload);
 
-      // === Construir HTML y pedir al main que guarde el PDF junto al JSON
-      if (jsonPath) {
-        const html = programacionToHTML({
-          curso: detalleAsig.cursoNombre ?? null,
-          asignatura: detalleAsig.nombre ?? null,
-          generadoEn: payload.generadoEn,
-          sesiones: sesionesPersist.map(s => ({
-            indice: s.indice,
-            fecha: s.fecha,
-            items: s.items.map((it) =>
-              it.tipo === "ce"
-                ? { tipo: "ce", raCodigo: it.raCodigo, ceCodigo: it.ceCodigo, ceDescripcion: it.ceDescripcion, dificultad: it.dificultad, minutos: it.minutos }
-                : { tipo: "eval", raCodigo: it.raCodigo, titulo: it.titulo }
-            ),
-          })),
-        });
-
-        const pdfRes = await window.electronAPI.exportarProgramacionPDF(html, jsonPath);
-        if (pdfRes.ok) {
-          toast.success(`PDF generado:\n${pdfRes.path}`, { duration: 5000 });
-          // abrir carpeta si tienes el helper expuesto
-          if (window.electronAPI.revelarEnCarpeta) {
-            await window.electronAPI.revelarEnCarpeta(pdfRes.path);
-          }
-        } else {
-          toast.message(pdfRes.error ?? "No se pudo generar el PDF.");
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error("No se pudo guardar/generar el PDF de la programación");
-    } finally {
-      setSaving(false);
+    const res = await window.electronAPI.guardarProgramacionDidactica(payload);
+    if (!res?.ok) {
+      toast.message(res?.error ?? "Se generó la programación, pero no se pudo guardar.");
+      return;
     }
-  };
+
+    const jsonPath: string | undefined = res?.resumen?.path;
+    const jsonOkMsg = jsonPath ? `Programación guardada:\n${jsonPath}` : "Programación guardada.";
+    toast.success(jsonOkMsg, { duration: 4000 });
+
+    if (jsonPath) {
+      const html = programacionToHTML({
+        curso: detalleAsig.cursoNombre ?? null,
+        asignatura: detalleAsig.nombre ?? null,
+        generadoEn: payload.generadoEn,
+        sesiones: sesionesPersist.map((s) => ({
+          indice: s.indice,
+          fecha: s.fecha,
+          items: s.items.map((it) =>
+            it.tipo === "ce"
+              ? {
+                  tipo: "ce",
+                  raCodigo: it.raCodigo,
+                  ceCodigo: it.ceCodigo,
+                  ceDescripcion: it.ceDescripcion,
+                  dificultad: it.dificultad,
+                  minutos: it.minutos,
+                }
+              : { tipo: "eval", raCodigo: it.raCodigo, titulo: (it as any).titulo }
+          ),
+          metodologias: s.metodologias,
+          sugerencias: s.sugerencias,
+          observaciones: s.observaciones,
+        })),
+      });
+
+      console.log("[handleGuardar] HTML generado:", html.substring(0, 500), "...");
+
+      const pdfRes = await window.electronAPI.exportarProgramacionPDF(html, jsonPath);
+      if (pdfRes.ok) {
+        toast.success(`PDF generado:\n${pdfRes.path}`, { duration: 5000 });
+        if (window.electronAPI.revelarEnCarpeta) {
+          await window.electronAPI.revelarEnCarpeta(pdfRes.path);
+        }
+      } else {
+        toast.message(pdfRes.error ?? "No se pudo generar el PDF.");
+      }
+    }
+  } catch (e) {
+    console.error(e);
+    toast.error("No se pudo guardar/generar el PDF de la programación");
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   /* ===== Auditoría CE (UI + PDF local) ===== */
   type AuditoriaRow = {
