@@ -1,7 +1,14 @@
 "use client";
 import { proxy } from "valtio";
 
-export type Asignatura = { id: string; nombre: string; color?: string | null };
+export type Asignatura = { 
+  id: string; 
+  nombre: string; 
+  color?: string | null;
+  RA?: RA[]; // 👈 añadido
+};
+export type CE = { codigo: string; descripcion: string };
+export type RA = { codigo: string; descripcion: string; CE: CE[] };
 
 type Store = {
   asignaturasPorCurso: Record<string, Asignatura[]>;
