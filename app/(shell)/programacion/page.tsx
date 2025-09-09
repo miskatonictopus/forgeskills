@@ -712,7 +712,8 @@ function ensureEvaluacionesPorRA(
           ? (sesionesValue as string[]).map((fechaISO, i) => ({ id: `S${i + 1}`, fechaISO, minutos: defaultMinutos }))
           : Array.from({ length: Number(sesionesValue) }).map((_, i) => ({ id: `S${i + 1}`, minutos: defaultMinutos }));
 
-     console.log("[plan inicial] items:", plan.items.filter(i => i.tipo === "EVALUACION_RA"));
+       // ... después de construir `catalogo` y `slots`
+console.log("[plan inicial] items:", plan.items.filter(i => i.tipo === "EVALUACION_RA"));
 
 ensureEvaluacionesPorRA(plan, slots, catalogo);
 
