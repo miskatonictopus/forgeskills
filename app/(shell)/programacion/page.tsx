@@ -869,6 +869,38 @@ setPreprogramacion(withUID(sesionesUI));
     }
   }
 
+  // === Sugerir todas las metodologías de golpe ===
+const [sugiriendoTodas, setSugiriendoTodas] = useState(false);
+const [progresoTodas, setProgresoTodas] = useState<{done:number,total:number}>({done:0,total:0});
+
+async function sugerirTodasMetodologias() {
+  if (sugiriendoTodas) return;
+  const sesionesConCE = preprogramacion.filter(s => s.items.some((it:any) => it.tipo === "ce"));
+
+  if (sesionesConCE.length === 0) {
+    toast.message("No hay sesiones con CE para sugerir.");
+    return;
+  }
+
+  setSugiriendoTodas(true);
+  setProgresoTodas({ done: 0, total: sesionesConCE.length });
+
+  try {
+    // Secuencial para no saturar el endpoint (más robusto)
+    for (let i = 0; i < sesionesConCE.length; i++) {
+      await sugerirParaSesion(sesionesConCE[i]);
+      setProgresoTodas({ done: i + 1, total: sesionesConCE.length });
+    }
+    toast.success(`Sugerencias generadas para ${sesionesConCE.length} sesiones.`);
+  } catch (err) {
+    console.error("[sugerirTodasMetodologias] error", err);
+    toast.error("Ocurrió un error generando algunas sugerencias.");
+  } finally {
+    setSugiriendoTodas(false);
+  }
+}
+
+
   // ===== Guardar JSON + generar PDF junto al JSON =====
  // ===== Guardar JSON + generar PDF junto al JSON =====
 const handleGuardar = async () => {
@@ -1125,7 +1157,31 @@ const handleGuardar = async () => {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>2) Previsualización de la programación ({resumen.totalSes} sesiones)</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+    <CardTitle>
+      2) Previsualización de la programación ({resumen.totalSes} sesiones)
+    </CardTitle>
+
+    <div className="flex items-center gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={sugerirTodasMetodologias}
+        disabled={sugiriendoTodas || preprogramacion.length === 0}
+        className="h-8"
+        title="Generar sugerencias de metodología para todas las sesiones con CE"
+      >
+        {sugiriendoTodas ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Sugerir todas ({progresoTodas.done}/{progresoTodas.total})
+          </>
+        ) : (
+          <>Sugerir metodologías (todas)</>
+        )}
+      </Button>
+    </div>
+  </CardHeader>
         <CardContent>
           {!detalleAsig ? (
             <p className="text-sm text-muted-foreground">Selecciona una asignatura para generar la propuesta.</p>
