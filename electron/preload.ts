@@ -95,12 +95,19 @@ const api = {
   actualizarColorAsignatura: (id: string, color: string) =>
     ipcRenderer.invoke("actualizar-color-asignatura", id, color),
   leerAsignatura: (id: string) => ipcRenderer.invoke("leer-asignatura", id),
-  leerAsignaturas: () => ipcRenderer.invoke("leer-asignaturas"),
-  leerAsignaturasCurso: (cursoId: string) => ipcRenderer.invoke("leer-asignaturas-curso", cursoId),
+  leerAsignaturas: (cursoId: string) =>
+    ipcRenderer.invoke("leer-asignaturas-curso", cursoId),
+    asignaturasDeCurso: (cursoId: string) =>
+    ipcRenderer.invoke("leer-asignaturas-curso", cursoId) as Promise<
+      { id: string; codigo: string; nombre: string }[]
+    >,
+
+  getCEsAsignatura: (asignaturaId: string) =>
+    ipcRenderer.invoke("get-ces-asignatura", asignaturaId) as Promise<
+      { codigo: string; descripcion: string; CE: { codigo: string; descripcion: string }[] }[]
+    >,
   asociarAsignaturasACurso: (cursoId: string, asignaturaIds: string[]) =>
     ipcRenderer.invoke("asociar-asignaturas-curso", cursoId, asignaturaIds),
-  asignaturasDeCurso: (cursoId: string): Promise<{ id: string; nombre: string }[]> =>
-    ipcRenderer.invoke("leer-asignaturas-curso", cursoId),
 
   /* ================= ALUMNOS ================= */
   guardarAlumno: (alumno: AlumnoEntrada) => ipcRenderer.invoke("guardar-alumno", alumno),

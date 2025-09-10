@@ -1,14 +1,16 @@
 "use client";
 import { proxy } from "valtio";
 
-export type Asignatura = { 
-  id: string; 
-  nombre: string; 
-  color?: string | null;
-  RA?: RA[]; // 👈 añadido
-};
 export type CE = { codigo: string; descripcion: string };
 export type RA = { codigo: string; descripcion: string; CE: CE[] };
+
+export type Asignatura = {
+  id: string;
+  nombre: string;
+  codigo?: string;          // 👈 lo añadimos (útil para RA/CE)
+  color?: string | null;
+  RA?: RA[];
+};
 
 type Store = {
   asignaturasPorCurso: Record<string, Asignatura[]>;
@@ -19,9 +21,15 @@ type Store = {
 export const store = proxy<Store>({
   asignaturasPorCurso: {},
 
-  // ⬇️ null-safe
   setAsignaturasCurso(cursoId, asignaturas) {
-    const safe = asignaturas ?? [];
+    const safe = (asignaturas ?? []).map((a) => ({
+      ...a,
+      // normalizamos por si vienen otras claves desde IPC
+      id: a.id,
+      nombre: a.nombre,
+      codigo: (a as any).codigo ?? (a as any).code ?? a.id,
+      color: a.color ?? null,
+    }));
     const prev = store.asignaturasPorCurso[cursoId] ?? [];
     const prevById = Object.fromEntries(prev.map((a) => [a.id, a] as const));
     store.asignaturasPorCurso[cursoId] = safe.map((a) => ({
@@ -42,10 +50,23 @@ export const store = proxy<Store>({
 export const asignaturasPorCurso = store.asignaturasPorCurso;
 export const setAsignaturasCurso = store.setAsignaturasCurso;
 
-// 🔄 Carga desde IPC (usa el nombre EXACTO de preload: leerAsignaturasCurso)
+// 🔄 Carga desde IPC (usa el nombre EXACTO que expone preload)
 export async function cargarAsignaturas(cursoId: string) {
   try {
-    const asignaturas = await window.electronAPI.leerAsignaturasCurso(cursoId);
+    const api = (window as any).electronAPI;
+    // prioridad al nombre nuevo; fallback al antiguo si existiera
+    const listar =
+      api?.asignaturasDeCurso ??
+      api?.leerAsignaturas ??
+      null;
+
+    if (!listar) {
+      console.error("[asignaturasPorCurso] No existe electronAPI.asignaturasDeCurso/leerAsignaturas");
+      setAsignaturasCurso(cursoId, []);
+      return;
+    }
+
+    const asignaturas = await listar(cursoId);
     setAsignaturasCurso(cursoId, asignaturas ?? []);
   } catch (err) {
     console.error("Error cargando asignaturas del curso:", err);

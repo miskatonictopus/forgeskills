@@ -80,13 +80,23 @@ export interface ElectronAPI {
   forzarRevisionEstados: () => Promise<number>;
 
   /* ===== Asignaturas ===== */
-  leerAsignaturas: () => Promise<Asignatura[]>;
+  leerAsignaturas?: (cursoId: string) =>
+        Promise<{ id: string; codigo?: string; nombre: string }[]>;
   leerAsignatura: (id: string) => Promise<any>;
   guardarAsignatura: (asignatura: any) => Promise<void>;
   actualizarColorAsignatura: (id: string, color: string) => Promise<void>;
   asociarAsignaturasACurso: (cursoId: string, asignaturaIds: string[]) => Promise<void>;
-  asignaturasDeCurso: (cursoId: string) => Promise<{ id: string; nombre: string }[]>;
-  leerAsignaturasCurso: (cursoId: string) => Promise<{ id: string; nombre: string; color?: string | null }[]>;
+  asignaturasDeCurso: (
+    cursoId: string
+  ) => Promise<{ id: string; codigo: string; nombre: string }[]>;
+  leerAsignaturasCurso: (cursoId: string) =>
+  Promise<{ id: string; codigo: string; nombre: string }[]>;
+
+  getCEsAsignatura: (
+    asignaturaId: string
+  ) => Promise<
+    { codigo: string; descripcion: string; CE: { codigo: string; descripcion: string }[] }[]
+  >;
 
   /* ===== Eventos/IPC de actividades ===== */
   onActividadesActualizadas: (

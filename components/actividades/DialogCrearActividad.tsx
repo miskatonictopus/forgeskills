@@ -36,7 +36,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   cursoId?: string;
   setRefreshKey?: React.Dispatch<React.SetStateAction<number>>;
-  asignaturaId?: string;
+  asignaturaId?: string;        // ID interno BD
   asignaturaNombre?: string;
   fechaInicial?: Date;
 };
@@ -74,12 +74,14 @@ export function DialogCrearActividad({
 
   const [cursoIdLocal, setCursoIdLocal] = useState<string | undefined>(cursoId);
   const [asignaturaIdLocal, setAsignaturaIdLocal] = useState<string | undefined>(asignaturaIdProp);
+  const [asignaturaCodigoLocal, setAsignaturaCodigoLocal] = useState<string | undefined>(undefined);
 
   const [cursos, setCursos] = useState<Array<{ id: string; nombre: string }>>([]);
-  const [asigsDeCurso, setAsigsDeCurso] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [asigsDeCurso, setAsigsDeCurso] = useState<Array<{ id: string; codigo?: string; nombre: string }>>([]);
 
   const cursoIdEf = cursoId ?? cursoIdLocal;
-  const asignaturaIdEf = asignaturaIdProp ?? asignaturaIdLocal;
+  const asignaturaIdEf = asignaturaIdProp ?? asignaturaIdLocal;               // para guardar
+  const asignaturaCodigoEf = asignaturaCodigoLocal ?? asignaturaIdEf;         // para RA/CE (fallback al id)
 
   // Nombre de asignatura desde store (si no viene por prop)
   const snap = useSnapshot(asignaturasPorCurso);
@@ -88,6 +90,7 @@ export function DialogCrearActividad({
     (todasAsignsDelCurso.find((a: any) => a.id === asignaturaIdEf)?.nombre as string) || "";
   const asignaturaNombreEf = asignaturaNombre ?? asignaturaNombreFromStore;
 
+  // Al abrir: cargar cursos si no viene por props y reset de archivo
   useEffect(() => {
     if (!open) return;
 
@@ -111,25 +114,43 @@ export function DialogCrearActividad({
     };
   }, [open, cursoId, asignaturaIdProp]);
 
+  // Cargar asignaturas del curso (una sola vez por cambio de curso / apertura)
   useEffect(() => {
+    if (!cursoIdEf) {
+      setAsigsDeCurso([]);
+      return;
+    }
+    let canceled = false;
     (async () => {
-      if (!cursoIdEf) return setAsigsDeCurso([]);
       try {
-        const asigs = await (window as any).electronAPI.asignaturasDeCurso(cursoIdEf);
-        setAsigsDeCurso(asigs ?? []);
+        const lista = await (window as any).electronAPI.asignaturasDeCurso(cursoIdEf);
+        const normalizadas = (lista ?? []).map((a: any) => ({
+          id: a.id,
+          codigo: a.codigo ?? a.id,
+          nombre: a.nombre,
+        }));
+        if (!canceled) {
+          setAsigsDeCurso(normalizadas);
+          // autoselección si no hay asignatura marcada
+          if (!asignaturaIdProp && !asignaturaIdLocal && normalizadas[0]?.id) {
+            setAsignaturaIdLocal(normalizadas[0].id);
+            setAsignaturaCodigoLocal(normalizadas[0].codigo);
+          }
+        }
       } catch (e) {
-        console.error(e);
-        setAsigsDeCurso([]);
+        console.error("[DialogCrearActividad] Error asignaturasDeCurso:", e);
+        if (!canceled) setAsigsDeCurso([]);
       }
     })();
-  }, [cursoIdEf]);
+    return () => { canceled = true; };
+  }, [cursoIdEf, open]); // recarga al reabrir o cambiar curso
 
   // -------- RA/CE para el popover (se cargan on-demand) ----------
   const [raOptions, setRaOptions] = useState<RA[]>([]);
   const [raLoading, setRaLoading] = useState(false);
 
   useEffect(() => {
-    if (!asignaturaIdEf) {
+    if (!asignaturaCodigoEf) {
       setRaOptions([]);
       return;
     }
@@ -138,15 +159,15 @@ export function DialogCrearActividad({
 
     (async () => {
       try {
-        const res = await (window as any)?.electronAPI?.getCEsAsignatura?.(asignaturaIdEf);
+        const res = await (window as any)?.electronAPI?.getCEsAsignatura?.(asignaturaCodigoEf);
 
         // Normalización robusta a RA[]
         const raRaw = Array.isArray(res) ? res : (res?.RA ?? res?.ra ?? []);
         const normalized: RA[] = (raRaw ?? []).map((ra: any) => ({
-          codigo: ra.codigo ?? ra.id ?? ra.code ?? String(ra?.codigo ?? ""),
+          codigo: String(ra.codigo ?? ra.id ?? ra.code ?? ""),
           descripcion: ra.descripcion ?? ra.nombre ?? "",
           CE: (ra.CE ?? ra.ce ?? []).map((ce: any) => ({
-            codigo: ce.codigo ?? ce.id ?? ce.code ?? String(ce?.codigo ?? ""),
+            codigo: String(ce.codigo ?? ce.id ?? ce.code ?? ""),
             descripcion: ce.descripcion ?? ce.nombre ?? "",
           })),
         }));
@@ -160,10 +181,8 @@ export function DialogCrearActividad({
       }
     })();
 
-    return () => {
-      canceled = true;
-    };
-  }, [asignaturaIdEf]);
+    return () => { canceled = true; };
+  }, [asignaturaCodigoEf]);
 
   // ================== GUARDAR ==================
   const handleGuardar = async () => {
@@ -181,7 +200,7 @@ export function DialogCrearActividad({
       nombre,
       fecha: new Date().toISOString().slice(0, 10),
       cursoId: cursoIdEf,
-      asignaturaId: asignaturaIdEf,
+      asignaturaId: asignaturaIdEf, // ID interno BD
       descripcion: descripcionHtml || descripcion,
       estado: "borrador",
     };
@@ -216,12 +235,11 @@ export function DialogCrearActividad({
   };
 
   const handleExtraerTexto = async (filePath: string) => {
-    if (!asignaturaIdEf) {
+    if (!asignaturaCodigoEf) {
       toast.warning("Selecciona primero curso y asignatura.");
       return;
     }
 
-    // Aseguramos tipos para evitar any implícito (TS7006)
     const raw = await (window as any).electronAPI.extraerTextoPDF(filePath);
     const texto: string = (raw ?? "").toString();
 
@@ -241,9 +259,10 @@ export function DialogCrearActividad({
     setDescripcionPlain(texto);
     setDirty(true);
 
+    // Usa el CÓDIGO para el análisis de CE (coincide con getCEsAsignatura)
     const ceDetectados = await (window as any).electronAPI.analizarDescripcionDesdeTexto(
       texto,
-      asignaturaIdEf
+      asignaturaCodigoEf
     );
     if (!ceDetectados || ceDetectados.length === 0) {
       toast.warning("No se han detectado CE relevantes.");
@@ -294,6 +313,7 @@ export function DialogCrearActividad({
                     onValueChange={(v) => {
                       setCursoIdLocal(v);
                       setAsignaturaIdLocal(undefined);
+                      setAsignaturaCodigoLocal(undefined);
                     }}
                   >
                     <SelectTrigger className="w-full">
@@ -314,21 +334,33 @@ export function DialogCrearActividad({
                 <div>
                   <Label className="mb-2">Asignatura</Label>
                   <Select
-                    disabled={!cursoIdEf}
-                    value={asignaturaIdLocal}
-                    onValueChange={setAsignaturaIdLocal}
+                    disabled={!cursoIdEf || asigsDeCurso.length === 0}
+                    value={
+                      asignaturaIdLocal
+                        ? `${asignaturaIdLocal}|${asignaturaCodigoLocal ?? ""}`
+                        : undefined
+                    }
+                    onValueChange={(v) => {
+                      const [id, codigo] = v.split("|");
+                      setAsignaturaIdLocal(id);
+                      setAsignaturaCodigoLocal(codigo || id); // fallback
+                    }}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue
-                        placeholder={cursoIdEf ? "Selecciona asignatura" : "Elige antes un curso"}
-                      />
+                      <SelectValue placeholder={cursoIdEf ? "Selecciona asignatura" : "Elige antes un curso"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {asigsDeCurso.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.id} - {a.nombre}
-                        </SelectItem>
-                      ))}
+                      {asigsDeCurso.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          {cursoIdEf ? "No hay asignaturas para este curso." : "Elige antes un curso"}
+                        </div>
+                      ) : (
+                        asigsDeCurso.map((a) => (
+                          <SelectItem key={a.id} value={`${a.id}|${a.codigo ?? a.id}`}>
+                            {a.codigo ?? a.id} - {a.nombre}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -347,7 +379,7 @@ export function DialogCrearActividad({
 
                   <ConfigActividadPopover
                     raOptions={raOptions}
-                    disabled={!asignaturaIdEf || raLoading || raOptions.length === 0}
+                    disabled={!asignaturaCodigoEf || raLoading || raOptions.length === 0}
                     onApply={({ suggestedName }) => setNombre(suggestedName)}
                   >
                     <Button type="button" variant="default" className="whitespace-nowrap">
@@ -357,12 +389,12 @@ export function DialogCrearActividad({
                   </ConfigActividadPopover>
                 </div>
 
-                {asignaturaIdEf && raLoading && (
+                {asignaturaCodigoEf && raLoading && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     Cargando RA/CE de la asignatura seleccionada…
                   </p>
                 )}
-                {asignaturaIdEf && !raLoading && raOptions.length === 0 && (
+                {asignaturaCodigoEf && !raLoading && raOptions.length === 0 && (
                   <p className="mt-1 text-xs text-destructive">
                     No se han encontrado RA/CE para esta asignatura.
                   </p>

@@ -881,50 +881,28 @@ ipcMain.handle("leer-asignaturas", () => {
   }));
 });
 
-ipcMain.handle("leer-asignaturas-curso", (_event, cursoId: string) => {
-  if (!cursoId) return [];
 
-  const rows = db
-    .prepare(
-      `SELECT
-       a.id,
-       a.nombre,
-       a.creditos,
-       a.descripcion,
-       a.RA,
-       a.color
-     FROM asignaturas a
-     JOIN curso_asignatura ca ON ca.asignatura_id = a.id
+// 1) Listar asignaturas de un curso
+ipcMain.handle("leer-asignaturas-curso", (_evt, cursoId: string) => {
+  // Devolvemos id (PK) y nombre; exponemos también "codigo" = id para el frontend
+  const rows = db.prepare(
+    `SELECT a.id        AS id,
+            a.id        AS codigo,   -- alias útil para el frontend
+            a.nombre    AS nombre
+     FROM curso_asignatura ca
+     JOIN asignaturas a ON a.id = ca.asignatura_id
      WHERE ca.curso_id = ?
      ORDER BY a.nombre COLLATE NOCASE`
-    )
-    .all(cursoId) as Array<{
-    id: string;
-    nombre: string;
-    creditos: string | null;
-    descripcion: string | null;
-    RA: string | null;
-    color: string | null;
-  }>;
+  ).all(cursoId) as { id: string; codigo: string; nombre: string }[];
 
-  const safeParse = (s: string | null) => {
-    if (!s) return null;
-    try {
-      return JSON.parse(s);
-    } catch {
-      return null;
-    }
-  };
-
-  return (rows ?? []).map((row) => ({
-    id: row.id,
-    nombre: row.nombre,
-    creditos: row.creditos ?? null,
-    descripcion: safeParse(row.descripcion),
-    RA: safeParse(row.RA) ?? [],
-    color: row.color ?? null,
-  }));
+  return rows;
 });
+
+// 2) Obtener RA y CE de una asignatura (parámetro = asignatura_id)
+
+
+
+
 
 /* --------------------------- IPC handlers: ALUMNOS -------------------------- */
 
@@ -3066,5 +3044,33 @@ ipcMain.handle("prog:exportar-pdf", async (_evt, html: string, jsonPath: string)
     console.error("[prog:exportar-pdf] ❌", err);
     return { ok: false as const, path: "", error: String(err?.message || err) };
   }
+});
+
+ipcMain.handle("get-ces-asignatura", (_evt, asignaturaId: string) => {
+  console.log("[IPC] get-ces-asignatura", { asignaturaId });
+
+  // Traer los RA de la asignatura
+  const raRows = db.prepare(
+    `SELECT r.id, r.codigo, r.descripcion
+     FROM ra r
+     WHERE r.asignatura_id = ?
+     ORDER BY r.codigo`
+  ).all(asignaturaId) as { id: string; codigo: string; descripcion: string }[];
+
+  // CE de cada RA
+  const stmtCE = db.prepare(
+    `SELECT c.codigo, c.descripcion
+     FROM ce c
+     WHERE c.ra_id = ?
+     ORDER BY c.codigo`
+  );
+
+  const result = raRows.map((r) => ({
+    codigo: r.codigo,
+    descripcion: r.descripcion,
+    CE: stmtCE.all(r.id) as { codigo: string; descripcion: string }[],
+  }));
+
+  return result;
 });
 
