@@ -5,3 +5,18 @@ dist-electron/
 .DS_Store
 .env
 .env.local
+# builds/artefactos
+out/
+dist/
+release/
+*.zip
+*.dmg
+*.exe
+*.msi
+*.AppImage
+*.pkg
+*.asar
+*.app
+# otros
+node_modules/
+.DS_Store
