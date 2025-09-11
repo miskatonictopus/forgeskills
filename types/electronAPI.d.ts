@@ -9,7 +9,11 @@ import type { Actividad } from "@/store/actividadesPorCurso";
  * Tipos base
  * ============================= */
 export type RangoLectivo = { start: string; end: string }; // "YYYY-MM-DD"
-
+export type Asignatura = {
+  id: string;
+  codigo?: string;
+  nombre: string;
+};
 export type Festivo = {
   id: string;
   start: string;
@@ -80,7 +84,7 @@ export interface ElectronAPI {
   forzarRevisionEstados: () => Promise<number>;
 
   /* ===== Asignaturas ===== */
-  leerAsignaturas?: (cursoId: string) =>
+  leerAsignaturas: (cursoId?: string) =>
         Promise<{ id: string; codigo?: string; nombre: string }[]>;
   leerAsignatura: (id: string) => Promise<any>;
   guardarAsignatura: (asignatura: any) => Promise<void>;
