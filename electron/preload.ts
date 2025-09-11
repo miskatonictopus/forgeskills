@@ -96,9 +96,7 @@ const api = {
     ipcRenderer.invoke("actualizar-color-asignatura", id, color),
   leerAsignatura: (id: string) => ipcRenderer.invoke("leer-asignatura", id),
   leerAsignaturas: (cursoId: string) =>
-    ipcRenderer.invoke("leer-asignaturas", cursoId),
-  // leerAsignaturas: (cursoId: string) =>
-  //   ipcRenderer.invoke("leer-asignaturas-curso", cursoId),
+    ipcRenderer.invoke("leer-asignaturas-curso", cursoId),
     asignaturasDeCurso: (cursoId: string) =>
     ipcRenderer.invoke("leer-asignaturas-curso", cursoId) as Promise<
       { id: string; codigo: string; nombre: string }[]
@@ -119,10 +117,8 @@ const api = {
 
   /* ================= HORARIOS ================= */
   guardarHorario: (data: GuardarHorarioIn) => ipcRenderer.invoke("guardar-horario", data),
-  leerHorarios: (asignaturaId: string) =>
-  ipcRenderer.invoke("leer-horarios", asignaturaId),
-  // leerHorarios: (asignaturaId: string, cursoId?: string) =>
-  //   ipcRenderer.invoke("leer-horarios", asignaturaId, cursoId),
+  leerHorarios: (asignaturaId: string, cursoId?: string) =>
+    ipcRenderer.invoke("leer-horarios", asignaturaId, cursoId),
   borrarHorario: (payload: BorrarHorarioIn) => ipcRenderer.invoke("borrar-horario", payload),
   getHorariosAsignatura: (cursoId: string, asignaturaId: string) =>
     ipcRenderer.invoke("horarios-de-asignatura", { cursoId, asignaturaId }),
