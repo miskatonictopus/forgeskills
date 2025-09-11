@@ -131,8 +131,8 @@ export default function ConfigActividadPopover({
       </PopoverTrigger>
 
       {/* forceMount para mantener el DOM estable dentro del Popover */}
-      <PopoverContent side="right" align="start" className="w-[720px] p-4" forceMount>
-        <div className="space-y-4">
+      <PopoverContent side="right" align="start" className="w-[720px] p-4 bg-zinc-800" forceMount>
+        <div className="space-y-4 bg-zinc-800">
           {/* Duración */}
           <div>
             <p className="text-sm font-medium mb-2">Duración de la actividad</p>
@@ -194,7 +194,7 @@ export default function ConfigActividadPopover({
                 onTouchMove={(e) => e.stopPropagation()}
               >
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-background">
+                  <thead className="sticky top-0  bg-zinc-900">
                     <tr className="border-b">
                       <th className="w-10 p-2"></th>
                       <th className="w-28 p-2 text-left">Código</th>
