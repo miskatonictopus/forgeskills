@@ -29,7 +29,7 @@ import TinyEditor from "@/components/TinyEditor";
 import { CEDetectedList } from "@/components/CEDetectedList";
 
 import ConfigActividadPopover from "@/components/actividades/ConfigActividadPopover";
-import type { RA } from "@/components/actividades/ConfigActividadPopover";
+import type { RA, ConfigActividadResult } from "@/components/actividades/ConfigActividadPopover";
 
 type Props = {
   open: boolean;
@@ -52,7 +52,7 @@ const itemVariants = {
 
 // CEDetectedList tipado laxo para no romper nada aquí
 const CEDetectedListAny =
-  CEDetectedList as unknown as React.ComponentType<{ items: any[]; className?: string }>;
+  CEDetectedList as unknown as React.ComponentType<{ results: any[]; className?: string }>;
 
 export function DialogCrearActividad({
   open,
@@ -82,6 +82,9 @@ export function DialogCrearActividad({
   const cursoIdEf = cursoId ?? cursoIdLocal;
   const asignaturaIdEf = asignaturaIdProp ?? asignaturaIdLocal;               // para guardar
   const asignaturaCodigoEf = asignaturaCodigoLocal ?? asignaturaIdEf;         // para RA/CE (fallback al id)
+
+  // 👉 NUEVO: última configuración aplicada desde el popover
+  const [ultimaConfig, setUltimaConfig] = useState<ConfigActividadResult | null>(null);
 
   // Nombre de asignatura desde store (si no viene por prop)
   const snap = useSnapshot(asignaturasPorCurso);
@@ -184,6 +187,62 @@ export function DialogCrearActividad({
     return () => { canceled = true; };
   }, [asignaturaCodigoEf]);
 
+  // 👉 NUEVO: muestra chips desde la selección (lo reutilizamos con CEDetectedList)
+  const setChipsDesdeSeleccion = (cfg: ConfigActividadResult) => {
+    const ceList = cfg.seleccion.map((s) => ({
+      raCodigo: s.raCodigo,
+      ceCodigo: s.ceCodigo,
+      ceDescripcion: s.ceDescripcion,
+    }));
+    setCesDetectados(ceList as any);
+  };
+
+  // 👉 NUEVO: generación con LLM + volcado en TinyEditor
+  const generarActividadIA = async (cfg: ConfigActividadResult) => {
+    if (!cfg?.duracionMin || !cfg?.seleccion?.length) {
+      toast.error("Configura duración y al menos un CE.");
+      return;
+    }
+    try {
+      setLoading(true);
+
+      const res = await fetch("/api/generar-actividad", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          duracionMin: cfg.duracionMin,
+          seleccion: cfg.seleccion,
+          asignaturaNombre: asignaturaNombreEf ?? undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data?.error ?? "No se pudo generar la actividad.");
+        return;
+      }
+
+      const html: string = data.html ?? "";
+      if (!html) {
+        toast.error("Respuesta vacía del generador.");
+        return;
+      }
+
+      setDescripcionHtml(html);
+      setDescripcion(html);
+      setDescripcionPlain(
+        html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+      );
+      setDirty(true);
+      toast.success("✨ Actividad generada en el editor.");
+    } catch (e) {
+      console.error(e);
+      toast.error("Error generando la actividad.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ================== GUARDAR ==================
   const handleGuardar = async () => {
     if (!nombre) {
@@ -226,6 +285,7 @@ export function DialogCrearActividad({
       setDescripcionPlain("");
       setArchivo(null);
       setCesDetectados([]);
+      setUltimaConfig(null);
       setRefreshKey?.((k) => k + 1);
     } catch {
       toast.error("Error al guardar la actividad.");
@@ -379,10 +439,15 @@ export function DialogCrearActividad({
 
                   <ConfigActividadPopover
                     raOptions={raOptions}
-                    disabled={!asignaturaCodigoEf || raLoading || raOptions.length === 0}
-                    onApply={({ suggestedName }) => setNombre(suggestedName)}
+                    disabled={!asignaturaCodigoEf || raLoading || raOptions.length === 0 || loading}
+                    onApply={(cfg) => {
+                      setUltimaConfig(cfg);            // guarda la configuración aplicada
+                      setNombre(cfg.suggestedName);     // pone nombre sugerido
+                      setChipsDesdeSeleccion(cfg);      // muestra chips CE
+                      generarActividadIA(cfg);          // genera e inserta HTML
+                    }}
                   >
-                    <Button type="button" variant="default" className="whitespace-nowrap">
+                    <Button type="button" variant="default" className="whitespace-nowrap" disabled={loading}>
                       <WandSparkles className="w-4 h-4 mr-1" />
                       Crear Actividad
                     </Button>
@@ -426,8 +491,8 @@ export function DialogCrearActividad({
             </div>
 
             {Array.isArray(cesDetectados) && cesDetectados.length > 0 && (
-              <CEDetectedListAny items={cesDetectados} className="mt-2" />
-            )}
+  <CEDetectedListAny results={cesDetectados} className="mt-2" />
+)}
           </div>
 
           {/* Archivo + Guardar */}
