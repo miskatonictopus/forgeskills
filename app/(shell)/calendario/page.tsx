@@ -15,11 +15,43 @@ import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import type { Festivo, Presencialidad, FCTTramo } from "@/types/electronAPI";
 
 /* ---------- utils ---------- */
+const normalizeHex = (v?: string | null) => {
+  if (!v) return "";
+  let s = v.trim().toLowerCase();
+  if (!s) return "";
+  if (!s.startsWith("#")) s = `#${s}`;
+  if (s.length === 4) s = `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`;
+  return /^#[0-9a-f]{6}$/i.test(s) ? s : "";
+};
+const textOn = (hex: string) => {
+  const r = parseInt(hex.slice(1, 3), 16),
+    g = parseInt(hex.slice(3, 5), 16),
+    b = parseInt(hex.slice(5, 7), 16);
+  const L = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
+  return L > 0.6 ? "#111" : "#fff";
+};
+
+type AsigLite = {
+  id: string;
+  nombre: string;
+  codigo?: string;   // a veces viene, a veces no
+  color?: string;    // puede venir si tu consulta ya lo incluye
+};
+
+
+const hexToRgba = (hex?: string, a = 0.28) => {
+  const h = normalizeHex(hex);
+  if (!h) return undefined;
+  const r = parseInt(h.slice(1, 3), 16);
+  const g = parseInt(h.slice(3, 5), 16);
+  const b = parseInt(h.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+};
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const toLocalISO = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  
+
 const ymdLocal = (d: Date) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -55,12 +87,11 @@ const expandirHorariosEnRango = (
   titulo: string,
   cursoId: string,
   asigId: string,
-  festivos: Festivo[]
+  festivos: Festivo[],
+  colorHex?: string
 ): Evento[] => {
   const out: Evento[] = [];
   const cursor = new Date(start);
-
-  const pad = (n: number) => String(n).padStart(2, "0");
 
   while (cursor <= end) {
     const dow = cursor.getDay();
@@ -72,14 +103,20 @@ const expandirHorariosEnRango = (
         const hi = h.horaInicio.length === 5 ? `${h.horaInicio}:00` : h.horaInicio;
         const hf = h.horaFin.length === 5 ? `${h.horaFin}:00` : h.horaFin;
 
+        const hex = normalizeHex(colorHex);
+        const bg  = hexToRgba(hex, 0.28);
+        const fg  = hex ? textOn(hex) : undefined;
+
         out.push({
           id: `horario-${cursoId}-${asigId}-${fecha}-${h.horaInicio}`,
           title: titulo,
-          start: `${fecha}T${hi}`,  // ✅ siempre YYYY-MM-DDTHH:mm:ss
+          start: `${fecha}T${hi}`,
           end:   `${fecha}T${hf}`,
           classNames: ["horario-event"],
-          backgroundColor: "rgba(120,160,255,0.28)",
           editable: false,
+          // damos pistas a FullCalendar y a nuestro eventDidMount
+          backgroundColor: bg, // puede ser sobreescrito por el tema, por eso también:
+          extendedProps: { __color: hex, __bg: bg, __fg: fg },
         });
       }
     });
@@ -88,10 +125,9 @@ const expandirHorariosEnRango = (
   return out;
 };
 
-
 /** Expandir TRAMOS (presencialidad/FCT) a background events */
 const expandirTramosBG = (
-  tramos: Array<{ diaSemana:number; horaInicio:string; horaFin:string }>,
+  tramos: Array<{ diaSemana: number; horaInicio: string; horaFin: string }>,
   start: Date,
   end: Date,
   className: string
@@ -99,10 +135,10 @@ const expandirTramosBG = (
   const out: FCEvent[] = [];
   const cursor = new Date(start);
   while (cursor <= end) {
-    const dow = cursor.getDay();     // 0..6 (L=1)
-    const fecha = ymdLocal(cursor);  // YYYY-MM-DD
+    const dow = cursor.getDay(); // 0..6
+    const fecha = ymdLocal(cursor);
     tramos.forEach((t, i) => {
-      const jsDow = t.diaSemana % 7; // 1..5 -> 1..5 (si usas 0..6 sirve igual)
+      const jsDow = t.diaSemana % 7; // 1..5 -> 1..5
       if (dow === jsDow) {
         out.push({
           id: `${className}-${fecha}-${i}`,
@@ -112,9 +148,11 @@ const expandirTramosBG = (
           editable: false,
           classNames: [className],
           backgroundColor:
-            className === "fct-bg" ? "rgba(200,120,255,0.26)" :
-            className === "presencial-bg" ? "rgba(120,160,255,0.28)" :
-            undefined,
+            className === "fct-bg"
+              ? "rgba(200,120,255,0.26)"
+              : className === "presencial-bg"
+              ? "rgba(120,160,255,0.28)"
+              : undefined,
           title: "",
         });
       }
@@ -130,12 +168,10 @@ export default function CalendarioGlobalPage() {
   const [lectivoEndISO, setLectivoEndISO] = useState<string | undefined>(undefined);
   const lectivoStartDate = useMemo(() => toDateStart(lectivoStartISO), [lectivoStartISO]);
   const lectivoEndDate = useMemo(() => toDateEnd(lectivoEndISO), [lectivoEndISO]);
-  const rangoValido =
-    !!lectivoStartDate && !!lectivoEndDate && lectivoStartDate < lectivoEndDate;
+  const rangoValido = !!lectivoStartDate && !!lectivoEndDate && lectivoStartDate < lectivoEndDate;
 
   /* -------- Eventos -------- */
   const [events, setEvents] = useState<FCEvent[]>([]);
-  const [diasPermitidos] = useState<number[] | undefined>([1, 2, 3, 4, 5]); // L–V
   const [festivos, setFestivos] = useState<Festivo[]>([]);
   const [presencialidades, setPresencialidades] = useState<Presencialidad[]>([]);
   const [fct, setFct] = useState<FCTTramo[]>([]);
@@ -153,9 +189,14 @@ export default function CalendarioGlobalPage() {
         if (!alive) return;
         cursoStore.cursos = cursos;
         for (const c of cursos) {
-          const asigs = await window.electronAPI.asignaturasDeCurso(c.id);
+          const asigs = (await window.electronAPI.asignaturasDeCurso(c.id)) as AsigLite[];
           if (!alive) return;
-          asignaturasPorCurso[c.id] = asigs.map((a: any) => ({ id: a.id, nombre: a.nombre }));
+          // guardamos color si viene ya en la consulta
+          asignaturasPorCurso[c.id] = (asigs || []).map((a: any) => ({
+            id: a.id,
+            nombre: a.nombre,
+            color: normalizeHex(a.color),
+          }));
         }
       } catch (e) {
         console.error(e);
@@ -220,13 +261,41 @@ export default function CalendarioGlobalPage() {
         let eventosFCTBG: FCEvent[] = [];
 
         if (rangoValido && lectivoStartDate && lectivoEndDate) {
-          // HORARIOS (excluyendo festivos)
           for (const c of cursos) {
             const asigs = await window.electronAPI.asignaturasDeCurso(c.id);
-            for (const a of asigs) {
+
+            // Mapa de colores por asignaturaId
+            const api: any = (window as any).electronAPI;
+            const colorMapCurso: Record<string, string> = {};
+            try {
+              const lista: any[] = (await api?.leerColoresAsignaturas?.(c.id)) ?? [];
+              for (const it of Array.isArray(lista) ? lista : []) {
+                const id  = String(it?.id ?? it?.asignaturaId ?? it?.asignatura_id ?? "");
+                const hex = normalizeHex(it?.color ?? it?.hex ?? it?.themeColor ?? it?.theme_color);
+                if (id && hex) colorMapCurso[id] = hex;
+              }
+              if (Object.keys(colorMapCurso).length === 0) {
+                for (const a of asigs || []) {
+                  const det =
+                    (await api?.leerAsignatura?.(a.id)) ??
+                    (await api?.getAsignatura?.(a.id));
+                  const hex = normalizeHex(det?.color ?? det?.hex ?? det?.themeColor ?? det?.theme_color);
+                  if (hex) colorMapCurso[String(a.id)] = hex;
+                }
+              }
+            } catch { /* noop */ }
+
+            for (const a of asigs || []) {
               const hrs = await window.electronAPI.getHorariosAsignatura(c.id, a.id);
               if (!hrs || hrs.length === 0) continue;
+
               const titulo = `${a.nombre} · ${c.nombre}`;
+              const colorHex =
+              normalizeHex((a as any)?.color) ||
+              colorMapCurso[String(a.id)] ||
+              normalizeHex(((await window.electronAPI.leerAsignatura?.(a.id)) as any)?.color) ||
+              "";
+
               eventosHorarios.push(
                 ...expandirHorariosEnRango(
                   hrs.map((h: any) => ({
@@ -239,7 +308,8 @@ export default function CalendarioGlobalPage() {
                   titulo,
                   c.id,
                   a.id,
-                  festivos || []
+                  festivos || [],
+                  colorHex
                 )
               );
             }
@@ -250,32 +320,28 @@ export default function CalendarioGlobalPage() {
           eventosFCTBG        = expandirTramosBG(fct || [],               lectivoStartDate, lectivoEndDate, "fct-bg");
         }
 
-        // ACTIVIDADES programadas (filtradas por rango y excluyendo festivos)
+        // ACTIVIDADES programadas
         const actividadesPorCurso = await Promise.all(
           cursos.map(async (c: any) => {
             const acts = await window.electronAPI.actividadesDeCurso(c.id);
             return (acts || [])
               .filter((a: any) => a.estado === "programada")
               .map((a: any) => {
-                // fuentes posibles
-                const startFromDb: string | undefined = a.programada_para;  // "YYYY-MM-DDTHH:mm:ss"
+                const startFromDb: string | undefined = a.programada_para;
                 const endFromDb:   string | undefined = a.programada_fin;
-              
-                // fallback (compat actividades antiguas)
+
                 let start = startFromDb;
                 let end   = endFromDb;
-              
+
                 if (!start) {
                   if (a.start_ms) {
                     start = toLocalISO(new Date(a.start_ms));
                   } else if (a.fecha && a.horaInicio) {
                     start = `${a.fecha}T${a.horaInicio}:00`;
                   } else if (a.fecha) {
-                    // último recurso para no perder el evento en pantalla
                     start = `${a.fecha}T08:00:00`;
                   }
                 }
-              
                 if (!end) {
                   if (a.end_ms) {
                     end = toLocalISO(new Date(a.end_ms));
@@ -283,7 +349,7 @@ export default function CalendarioGlobalPage() {
                     end = `${a.fecha}T${a.horaFin}:00`;
                   }
                 }
-              
+
                 return {
                   id: a.id,
                   title: `${a.nombre} · ${c.nombre}`,
@@ -292,7 +358,7 @@ export default function CalendarioGlobalPage() {
                   allDay: false,
                   extendedProps: { estado: a.estado },
                 } as Evento;
-              })
+              });
           })
         );
         let actividades = actividadesPorCurso.flat();
@@ -311,7 +377,7 @@ export default function CalendarioGlobalPage() {
           ...actividades,
           ...eventosFestivos,
           ...eventosPresencialBG,
-          ...eventosFCTBG, // ⬅️ AÑADIDO
+          ...eventosFCTBG,
         ]);
       } catch (e) {
         console.error(e);
@@ -319,7 +385,7 @@ export default function CalendarioGlobalPage() {
       }
     })();
     return () => { alive = false; };
-  }, [refreshKey, rangoValido, lectivoStartISO, lectivoEndISO, festivos, presencialidades, fct]); // ⬅️ depende de FCT
+  }, [refreshKey, rangoValido, lectivoStartISO, lectivoEndISO, festivos, presencialidades, fct]);
 
   /* -------- Crear / mover actividades respetando NO lectivos -------- */
   const libreDeFestivo = useCallback(
@@ -362,7 +428,8 @@ export default function CalendarioGlobalPage() {
         toast.warning("No se pueden crear actividades en festivos.");
         return;
       }
-      const fin = new Date(date); fin.setMinutes(fin.getMinutes() + 30);
+      const fin = new Date(date);
+      fin.setMinutes(fin.getMinutes() + 30);
       if (!libreDeTramos(date, fin, presencialidades)) {
         toast.warning("No se pueden crear actividades durante presencialidades.");
         return;
@@ -394,7 +461,8 @@ export default function CalendarioGlobalPage() {
         setRefreshKey((k) => k + 1);
         return;
       }
-      const fin = new Date(start); fin.setMinutes(fin.getMinutes() + 30);
+      const fin = new Date(start);
+      fin.setMinutes(fin.getMinutes() + 30);
       if (!libreDeTramos(start, fin, presencialidades)) {
         toast.error("No puedes mover la actividad a una presencialidad.");
         setRefreshKey((k) => k + 1);
@@ -423,61 +491,62 @@ export default function CalendarioGlobalPage() {
   );
 
   return (
-   
-
-
-        
-      <main>
-        {/* Contenido */}
-        <div className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold tracking-tight">Calendario global</h1>
-            <Button onClick={() => setOpenDialog(true)}>Nueva actividad</Button>
-          </div>
-
-          {rangoValido ? (
-            <div className="text-sm text-muted-foreground">
-              Lectivo: <span className="font-medium">{lectivoStartISO}</span> →{" "}
-              <span className="font-medium">{lectivoEndISO}</span>
-            </div>
-          ) : (
-            <div className="text-sm text-destructive">
-              No hay periodo lectivo activo. Ve a <span className="font-medium">Configuración</span> para definirlo.
-            </div>
-          )}
-
-          <Calendario
-            events={events}
-            diasPermitidos={[1,2,3,4,5]}
-            initialView="timeGridWeek"
-            onDateClick={handleCreate}
-            onEventMove={handleMove}
-            slotMinTime="08:00:00"
-            slotMaxTime="20:00:00"
-            height="auto"
-            validRange={
-              rangoValido && lectivoStartISO && lectivoEndISO
-                ? { start: lectivoStartISO, end: lectivoEndISO }
-                : undefined
-            }
-            festivos={festivos.map((f) => ({ start: f.start, end: f.end ?? undefined }))}
-          />
-
-          <DialogCrearActividad
-            open={openDialog}
-            onOpenChange={setOpenDialog}
-            setRefreshKey={setRefreshKey}
-            fechaInicial={fechaPreseleccionada}
-          />
+    <main>
+      <div className="p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold tracking-tight">Calendario global</h1>
+          <Button onClick={() => setOpenDialog(true)}>Nueva actividad</Button>
         </div>
 
-        {/* estilos para background */}
-        <style jsx global>{`
-          .fc .festivo-background { background: rgba(80, 200, 120, 0.12); }
-          .fc .presencial-bg    { background: rgba(120, 160, 255, 0.12); }
-          .fc .fct-bg           { background: rgba(200, 120, 255, 0.16); } /* ⬅️ NUEVO */
-        `}</style>
+        {rangoValido ? (
+          <div className="text-sm text-muted-foreground">
+            Lectivo: <span className="font-medium">{lectivoStartISO}</span> →{" "}
+            <span className="font-medium">{lectivoEndISO}</span>
+          </div>
+        ) : (
+          <div className="text-sm text-destructive">
+            No hay periodo lectivo activo. Ve a <span className="font-medium">Configuración</span> para definirlo.
+          </div>
+        )}
 
-</main>
+        <Calendario
+          events={events}
+          diasPermitidos={[1, 2, 3, 4, 5]}
+          initialView="timeGridWeek"
+          onDateClick={handleCreate}
+          onEventMove={handleMove}
+          slotMinTime="08:00:00"
+          slotMaxTime="20:00:00"
+          height="auto"
+          validRange={
+            rangoValido && lectivoStartISO && lectivoEndISO
+              ? { start: lectivoStartISO, end: lectivoEndISO }
+              : undefined
+          }
+          festivos={festivos.map((f) => ({ start: f.start, end: f.end ?? undefined }))}
+        />
+
+        <DialogCrearActividad
+          open={openDialog}
+          onOpenChange={setOpenDialog}
+          setRefreshKey={setRefreshKey}
+          fechaInicial={fechaPreseleccionada}
+        />
+      </div>
+
+      {/* Estilos de refuerzo para que el tema no pise los inline */}
+      <style jsx global>{`
+        .fc .festivo-background { background: rgba(80, 200, 120, 0.12); }
+        .fc .presencial-bg    { background: rgba(120, 160, 255, 0.12); }
+        .fc .fct-bg           { background: rgba(200, 120, 255, 0.16); }
+
+        .fc .fc-timegrid-event,
+        .fc .fc-timegrid-event .fc-event-main {
+          background-color: inherit !important;
+          border-color: inherit !important;
+          color: inherit !important;
+        }
+      `}</style>
+    </main>
   );
 }

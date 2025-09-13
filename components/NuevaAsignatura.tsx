@@ -66,12 +66,7 @@ export default function NuevaAsignatura({ cursoId, onSave }: Props) {
     }
   
     try {
-      // 1) Guardar asignatura
-      await window.electronAPI.guardarAsignatura(asignaturaSeleccionada);
-      toast.success("Asignatura guardada en la base de datos");
-  
-      // 2) Importar RA/CE oficiales a SQLite (idempotente, con UPSERT en main)
-      //    Importamos lo que ya trae el JSON remoto en asignaturaSeleccionada.RA
+      // 1) Prepara RA/CE en el shape esperado
       const raList = (asignaturaSeleccionada.RA ?? []).map((ra) => ({
         codigo: ra.codigo,
         descripcion: ra.descripcion,
@@ -81,19 +76,32 @@ export default function NuevaAsignatura({ cursoId, onSave }: Props) {
         })),
       }));
   
-      if (raList.length > 0) {
-        const res = await window.electronAPI.guardarAsignaturaEImportarRAyCE(
-          asignaturaSeleccionada.id,
-          raList
-        );
-        // res: { ok: true, raCount, ceCount }
-        toast.success(`RA/CE importados: RA=${res.raCount}, CE=${res.ceCount}`);
-      } else {
-        // Si por lo que sea el JSON no trae RA, avisamos (no rompemos el flujo)
-        toast.message("Esta asignatura no trae RA/CE en el JSON remoto");
-      }
+      // 2) Guardar asignatura (main importará RA/CE y devolverá contadores)
+      const res = await window.electronAPI.guardarAsignatura({
+        id: asignaturaSeleccionada.id,
+        nombre: asignaturaSeleccionada.nombre,
+        creditos: asignaturaSeleccionada.creditos,
+        descripcion: asignaturaSeleccionada.descripcion ?? {}, // objeto; main lo serializa
+        RA: raList,
+        color: (asignaturaSeleccionada as any).color ?? undefined,
+      });
   
-      // 3) Guardar horarios si los hay
+      // 3) Asociar al curso actual SIN perder las ya existentes (merge)
+      //    Usa tu IPC existente "asignar-asignaturas-curso" que recibe el listado completo
+      const actuales = await window.electronAPI.asignaturasDeCurso(cursoId); // ya lo usas en CursoCard
+      const actualesIds = new Set(
+        (Array.isArray(actuales) ? actuales : []).map((a: any) => String(a.id))
+      );
+      actualesIds.add(String(asignaturaSeleccionada.id)); // añade la nueva
+  
+      await window.electronAPI.asociarAsignaturasACurso(
+        cursoId,
+        Array.from(actualesIds) // pasamos TODAS (tu handler hace DELETE + INSERT)
+      );
+  
+      toast.success(`Asignatura guardada. RA=${res.raCount}, CE=${res.ceCount}`);
+  
+      // 4) Guardar horarios si los hay
       if (horarios.length > 0) {
         for (const h of horarios) {
           await window.electronAPI.guardarHorario({
@@ -107,12 +115,14 @@ export default function NuevaAsignatura({ cursoId, onSave }: Props) {
         toast.success("Horarios guardados");
       }
   
-      onSave?.(); // 🔄 refresca UI y cierra
+      onSave?.(); // refresca UI/cierra
     } catch (error) {
       console.error(error);
-      toast.error("Error al guardar la asignatura o importar RA/CE");
+      toast.error("Error al guardar/asociar la asignatura o guardar horarios");
     }
   };
+  
+  
   /* ================== Helpers horarios ================== */
   const addHorario = () => {
     setHorarios([...horarios, { dia: "lunes", horaInicio: "08:00", horaFin: "09:00" }]);

@@ -44,7 +44,11 @@ type ItemCEPersist = {
   minutos?: number;
 };
 type ItemEvalPersist = { tipo: "eval"; raCodigo: string; titulo: string };
-type SesionPersist = { indice: number; fecha?: string; items: Array<ItemCEPersist | ItemEvalPersist> };
+type SesionPersist = {
+  indice: number;
+  fecha?: string;
+  items: Array<ItemCEPersist | ItemEvalPersist>;
+};
 
 type GuardarProgramacionPayload = {
   asignaturaId: string;
@@ -75,7 +79,8 @@ type RenderResult = { ok: true; path: string } | { ok: false; error: string };
 /* ========= API expuesta ========= */
 const api = {
   /* ================= NOMBRES / PRUEBAS ================= */
-  guardarNombre: (nombre: string) => ipcRenderer.invoke("guardar-nombre", nombre),
+  guardarNombre: (nombre: string) =>
+    ipcRenderer.invoke("guardar-nombre", nombre),
   leerNombres: () => ipcRenderer.invoke("leer-nombres"),
 
   /* ================= CURSOS ================= */
@@ -90,56 +95,82 @@ const api = {
   borrarCurso: (id: string) => ipcRenderer.invoke("borrar-curso", id),
 
   /* ================= ASIGNATURAS ================= */
-  guardarAsignatura: (asignatura: Asignatura) =>
-    ipcRenderer.invoke("guardar-asignatura", asignatura),
+
   actualizarColorAsignatura: (id: string, color: string) =>
     ipcRenderer.invoke("actualizar-color-asignatura", id, color),
+  leerColoresAsignaturas: (cursoId: string) =>
+    ipcRenderer.invoke("asignaturas:leer-colores-curso", cursoId),
+  guardarAsignatura: (asignatura: Asignatura) =>
+    ipcRenderer.invoke("guardar-asignatura", asignatura),
   leerAsignatura: (id: string) => ipcRenderer.invoke("leer-asignatura", id),
+
+
   leerAsignaturas: (cursoId: string) =>
     ipcRenderer.invoke("leer-asignaturas-curso", cursoId),
-    asignaturasDeCurso: (cursoId: string) =>
-    ipcRenderer.invoke("leer-asignaturas-curso", cursoId) as Promise<
-      { id: string; codigo: string; nombre: string }[]
-    >,
+
+  asignaturasDeCurso: (cursoId: string) =>
+    ipcRenderer.invoke("asignaturas-de-curso", cursoId),
+
+  listarColoresAsignaturas: () =>
+    ipcRenderer.invoke("asignaturas:listar-colores"),
 
   getCEsAsignatura: (asignaturaId: string) =>
     ipcRenderer.invoke("get-ces-asignatura", asignaturaId) as Promise<
-      { codigo: string; descripcion: string; CE: { codigo: string; descripcion: string }[] }[]
+      {
+        codigo: string;
+        descripcion: string;
+        CE: { codigo: string; descripcion: string }[];
+      }[]
     >,
   asociarAsignaturasACurso: (cursoId: string, asignaturaIds: string[]) =>
     ipcRenderer.invoke("asociar-asignaturas-curso", cursoId, asignaturaIds),
 
   /* ================= ALUMNOS ================= */
-  guardarAlumno: (alumno: AlumnoEntrada) => ipcRenderer.invoke("guardar-alumno", alumno),
+  guardarAlumno: (alumno: AlumnoEntrada) =>
+    ipcRenderer.invoke("guardar-alumno", alumno),
   leerAlumnos: () => ipcRenderer.invoke("leer-alumnos"),
-  leerAlumnosPorCurso: (cursoId: string) => ipcRenderer.invoke("leer-alumnos-por-curso", cursoId),
-  alumnosPorCurso: (cursoId: string) => ipcRenderer.invoke("alumnos.por-curso", { cursoId }),
+  leerAlumnosPorCurso: (cursoId: string) =>
+    ipcRenderer.invoke("leer-alumnos-por-curso", cursoId),
+  alumnosPorCurso: (cursoId: string) =>
+    ipcRenderer.invoke("alumnos.por-curso", { cursoId }),
 
   /* ================= HORARIOS ================= */
-  guardarHorario: (data: GuardarHorarioIn) => ipcRenderer.invoke("guardar-horario", data),
+  guardarHorario: (data: GuardarHorarioIn) =>
+    ipcRenderer.invoke("guardar-horario", data),
   leerHorarios: (asignaturaId: string, cursoId?: string) =>
     ipcRenderer.invoke("leer-horarios", asignaturaId, cursoId),
-  borrarHorario: (payload: BorrarHorarioIn) => ipcRenderer.invoke("borrar-horario", payload),
+  borrarHorario: (payload: BorrarHorarioIn) =>
+    ipcRenderer.invoke("borrar-horario", payload),
   getHorariosAsignatura: (cursoId: string, asignaturaId: string) =>
     ipcRenderer.invoke("horarios-de-asignatura", { cursoId, asignaturaId }),
   horariosDeAsignatura: (params: { cursoId: string; asignaturaId: string }) =>
     ipcRenderer.invoke("horarios-de-asignatura", params),
 
   /* ================= ACTIVIDADES ================= */
-  actividadesDeCurso: (cursoId: string) => ipcRenderer.invoke("actividades-de-curso", cursoId),
+  actividadesDeCurso: (cursoId: string) =>
+    ipcRenderer.invoke("actividades-de-curso", cursoId),
   guardarActividad: (payload: GuardarActividadPayload) =>
-    ipcRenderer.invoke("guardarActividad", payload) as Promise<GuardarActividadResult>,
+    ipcRenderer.invoke(
+      "guardarActividad",
+      payload
+    ) as Promise<GuardarActividadResult>,
   listarActividadesPorAsignatura: (cursoId: string, asignaturaId: string) =>
-    ipcRenderer.invoke("actividades.listar-por-asignatura", { cursoId, asignaturaId }),
-  listarActividadesGlobal: () => ipcRenderer.invoke("listar-actividades-global"),
+    ipcRenderer.invoke("actividades.listar-por-asignatura", {
+      cursoId,
+      asignaturaId,
+    }),
+  listarActividadesGlobal: () =>
+    ipcRenderer.invoke("listar-actividades-global"),
   actualizarActividadFecha: (id: string, fecha: string) =>
     ipcRenderer.invoke("actualizar-actividad-fecha", id, fecha),
-  borrarActividad: (actividadId: string) => ipcRenderer.invoke("borrar-actividad", actividadId),
+  borrarActividad: (actividadId: string) =>
+    ipcRenderer.invoke("borrar-actividad", actividadId),
 
   /* ================= RA / CE + Análisis ================= */
   obtenerRAPorAsignatura: (asignaturaId: string) =>
     ipcRenderer.invoke("obtener-ra-por-asignatura", asignaturaId),
-  obtenerCEPorRA: (raId: string) => ipcRenderer.invoke("obtener-ce-por-ra", raId),
+  obtenerCEPorRA: (raId: string) =>
+    ipcRenderer.invoke("obtener-ce-por-ra", raId),
   analizarDescripcion: (actividadId: string) =>
     ipcRenderer.invoke("analizar-descripcion", actividadId),
   analizarDescripcionDesdeTexto: (texto: string, asignaturaId: string) =>
@@ -154,34 +185,52 @@ const api = {
   },
 
   guardarAnalisisActividad: (actividadId: string, umbral: number, ces: any[]) =>
-    ipcRenderer.invoke("actividad.guardar-analisis", { actividadId, umbral, ces }),
+    ipcRenderer.invoke("actividad.guardar-analisis", {
+      actividadId,
+      umbral,
+      ces,
+    }),
   leerAnalisisActividad: (actividadId: string) =>
     ipcRenderer.invoke("actividad.leer-analisis", actividadId),
 
   /* ================= PROGRAMAR / DESPROGRAMAR ================= */
-  actividadProgramar: (payload: { actividadId: string; startISO: string; duracionMin: number }) =>
-    ipcRenderer.invoke("actividad:programar", payload),
+  actividadProgramar: (payload: {
+    actividadId: string;
+    startISO: string;
+    duracionMin: number;
+  }) => ipcRenderer.invoke("actividad:programar", payload),
 
   /* ================= LECTIVO / FESTIVOS / PRESENCIALIDAD / FCT ================= */
   leerRangoLectivo: () => ipcRenderer.invoke("lectivo:leer"),
   guardarRangoLectivo: (r: { start: string; end: string }) =>
     ipcRenderer.invoke("lectivo:guardar", r),
 
-  listarFestivos: (): Promise<Festivo[]> => ipcRenderer.invoke("festivos:listar"),
-  crearFestivo: (f: FestivoCreate): Promise<Festivo> => ipcRenderer.invoke("festivos:crear", f),
-  borrarFestivo: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke("festivos:borrar", id),
+  listarFestivos: (): Promise<Festivo[]> =>
+    ipcRenderer.invoke("festivos:listar"),
+  crearFestivo: (f: FestivoCreate): Promise<Festivo> =>
+    ipcRenderer.invoke("festivos:crear", f),
+  borrarFestivo: (id: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke("festivos:borrar", id),
 
   listarPresencialidades: (): Promise<Presencialidad[]> =>
     ipcRenderer.invoke("presencialidades-listar"),
-  crearPresencialidad: (p: { diaSemana: number; horaInicio: string; horaFin: string }): Promise<Presencialidad> =>
+  crearPresencialidad: (p: {
+    diaSemana: number;
+    horaInicio: string;
+    horaFin: string;
+  }): Promise<Presencialidad> =>
     ipcRenderer.invoke("presencialidades-crear", p),
   borrarPresencialidad: (id: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke("presencialidades-borrar", id),
 
   listarFCT: (): Promise<FCTTramo[]> => ipcRenderer.invoke("fct-listar"),
-  crearFCT: (p: { diaSemana: number; horaInicio: string; horaFin: string }): Promise<FCTTramo> =>
-    ipcRenderer.invoke("fct-crear", p),
-  borrarFCT: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke("fct-borrar", id),
+  crearFCT: (p: {
+    diaSemana: number;
+    horaInicio: string;
+    horaFin: string;
+  }): Promise<FCTTramo> => ipcRenderer.invoke("fct-crear", p),
+  borrarFCT: (id: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke("fct-borrar", id),
 
   /* ================= INFORMES (HTML → PDF) ================= */
   generarInformeActividadHTML: (
@@ -198,8 +247,11 @@ const api = {
   guardarProgramacionDidactica: (payload: GuardarProgramacionPayload) =>
     ipcRenderer.invoke("prog:guardar", payload) as Promise<ProgGuardarResult>,
   revelarEnCarpeta: (fullPath: string) =>
-    ipcRenderer.invoke("fs:reveal", fullPath) as Promise<{ ok: boolean; error?: string }>,
-    exportarProgramacionPDF: (html: string, jsonPath: string) =>
+    ipcRenderer.invoke("fs:reveal", fullPath) as Promise<{
+      ok: boolean;
+      error?: string;
+    }>,
+  exportarProgramacionPDF: (html: string, jsonPath: string) =>
     ipcRenderer.invoke("pdf:exportProgramacion", { html, jsonPath }),
 
   /* ================= MISC ================= */
@@ -210,7 +262,8 @@ const api = {
     ipcRenderer.invoke("actividades.leer-por-curso", { cursoId }),
 
   // util genérico
-  invoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args),
+  invoke: (channel: string, ...args: unknown[]) =>
+    ipcRenderer.invoke(channel, ...args),
 };
 
 /* Exponer en window */
@@ -218,9 +271,7 @@ contextBridge.exposeInMainWorld("electronAPI", api);
 
 /* Declaración global para TS */
 declare global {
-  interface Window {
-    
-  }
+  interface Window {}
 }
 
 export {};

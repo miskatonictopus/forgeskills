@@ -772,15 +772,51 @@ ipcMain.handle("guardar-nombre", (_event, nombre: string) => {
   db.prepare("INSERT INTO nombres (nombre) VALUES (?)").run(nombre);
 });
 
+ipcMain.handle("asignaturas:listar-colores", () => {
+  return db.prepare(`
+    SELECT CAST(id AS TEXT) AS id, COALESCE(color,'') AS color
+    FROM asignaturas
+  `).all();
+});
+
 /* ------------------------ IPC handlers: ASIGNATURAS ------------------------ */
 
-ipcMain.handle(
-  "actualizar-color-asignatura",
-  (_event, id: string, color: string) => {
-    const stmt = db.prepare(`UPDATE asignaturas SET color = ? WHERE id = ?`);
-    stmt.run(color, id);
+ipcMain.handle("actualizar-color-asignatura", (_e, id: string | number, color: string) => {
+  if (!id) throw new Error("asignatura id vacío");
+
+  // normaliza #rgb → #rrggbb y valida
+  let c = String(color || "").trim().toLowerCase();
+  if (!c.startsWith("#")) c = `#${c}`;
+  if (/^#[0-9a-f]{3}$/i.test(c)) c = `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`;
+  if (!/^#[0-9a-f]{6}$/i.test(c)) throw new Error("color inválido");
+
+  const raw = String(id).trim();
+  const num = Number(raw.replace(/^0+/, "")); // 0487 → 487 (NaN si no num)
+  const hasNum = Number.isFinite(num);
+
+  // 1) intenta por TEXT y por INTEGER en la misma sentencia
+  const stmt = db.prepare(`
+    UPDATE asignaturas
+       SET color = ?
+     WHERE CAST(id AS TEXT) = CAST(? AS TEXT)
+        OR (${hasNum ? "CAST(id AS INTEGER) = CAST(? AS INTEGER)" : "0"})
+  `);
+
+  const info = hasNum ? stmt.run(c, raw, num) : stmt.run(c, raw);
+
+  // 2) Si no tocó nada, reintenta con id "canonizado" (relleno a 4 dígitos) por si guardaste "0487"
+  if (info.changes === 0) {
+    const padded4 = raw.padStart(4, "0");
+    const tryPad = db.prepare(`
+      UPDATE asignaturas SET color = ?
+      WHERE CAST(id AS TEXT) = CAST(? AS TEXT)
+    `).run(c, padded4);
+    return { ok: tryPad.changes > 0, color: c };
   }
-);
+
+  return { ok: info.changes > 0, color: c };
+});
+
 
 function toText(v: unknown): string {
   if (v == null) return "";
@@ -792,28 +828,58 @@ function toText(v: unknown): string {
   }
 }
 
+// Helper por si RA viene como string/obj variado
+function normalizeRA(raw: any): Array<{
+  raCodigo: string;
+  raDescripcion: string;
+  CE: Array<{ ceCodigo: string; ceDescripcion: string }>;
+}> {
+  if (!raw) return [];
+  let arr: any = raw;
+
+  if (typeof raw === "string") {
+    try { arr = JSON.parse(raw); } catch { arr = []; }
+  }
+  if (!Array.isArray(arr)) return [];
+
+  return arr.map((ra: any) => {
+    const raCodigo =
+      ra?.raCodigo ?? ra?.codigo ?? ra?.code ?? String(ra?.id ?? "").trim();
+    const raDescripcion =
+      ra?.raDescripcion ?? ra?.descripcion ?? ra?.description ?? "";
+    const ceList: any[] = Array.isArray(ra?.CE) ? ra.CE : (Array.isArray(ra?.ce) ? ra.ce : []);
+
+    const CE = ceList.map((ce: any) => ({
+      ceCodigo: ce?.ceCodigo ?? ce?.codigo ?? ce?.code ?? String(ce?.id ?? "").trim(),
+      ceDescripcion: ce?.ceDescripcion ?? ce?.descripcion ?? ce?.description ?? "",
+    }));
+
+    return { raCodigo, raDescripcion, CE };
+  });
+}
+
+
+
 ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
   try {
     // Admite el objeto remoto directamente
     const { id, nombre, creditos, descripcion, RA, color } = asignatura ?? {};
 
-    // Requisitos mínimos
     if (!id || !nombre) {
       throw new Error("Faltan campos obligatorios: id y nombre.");
     }
 
-    // Normalización para columnas TEXT del esquema actual
+    // 1) UPSERT en asignaturas (tal como tenías)
     const row = {
       id: String(id),
       nombre: String(nombre),
       creditos: creditos != null ? String(creditos) : "",
-      descripcion: toText(descripcion ?? {}), // en tu DB es TEXT
-      RA: toText(RA ?? []), // en tu DB es TEXT
+      descripcion: toText(descripcion ?? {}),
+      RA: toText(RA ?? []),                 // seguimos guardando la copia JSON
       color: color ? String(color) : "#4B5563",
     };
 
-    // UPSERT por id (reemplaza si existe)
-    const stmt = db.prepare(`
+    const upsertAsignatura = db.prepare(`
       INSERT INTO asignaturas (id, nombre, creditos, descripcion, RA, color)
       VALUES (@id, @nombre, @creditos, @descripcion, @RA, @color)
       ON CONFLICT(id) DO UPDATE SET
@@ -824,14 +890,59 @@ ipcMain.handle("guardar-asignatura", async (_event, asignatura) => {
         color       = excluded.color
     `);
 
-    stmt.run(row);
+    let raCount = 0;
+    let ceCount = 0;
 
-    return { success: true, id: row.id };
+    // 2) Importar RA/CE normalizando estructura
+    const raList = normalizeRA(RA);
+
+    const tx = db.transaction(() => {
+      upsertAsignatura.run(row);
+
+      // Limpia RA/CE previos de esa asignatura
+      const raPrev = db
+        .prepare("SELECT id FROM ra WHERE asignatura_id = ?")
+        .all(row.id) as Array<{ id: string }>;
+
+      if (raPrev.length) {
+        const ids = raPrev.map(r => `'${r.id}'`).join(",");
+        db.prepare(`DELETE FROM ce WHERE ra_id IN (${ids})`).run();
+        db.prepare("DELETE FROM ra WHERE asignatura_id = ?").run(row.id);
+      }
+
+      if (raList.length > 0) {
+        const insRA = db.prepare(
+          "INSERT INTO ra (id, asignatura_id, codigo, descripcion) VALUES (?, ?, ?, ?)"
+        );
+        const insCE = db.prepare(
+          "INSERT INTO ce (id, ra_id, codigo, descripcion) VALUES (?, ?, ?, ?)"
+        );
+
+        for (const ra of raList) {
+          const raId = uuid();
+          insRA.run(raId, row.id, String(ra.raCodigo ?? ""), String(ra.raDescripcion ?? ""));
+          raCount++;
+
+          for (const ce of ra.CE || []) {
+            insCE.run(uuid(), raId, String(ce.ceCodigo ?? ""), String(ce.ceDescripcion ?? ""));
+            ceCount++;
+          }
+        }
+      }
+    });
+
+    tx();
+
+    return { success: true, id: row.id, raCount, ceCount };
   } catch (error) {
     console.error("❌ Error al guardar asignatura:", error);
     throw error;
   }
 });
+
+
+
+
 
 ipcMain.handle("leer-asignatura", (_evt, asignaturaId: string) => {
   const row = db
@@ -880,6 +991,35 @@ ipcMain.handle("leer-asignaturas", () => {
     color: row.color,
   }));
 });
+
+// Lista de asignaturas de un curso con color persistido
+ipcMain.handle("asignaturas-de-curso", (_e, cursoId: string | number) => {
+  return db.prepare(`
+    SELECT
+      CAST(a.id AS TEXT)            AS id,        -- conserva ceros
+      a.nombre                      AS nombre,
+      COALESCE(a.color, '')         AS color      -- trae color persistido
+    FROM curso_asignatura ca
+    JOIN asignaturas a
+      ON CAST(a.id AS TEXT) = CAST(ca.asignatura_id AS TEXT)
+    WHERE CAST(ca.curso_id AS TEXT) = ?
+    ORDER BY a.nombre COLLATE NOCASE
+  `).all(String(cursoId));
+});
+
+// (opcional, si tu CursoCard lo usa) Colores en bloque por curso
+ipcMain.handle("asignaturas:leer-colores-curso", (_e, cursoId: string | number) => {
+  return db.prepare(`
+    SELECT
+      CAST(a.id AS TEXT)    AS id,
+      COALESCE(a.color,'')  AS color
+    FROM curso_asignatura ca
+    JOIN asignaturas a
+      ON CAST(a.id AS TEXT) = CAST(ca.asignatura_id AS TEXT)
+    WHERE CAST(ca.curso_id AS TEXT) = ?
+  `).all(String(cursoId));
+});
+
 
 
 // 1) Listar asignaturas de un curso
@@ -938,19 +1078,14 @@ ipcMain.handle("leer-alumnos-por-curso", (_event, cursoId: string) => {
 ipcMain.handle("guardar-horario", (_e, payload) => {
   const cursoId = String(payload.cursoId ?? "").trim();
   const asignaturaId = String(payload.asignaturaId ?? "").trim();
-  const diaRaw = String(payload.dia ?? "")
-    .trim()
-    .toLowerCase();
+  const diaRaw = String(payload.dia ?? "").trim().toLowerCase();
   const dia =
-    diaRaw === "miercoles"
-      ? "miércoles"
-      : diaRaw === "sabado"
-      ? "sábado"
-      : diaRaw;
+    diaRaw === "miercoles" ? "miércoles" :
+    diaRaw === "sabado"    ? "sábado"    : diaRaw;
   const horaInicio = String(payload.horaInicio ?? "").trim();
-  const horaFin = String(payload.horaFin ?? "").trim();
+  const horaFin    = String(payload.horaFin ?? "").trim();
 
-  const faltan = [];
+  const faltan: string[] = [];
   if (!cursoId) faltan.push("cursoId");
   if (!asignaturaId) faltan.push("asignaturaId");
   if (!dia) faltan.push("dia");
@@ -958,29 +1093,45 @@ ipcMain.handle("guardar-horario", (_e, payload) => {
   if (!horaFin) faltan.push("horaFin");
   if (faltan.length) throw new Error(`Faltan campos (${faltan.join(", ")})`);
 
-  // 👇 Añadimos created_at en el insert
+  // 1) Intento de inserción idempotente
   const insert = db.prepare(`
-    INSERT INTO horarios (curso_id, asignatura_id, dia, hora_inicio, hora_fin, created_at)
+    INSERT OR IGNORE INTO horarios
+      (curso_id, asignatura_id, dia, hora_inicio, hora_fin, created_at)
     VALUES (?, ?, ?, ?, ?, datetime('now'))
   `);
-
   const info = insert.run(cursoId, asignaturaId, dia, horaInicio, horaFin);
 
-  return db
-    .prepare(
-      `
+  // 2) Si no insertó (duplicado), obtén la fila existente
+  const selectByVals = db.prepare(`
     SELECT id,
            curso_id      AS cursoId,
            asignatura_id AS asignaturaId,
            dia,
            hora_inicio   AS horaInicio,
            hora_fin      AS horaFin,
-           created_at    AS createdAt   -- 👈 devolvemos también la marca temporal
-    FROM horarios WHERE id = ?
-  `
-    )
-    .get(info.lastInsertRowid as number);
+           created_at    AS createdAt
+    FROM horarios
+    WHERE curso_id = ? AND asignatura_id = ? AND dia = ? AND hora_inicio = ? AND hora_fin = ?
+  `);
+
+  if (info.changes === 1) {
+    // Fue nuevo → lee por lastInsertRowid
+    return db.prepare(`
+      SELECT id,
+             curso_id      AS cursoId,
+             asignatura_id AS asignaturaId,
+             dia,
+             hora_inicio   AS horaInicio,
+             hora_fin      AS horaFin,
+             created_at    AS createdAt
+      FROM horarios WHERE id = ?
+    `).get(info.lastInsertRowid as number);
+  }
+
+  // Ya existía → devuelve la existente (sin error)
+  return selectByVals.get(cursoId, asignaturaId, dia, horaInicio, horaFin);
 });
+
 
 ipcMain.handle(
   "leer-horarios",

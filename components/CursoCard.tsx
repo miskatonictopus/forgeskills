@@ -1,6 +1,7 @@
 "use client";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import { asignaturasPorCurso, setAsignaturasCurso } from "@/store/asignaturasPor
 import type { Asignatura } from "@/models/asignatura";
 
 /* ================= helpers color ================= */
+
 const normalizeHex = (v?: string | null) => {
   if (!v) return "";
   let s = v.trim();
@@ -90,28 +92,55 @@ export function CursoCard({ curso }: Props) {
     () => (asignaturas || []).map(a => `${a.id}:${normalizeHex(pickColorProp(a)) || ""}`).join("|"),
     [asignaturas]
   );
-
+const persistTimers = useRef<Record<string, any>>({});
   useEffect(() => {
     const onColor = (e: any) => {
       const { asignaturaId, color } = e?.detail || {};
       if (!asignaturaId) return;
-      setColorByAsig(prev => (prev[asignaturaId] === color ? prev : { ...prev, [asignaturaId]: color }));
+  
+      // Normaliza a #rrggbb (como haces en otras partes)
+      const hex = normalizeHex(color);
+      if (!hex) return;
+  
+      // 1) Estado local (evita renders si no hay cambio real)
+      setColorByAsig(prev =>
+        prev[asignaturaId] === hex ? prev : { ...prev, [asignaturaId]: hex }
+      );
+  
+      // 2) Store por curso, para que tu UI interna se actualice
       try {
         const lista = (asignaturasPorCurso[curso.id] || []) as Array<Asignatura & { color?: string }>;
         const idx = lista.findIndex(a => String(a.id) === String(asignaturaId));
         if (idx !== -1) {
-          const actual = lista[idx]?.color;
-          if (actual !== color) {
+          const actual = normalizeHex(lista[idx]?.color);
+          if (actual !== hex) {
             const nueva = [...lista];
-            nueva[idx] = { ...nueva[idx], color };
+            nueva[idx] = { ...nueva[idx], color: hex };
             setAsignaturasCurso(curso.id, nueva as any);
           }
         }
       } catch {}
+  
+      // 3) ✅ Persistencia en SQLite (debounced)
+      try {
+        const api = (window as any).electronAPI;
+        const id = String(asignaturaId);
+  
+        // limpia cualquier timer previo para este id
+        if (persistTimers.current[id]) clearTimeout(persistTimers.current[id]);
+  
+        persistTimers.current[id] = setTimeout(() => {
+          api?.actualizarColorAsignatura?.(id, hex).catch(() => {/* noop */});
+        }, 250);
+      } catch {
+        /* noop */
+      }
     };
+  
     window.addEventListener("asignatura:color:actualizado", onColor);
     return () => window.removeEventListener("asignatura:color:actualizado", onColor);
   }, [curso.id]);
+  
 
   // carga asignaturas del curso
   useEffect(() => {
