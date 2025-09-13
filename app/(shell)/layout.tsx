@@ -1,6 +1,6 @@
 // app/(shell)/layout.tsx
 "use client";
-
+import ClientShell from "@/components/ClientShell";
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { AsignaturaColorsProvider } from "@/providers/AsignaturaColorsProvider";

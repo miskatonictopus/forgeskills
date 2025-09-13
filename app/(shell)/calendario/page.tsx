@@ -114,10 +114,15 @@ const expandirHorariosEnRango = (
           end:   `${fecha}T${hf}`,
           classNames: ["horario-event"],
           editable: false,
-          // damos pistas a FullCalendar y a nuestro eventDidMount
-          backgroundColor: bg, // puede ser sobreescrito por el tema, por eso también:
-          extendedProps: { __color: hex, __bg: bg, __fg: fg },
+        
+          // 👇 fuerza colores nativos de FullCalendar
+          backgroundColor: colorHex || undefined,
+          borderColor: colorHex || undefined,
+          textColor: colorHex ? textOn(colorHex) : undefined,
+        
+          extendedProps: { __color: colorHex || "" },
         });
+        
       }
     });
     cursor.setDate(cursor.getDate() + 1);

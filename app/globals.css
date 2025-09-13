@@ -244,4 +244,8 @@
   animation: fadeInUp 0.7s ease-out forwards;
 }
 
+.fc .fc-event {
+  border: none !important;
+}
+
 }

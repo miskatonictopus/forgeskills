@@ -20,20 +20,20 @@ export type FCEvent = {
   start?: string | Date;
   end?: string | Date;
   allDay?: boolean;
-  daysOfWeek?: number[];
-  startTime?: string;
-  endTime?: string;
-  startRecur?: string;
-  endRecur?: string;
+  daysOfWeek?: number[];       // p.ej. [1] (lunes)
+  startTime?: string;          // "09:00:00"
+  endTime?: string;            // "11:00:00"  ← si falta, lo inferimos
+  startRecur?: string;         // "YYYY-MM-DD"
+  endRecur?: string;           // "YYYY-MM-DD"
   classNames?: string[];
   editable?: boolean;
   display?: "auto" | "block" | "list-item" | "background" | "inverse-background" | "none";
-  backgroundColor?: string;
+  backgroundColor?: string;    // usamos esto para colores
   borderColor?: string;
   textColor?: string;
   rrule?: any;
-  duration?: string;
-  extendedProps?: Record<string, any>;
+  duration?: string;           // "02:00"      ← alternativa a endTime
+  extendedProps?: Record<string, any>; // puede traer horaFin, duracionMin, __color, etc.
 };
 
 type Props = {
@@ -61,6 +61,7 @@ const normalizeHex = (v?: string | null) => {
   if (s.length === 4) s = `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`;
   return /^#[0-9a-f]{6}$/i.test(s) ? s : "";
 };
+
 const textOn = (hex: string) => {
   try {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -86,6 +87,73 @@ const isMidnight = (start?: string | Date) => {
   } catch {
     return false;
   }
+};
+
+/* === Helpers de tiempo para inferir endTime/duration === */
+const toMin = (hhmm?: string) => {
+  if (!hhmm) return null;
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(hhmm);
+  if (!m) return null;
+  const h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  return h * 60 + min;
+};
+const fromMinHHMM = (mins: number) => {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  return `${pad(h)}:${pad(m)}`;
+};
+
+/**
+ * Rellena automáticamente endTime o duration si falta:
+ * - Si hay startTime y extendedProps.horaFin -> endTime = horaFin
+ * - Si hay startTime y extendedProps.duracionMin(utos) -> duration = "HH:MM"
+ * - Si hay start con hora "YYYY-MM-DDTHH:mm" y extendedProps.horaFin -> end = misma fecha con horaFin
+ * - Si hay start con hora y extendedProps.duracionMin -> end = start + duración
+ */
+const withAutoDuration = (e: FCEvent): FCEvent => {
+  const ep = e.extendedProps || {};
+  const hasRecurrence = !!(e.daysOfWeek || e.rrule || e.startRecur);
+
+  // Caso A: recurrente con startTime (clases semanales)
+  if (hasRecurrence && e.startTime && !e.endTime && !e.duration) {
+    const fin = (ep.horaFin as string) || (ep.endTime as string) || "";
+    const durMin =
+      ep.duracionMin ?? ep.duracionMinutos ?? ep.durationMin ?? ep.minutes ?? ep.mins ?? null;
+
+    if (fin) {
+      return { ...e, endTime: /^\d{1,2}:\d{2}$/.test(fin) ? `${fin}:00` : fin };
+    } else if (durMin != null) {
+      const minutes = typeof durMin === "number" ? durMin : parseInt(String(durMin), 10);
+      if (Number.isFinite(minutes)) {
+        return { ...e, duration: fromMinHHMM(minutes) }; // p.ej. "02:00"
+      }
+    }
+  }
+
+  // Caso B: puntual con start (ISO) sin end
+  if (!hasRecurrence && typeof e.start === "string" && !e.end) {
+    const hasTime = /\d{2}:\d{2}/.test(e.start);
+    if (hasTime) {
+      const fin = (ep.horaFin as string) || (ep.endTime as string) || "";
+      if (fin) {
+        const date = e.start.slice(0, 10);
+        const finNorm = /^\d{1,2}:\d{2}$/.test(fin) ? `${fin}:00` : fin;
+        return { ...e, end: `${date}T${finNorm}` };
+      }
+      const durMin =
+        ep.duracionMin ?? ep.duracionMinutos ?? ep.durationMin ?? ep.minutes ?? ep.mins ?? null;
+      const minutes = typeof durMin === "number" ? durMin : parseInt(String(durMin || ""), 10);
+      if (Number.isFinite(minutes)) {
+        const start = new Date(e.start);
+        const end = new Date(start.getTime() + minutes * 60 * 1000).toISOString();
+        return { ...e, end };
+      }
+    }
+  }
+
+  return e;
 };
 
 /* ===================== Componente ===================== */
@@ -128,13 +196,21 @@ export default function Calendario({
     [rangoStart, rangoEnd]
   );
 
-  // Sanea eventos todo-día o 00:00
+  // 1) Asegura duración/fin
+  // 2) No convierte a allDay los recurrentes con horas
   const sanitizedEvents = React.useMemo<FCEvent[]>(() => {
-    return (events ?? []).map((e) => {
-      if (typeof e.start === "string") {
-        if (isDateOnly(e.start) || isMidnight(e.start)) return { ...e, allDay: true };
-      } else if (isMidnight(e.start)) {
-        return { ...e, allDay: true };
+    return (events ?? []).map((ev) => {
+      let e = withAutoDuration(ev);
+
+      const isRecurrentTimed =
+        !!(e.daysOfWeek || e.rrule || e.startRecur) && (e.startTime || e.endTime || e.duration);
+
+      if (!isRecurrentTimed) {
+        if (typeof e.start === "string") {
+          if (isDateOnly(e.start) || isMidnight(e.start)) e = { ...e, allDay: true };
+        } else if (isMidnight(e.start)) {
+          e = { ...e, allDay: true };
+        }
       }
       return e;
     });
@@ -156,6 +232,7 @@ export default function Calendario({
         nowIndicator={true}
         slotMinTime={slotMinTime}
         slotMaxTime={slotMaxTime}
+        slotDuration="00:30:00"
         expandRows={true}
         stickyHeaderDates={true}
         headerToolbar={{
@@ -203,39 +280,47 @@ export default function Calendario({
           onEventResize?.({ id: info.event.id, start, end });
         }}
 
-        /* ✅ Fuerza el color desde extendedProps.__color o backgroundColor */
+        /* ✅ Mantiene tu forma de pintar colores */
         eventDidMount={(info) => {
           const el = info.el as HTMLElement;
           const ep = (info.event.extendedProps ?? {}) as any;
-
+        
           const raw =
             ep.__color ||
             ep.color ||
             (typeof info.event.backgroundColor === "string" ? info.event.backgroundColor : "") ||
             "";
-
+        
           const hex = normalizeHex(raw);
           if (!hex) return;
-
+        
           const fg = textOn(hex);
-
-          // 1) Actualiza el modelo de FC (sin getProp)
+        
           try {
             info.event.setProp("backgroundColor", hex);
             info.event.setProp("borderColor", hex);
             info.event.setProp("textColor", fg);
           } catch {}
-
-          // 2) Refuerzo visual por si el tema pisa estilos
+        
+          // Pintamos también el elemento MAIN del evento (el que FC usa para el fondo)
+          const main = el.querySelector(".fc-event-main") as HTMLElement | null;
+          if (main) {
+            main.style.backgroundColor = hex;
+            main.style.color = fg;
+            main.style.borderColor = hex;
+            main.style.height = "100%";
+            main.style.borderRadius = "8px";
+            main.style.boxSizing = "border-box";
+          }
+        
+          // Variables CSS por si el tema las usa
           el.style.setProperty("--fc-event-bg-color", hex);
           el.style.setProperty("--fc-event-border-color", hex);
           el.style.setProperty("--fc-event-text-color", fg);
-          el.style.backgroundColor = hex;
-          el.style.borderColor = hex;
-          el.style.color = fg;
         }}
+        
 
-        /* 🛟 Fallback: si aún así el tema lo pisa, coloreamos el contenido */
+        /* 🛟 Fallback por si algún tema pisa estilos */
         eventContent={(arg: any) => {
           const ep = (arg.event.extendedProps ?? {}) as any;
           const raw =
@@ -245,30 +330,41 @@ export default function Calendario({
             "";
           const hex = normalizeHex(raw);
           if (!hex) return undefined;
-
+        
           const fg = textOn(hex);
           const wrap = document.createElement("div");
+          wrap.style.height = "100%";           // 👈 clave
+          wrap.style.display = "flex";          // verticalmente centrado
+          wrap.style.alignItems = "center";
           wrap.style.background = hex;
           wrap.style.color = fg;
           wrap.style.padding = "2px 6px";
-          wrap.style.borderRadius = "6px";
+          wrap.style.borderRadius = "8px";
           wrap.style.border = `1px solid ${hex}`;
           wrap.style.boxSizing = "border-box";
           wrap.textContent = arg.event.title;
-
+        
           return { domNodes: [wrap] };
         }}
+        
       />
 
-      {/* Refuerzo global para respetar los colores inline */}
+      {/* Quita bordes por defecto y aumenta altura de slot */}
       <style jsx global>{`
-        .fc .fc-timegrid-event,
-        .fc .fc-timegrid-event .fc-event-main {
-          background-color: inherit !important;
-          border-color: inherit !important;
-          color: inherit !important;
-        }
-      `}</style>
+  .fc .fc-event,
+  .fc .fc-timegrid-event,
+  .fc .fc-timegrid-event .fc-event-main,
+  .fc .fc-daygrid-event,
+  .fc .fc-daygrid-event .fc-event-main {
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+  .fc .fc-timegrid-slot {
+    height: 3em !important; /* ajusta si quieres más alto */
+  }
+`}</style>
+
     </>
   );
 }
