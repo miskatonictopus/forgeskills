@@ -15,6 +15,14 @@ import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import type { Festivo, Presencialidad, FCTTramo } from "@/types/electronAPI";
 
 /* ---------- utils ---------- */
+const cursoTag = (c: any) => {
+  const acr = c?.acronimo || c?.acr || c?.acronym || "";
+  const nivelRaw = c?.nivel ?? "";
+  const nivel = c?.nivel ? `${c.nivel}` : "";
+  if (!acr && !nivel) return c?.nombre || "";
+  return [acr, nivel].filter(Boolean).join("");
+};
+
 const normalizeHex = (v?: string | null) => {
   if (!v) return "";
   let s = v.trim().toLowerCase();
@@ -153,11 +161,11 @@ const expandirTramosBG = (
           editable: false,
           classNames: [className],
           backgroundColor:
-            className === "fct-bg"
-              ? "rgba(200,120,255,0.26)"
-              : className === "presencial-bg"
-              ? "rgba(120,160,255,0.28)"
-              : undefined,
+  className === "fct-bg"
+    ? "rgba(200,120,255,1)"
+    : className === "presencial-bg"
+    ? "#ffffff"   // 👈 blanco sólido
+    : undefined,
           title: "",
         });
       }
@@ -294,7 +302,7 @@ export default function CalendarioGlobalPage() {
               const hrs = await window.electronAPI.getHorariosAsignatura(c.id, a.id);
               if (!hrs || hrs.length === 0) continue;
 
-              const titulo = `${a.nombre} · ${c.nombre}`;
+              const titulo = `${a.nombre} · ${cursoTag(c)}`;
               const colorHex =
               normalizeHex((a as any)?.color) ||
               colorMapCurso[String(a.id)] ||
@@ -357,7 +365,7 @@ export default function CalendarioGlobalPage() {
 
                 return {
                   id: a.id,
-                  title: `${a.nombre} · ${c.nombre}`,
+                  title: `${a.nombre} · ${cursoTag(c)}`,
                   start,
                   end,
                   allDay: false,

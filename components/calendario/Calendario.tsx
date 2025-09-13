@@ -2,11 +2,8 @@
 
 import React from "react";
 import dynamic from "next/dynamic";
-
-// FullCalendar (React wrapper sin SSR)
 const FullCalendar = dynamic(() => import("@fullcalendar/react"), { ssr: false });
 
-// Plugins
 import esLocale from "@fullcalendar/core/locales/es";
 import interactionPlugin from "@fullcalendar/interaction";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -20,20 +17,20 @@ export type FCEvent = {
   start?: string | Date;
   end?: string | Date;
   allDay?: boolean;
-  daysOfWeek?: number[];       // p.ej. [1] (lunes)
-  startTime?: string;          // "09:00:00"
-  endTime?: string;            // "11:00:00"  ← si falta, lo inferimos
-  startRecur?: string;         // "YYYY-MM-DD"
-  endRecur?: string;           // "YYYY-MM-DD"
+  daysOfWeek?: number[];
+  startTime?: string;
+  endTime?: string;
+  startRecur?: string;
+  endRecur?: string;
   classNames?: string[];
   editable?: boolean;
   display?: "auto" | "block" | "list-item" | "background" | "inverse-background" | "none";
-  backgroundColor?: string;    // usamos esto para colores
+  backgroundColor?: string;
   borderColor?: string;
   textColor?: string;
   rrule?: any;
-  duration?: string;           // "02:00"      ← alternativa a endTime
-  extendedProps?: Record<string, any>; // puede traer horaFin, duracionMin, __color, etc.
+  duration?: string;
+  extendedProps?: Record<string, any>;
 };
 
 type Props = {
@@ -50,6 +47,9 @@ type Props = {
   onSelectRange?: (start: Date, end: Date) => void;
   onEventMove?: (e: { id: string; start: Date; end?: Date }) => void;
   onEventResize?: (e: { id: string; start: Date; end?: Date }) => void;
+
+  // ⭐ nueva prop: te dejo decidir el título final con acceso a tu store
+  resolveTitle?: (e: FCEvent) => string;
 };
 
 /* ===================== Helpers ===================== */
@@ -61,7 +61,6 @@ const normalizeHex = (v?: string | null) => {
   if (s.length === 4) s = `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`;
   return /^#[0-9a-f]{6}$/i.test(s) ? s : "";
 };
-
 const textOn = (hex: string) => {
   try {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -73,11 +72,9 @@ const textOn = (hex: string) => {
     return "#fff";
   }
 };
-
 const parseISODate = (iso: string) => new Date(`${iso}T00:00:00`);
 const parseISOEndDay = (iso: string) => new Date(`${iso}T23:59:59`);
 const between = (start: Date, d: Date, end: Date) => start <= d && d <= end;
-
 const isDateOnly = (s?: string) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
 const isMidnight = (start?: string | Date) => {
   if (!start) return false;
@@ -88,35 +85,16 @@ const isMidnight = (start?: string | Date) => {
     return false;
   }
 };
-
-/* === Helpers de tiempo para inferir endTime/duration === */
-const toMin = (hhmm?: string) => {
-  if (!hhmm) return null;
-  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(hhmm);
-  if (!m) return null;
-  const h = parseInt(m[1], 10);
-  const min = parseInt(m[2], 10);
-  return h * 60 + min;
-};
 const fromMinHHMM = (mins: number) => {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
   return `${pad(h)}:${pad(m)}`;
 };
-
-/**
- * Rellena automáticamente endTime o duration si falta:
- * - Si hay startTime y extendedProps.horaFin -> endTime = horaFin
- * - Si hay startTime y extendedProps.duracionMin(utos) -> duration = "HH:MM"
- * - Si hay start con hora "YYYY-MM-DDTHH:mm" y extendedProps.horaFin -> end = misma fecha con horaFin
- * - Si hay start con hora y extendedProps.duracionMin -> end = start + duración
- */
 const withAutoDuration = (e: FCEvent): FCEvent => {
   const ep = e.extendedProps || {};
   const hasRecurrence = !!(e.daysOfWeek || e.rrule || e.startRecur);
 
-  // Caso A: recurrente con startTime (clases semanales)
   if (hasRecurrence && e.startTime && !e.endTime && !e.duration) {
     const fin = (ep.horaFin as string) || (ep.endTime as string) || "";
     const durMin =
@@ -127,12 +105,11 @@ const withAutoDuration = (e: FCEvent): FCEvent => {
     } else if (durMin != null) {
       const minutes = typeof durMin === "number" ? durMin : parseInt(String(durMin), 10);
       if (Number.isFinite(minutes)) {
-        return { ...e, duration: fromMinHHMM(minutes) }; // p.ej. "02:00"
+        return { ...e, duration: fromMinHHMM(minutes) };
       }
     }
   }
 
-  // Caso B: puntual con start (ISO) sin end
   if (!hasRecurrence && typeof e.start === "string" && !e.end) {
     const hasTime = /\d{2}:\d{2}/.test(e.start);
     if (hasTime) {
@@ -152,7 +129,6 @@ const withAutoDuration = (e: FCEvent): FCEvent => {
       }
     }
   }
-
   return e;
 };
 
@@ -171,6 +147,7 @@ export default function Calendario({
   onSelectRange,
   onEventMove,
   onEventResize,
+  resolveTitle, // ⭐
 }: Props) {
   const setPermitidos = React.useMemo(
     () => (diasPermitidos && diasPermitidos.length > 0 ? new Set(diasPermitidos) : null),
@@ -196,15 +173,12 @@ export default function Calendario({
     [rangoStart, rangoEnd]
   );
 
-  // 1) Asegura duración/fin
-  // 2) No convierte a allDay los recurrentes con horas
+  // 1) normalizamos eventos (duraciones, allDay, etc.)
   const sanitizedEvents = React.useMemo<FCEvent[]>(() => {
     return (events ?? []).map((ev) => {
       let e = withAutoDuration(ev);
-
       const isRecurrentTimed =
         !!(e.daysOfWeek || e.rrule || e.startRecur) && (e.startTime || e.endTime || e.duration);
-
       if (!isRecurrentTimed) {
         if (typeof e.start === "string") {
           if (isDateOnly(e.start) || isMidnight(e.start)) e = { ...e, allDay: true };
@@ -216,10 +190,24 @@ export default function Calendario({
     });
   }, [events]);
 
+  // 2) forzamos título con resolver externo si existe
+  const displayEvents = React.useMemo<FCEvent[]>(() => {
+    if (!resolveTitle) return sanitizedEvents;
+    return sanitizedEvents.map((e) => {
+      try {
+        const t = resolveTitle(e);
+        return t && t !== e.title ? { ...e, title: t } : e;
+      } catch {
+        return e;
+      }
+    });
+  }, [sanitizedEvents, resolveTitle]);
+
   return (
     <>
       <FullCalendar
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
+        events={displayEvents as any}
         locale={esLocale}
         timeZone="local"
         initialView={initialView}
@@ -246,7 +234,6 @@ export default function Calendario({
         editable
         eventStartEditable
         eventDurationEditable
-        events={sanitizedEvents as any}
         dateClick={(info) => {
           if (setPermitidos && !setPermitidos.has(info.date.getDay())) return;
           if (!dentroDeRango(info.date)) return;
@@ -279,30 +266,25 @@ export default function Calendario({
           }
           onEventResize?.({ id: info.event.id, start, end });
         }}
-
-        /* ✅ Mantiene tu forma de pintar colores */
         eventDidMount={(info) => {
           const el = info.el as HTMLElement;
           const ep = (info.event.extendedProps ?? {}) as any;
-        
+
           const raw =
             ep.__color ||
             ep.color ||
             (typeof info.event.backgroundColor === "string" ? info.event.backgroundColor : "") ||
             "";
-        
           const hex = normalizeHex(raw);
           if (!hex) return;
-        
+
           const fg = textOn(hex);
-        
           try {
             info.event.setProp("backgroundColor", hex);
             info.event.setProp("borderColor", hex);
             info.event.setProp("textColor", fg);
           } catch {}
-        
-          // Pintamos también el elemento MAIN del evento (el que FC usa para el fondo)
+
           const main = el.querySelector(".fc-event-main") as HTMLElement | null;
           if (main) {
             main.style.backgroundColor = hex;
@@ -312,16 +294,15 @@ export default function Calendario({
             main.style.borderRadius = "8px";
             main.style.boxSizing = "border-box";
           }
-        
-          // Variables CSS por si el tema las usa
+
           el.style.setProperty("--fc-event-bg-color", hex);
           el.style.setProperty("--fc-event-border-color", hex);
           el.style.setProperty("--fc-event-text-color", fg);
         }}
-        
-
-        /* 🛟 Fallback por si algún tema pisa estilos */
         eventContent={(arg: any) => {
+          // No personalizamos los background events
+          if (arg.event.display === "background") return undefined;
+        
           const ep = (arg.event.extendedProps ?? {}) as any;
           const raw =
             ep.__color ||
@@ -329,28 +310,107 @@ export default function Calendario({
             (typeof arg.event.backgroundColor === "string" ? arg.event.backgroundColor : "") ||
             "";
           const hex = normalizeHex(raw);
-          if (!hex) return undefined;
+          const fg = hex ? textOn(hex) : undefined;
         
-          const fg = textOn(hex);
+          // Partimos el title que viene como: "Asignatura · CURSO_TAG"
+          const title = String(arg.event.title || "");
+          const parts = title.split(" · ");
+          const asignatura = parts.length > 1 ? parts[0] : title;
+const cursoTag = parts.length > 1 ? parts.slice(1).join(" · ") : "";
+        
+          // Contenedor
           const wrap = document.createElement("div");
-          wrap.style.height = "100%";           // 👈 clave
-          wrap.style.display = "flex";          // verticalmente centrado
-          wrap.style.alignItems = "center";
-          wrap.style.background = hex;
-          wrap.style.color = fg;
-          wrap.style.padding = "2px 6px";
+          wrap.style.height = "100%";
+          wrap.style.display = "flex";
+          wrap.style.flexDirection = "column";
+          wrap.style.alignItems = "flex-start";
+          wrap.style.alignItems = "flex-start";
+wrap.style.justifyContent = "flex-start";  
+wrap.style.padding = "8px 8px 6px 8px";    
+wrap.style.gap = "4px";
+          wrap.style.padding = "4px 6px";
           wrap.style.borderRadius = "8px";
-          wrap.style.border = `1px solid ${hex}`;
           wrap.style.boxSizing = "border-box";
-          wrap.textContent = arg.event.title;
+          if (hex) {
+            wrap.style.background = hex;
+            wrap.style.border = `1px solid ${hex}`;
+            wrap.style.color = fg!;
+          }
+        
+          // Curso (arriba izq., más grande y negrita)
+          const top = document.createElement("div");
+          top.textContent = cursoTag || "";
+          top.style.fontSize = "18px";     // curso (acrónimo+nivel)
+
+
+          top.style.fontWeight = "700";
+          top.style.fontSize = "18px";
+          top.style.lineHeight = "1.1";
+          top.style.textAlign = "left";
+          top.style.width = "100%";
+          top.style.whiteSpace = "nowrap";
+          top.style.overflow = "hidden";
+          top.style.textOverflow = "ellipsis";
+        
+          // Asignatura (debajo, más pequeña)
+          const bottom = document.createElement("div");
+          bottom.style.fontSize = "13px";  // asignatura
+          bottom.textContent = asignatura;
+          bottom.style.fontSize = "13px";
+          bottom.style.lineHeight = "1.1";
+          bottom.style.textAlign = "left";
+          bottom.style.opacity = "0.95";
+          bottom.style.width = "100%";
+          bottom.style.whiteSpace = "nowrap";
+          bottom.style.overflow = "hidden";
+          bottom.style.textOverflow = "ellipsis";
+        
+          // Si por lo que sea no hay cursoTag, mostramos solo el título
+          wrap.appendChild(top.textContent ? top : bottom);
+          if (top.textContent) wrap.appendChild(bottom);
         
           return { domNodes: [wrap] };
         }}
         
       />
 
-      {/* Quita bordes por defecto y aumenta altura de slot */}
-      <style jsx global>{`
+<style jsx global>{`
+  /* Sin sombras ni filtros en TODO lo que vaya dentro de un evento */
+  .fc .fc-event,
+  .fc .fc-event * {
+    text-shadow: none !important;
+    -webkit-text-stroke: 0 !important;
+    filter: none !important;
+  }
+
+  /* Por si tu tema añade estilos más específicos */
+  .fc .fc-timegrid-event .fc-event-main,
+  .fc .fc-daygrid-event .fc-event-main,
+  .fc .fc-event-title,
+  .fc .fc-event-time,
+  .fc .fc-event-main-frame {
+    text-shadow: none !important;
+    filter: none !important;
+  }
+
+  .fc .fct-bg {
+    background: #a3a3a3 !important; /* morado claro */
+    opacity: 1 !important;
+    margin: 4px !important;
+    border-radius: 10px !important;
+  }
+  
+  .fc .fct-bg::after {
+    content: "FCT";
+    position: absolute;
+    top: 3px;
+    left: 5px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #111;
+  }
+
+  /* (lo que ya tenías) */
   .fc .fc-event,
   .fc .fc-timegrid-event,
   .fc .fc-timegrid-event .fc-event-main,
@@ -360,11 +420,27 @@ export default function Calendario({
     border-color: transparent !important;
     box-shadow: none !important;
   }
-  .fc .fc-timegrid-slot {
-    height: 3em !important; /* ajusta si quieres más alto */
+  .fc .presencial-bg {
+    background: #e5e5e5 !important;
+    opacity: 1 !important;
+    border: none !important;
+    border-radius: 10px !important;
   }
+  .fc .presencial-bg .fc-event-main {
+    color: #111 !important;
+  }
+  .fc .presencial-bg::after {
+    content: "PRESENCIALIDAD";
+    position: absolute;
+    top: 3px;
+    left: 5px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #111;
+  }
+  .fc .presencial-bg{margin:4px !important}
+  .fc .fc-timegrid-slot { height: 3em !important; }
 `}</style>
-
     </>
   );
 }
