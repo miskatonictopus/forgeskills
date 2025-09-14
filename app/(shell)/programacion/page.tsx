@@ -492,7 +492,7 @@ export default function PageProgramacion() {
     for (const curso of cursos) {
       const cursoId: string = (curso as any).id;
       const cursoNombre: string = (curso as any).acronimo || (curso as any).nombre || "Curso";
-      const asigs = await window.electronAPI.leerAsignaturasCurso(cursoId);
+      const asigs = await window.electronAPI.leerAsignaturas(cursoId);
       for (const a of asigs) result.push({ id: a.id, nombre: a.nombre, cursoId, cursoNombre });
     }
     return result.sort(
