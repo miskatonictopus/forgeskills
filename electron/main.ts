@@ -1076,33 +1076,43 @@ ipcMain.handle("leer-alumnos-por-curso", (_event, cursoId: string) => {
 /* ---------------------------- IPC: HORARIOS CRUD --------------------------- */
 
 ipcMain.handle("guardar-horario", (_e, payload) => {
-  const cursoId = String(payload.cursoId ?? "").trim();
+  const cursoId      = String(payload.cursoId ?? "").trim();
   const asignaturaId = String(payload.asignaturaId ?? "").trim();
-  const diaRaw = String(payload.dia ?? "").trim().toLowerCase();
-  const dia =
-    diaRaw === "miercoles" ? "miércoles" :
-    diaRaw === "sabado"    ? "sábado"    : diaRaw;
-  const horaInicio = String(payload.horaInicio ?? "").trim();
-  const horaFin    = String(payload.horaFin ?? "").trim();
+  const diaRaw       = String(payload.dia ?? "").trim().toLowerCase();
+  const dia          = diaRaw === "miercoles" ? "miércoles"
+                      : diaRaw === "sabado"   ? "sábado"
+                      : diaRaw;
+  const horaInicio   = String(payload.horaInicio ?? "").trim();
+  const horaFin      = String(payload.horaFin ?? "").trim();
 
   const faltan: string[] = [];
-  if (!cursoId) faltan.push("cursoId");
+  if (!cursoId)      faltan.push("cursoId");
   if (!asignaturaId) faltan.push("asignaturaId");
-  if (!dia) faltan.push("dia");
-  if (!horaInicio) faltan.push("horaInicio");
-  if (!horaFin) faltan.push("horaFin");
+  if (!dia)          faltan.push("dia");
+  if (!horaInicio)   faltan.push("horaInicio");
+  if (!horaFin)      faltan.push("horaFin");
   if (faltan.length) throw new Error(`Faltan campos (${faltan.join(", ")})`);
 
-  // 1) Intento de inserción idempotente
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO horarios
-      (curso_id, asignatura_id, dia, hora_inicio, hora_fin, created_at)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
-  `);
-  const info = insert.run(cursoId, asignaturaId, dia, horaInicio, horaFin);
+  // --- 🔑 Paso 1: asegurar la pareja curso↔asignatura en la tabla puente ---
+  db.prepare(`
+    INSERT OR IGNORE INTO curso_asignatura (curso_id, asignatura_id)
+    VALUES (?, ?)
+  `).run(cursoId, asignaturaId);
 
-  // 2) Si no insertó (duplicado), obtén la fila existente
-  const selectByVals = db.prepare(`
+  // --- 🔑 Paso 2: UPSERT en horarios ---
+  const stmt = db.prepare(`
+    INSERT INTO horarios (curso_id, asignatura_id, dia, hora_inicio, hora_fin, created_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(curso_id, asignatura_id, dia, hora_inicio)
+    DO UPDATE SET
+      hora_fin   = excluded.hora_fin,
+      created_at = datetime('now')
+  `);
+
+  stmt.run(cursoId, asignaturaId, dia, horaInicio, horaFin);
+
+  // --- 🔑 Paso 3: devolver siempre la fila actualizada ---
+  return db.prepare(`
     SELECT id,
            curso_id      AS cursoId,
            asignatura_id AS asignaturaId,
@@ -1111,26 +1121,11 @@ ipcMain.handle("guardar-horario", (_e, payload) => {
            hora_fin      AS horaFin,
            created_at    AS createdAt
     FROM horarios
-    WHERE curso_id = ? AND asignatura_id = ? AND dia = ? AND hora_inicio = ? AND hora_fin = ?
-  `);
-
-  if (info.changes === 1) {
-    // Fue nuevo → lee por lastInsertRowid
-    return db.prepare(`
-      SELECT id,
-             curso_id      AS cursoId,
-             asignatura_id AS asignaturaId,
-             dia,
-             hora_inicio   AS horaInicio,
-             hora_fin      AS horaFin,
-             created_at    AS createdAt
-      FROM horarios WHERE id = ?
-    `).get(info.lastInsertRowid as number);
-  }
-
-  // Ya existía → devuelve la existente (sin error)
-  return selectByVals.get(cursoId, asignaturaId, dia, horaInicio, horaFin);
+    WHERE curso_id=? AND asignatura_id=? AND dia=? AND hora_inicio=?
+  `).get(cursoId, asignaturaId, dia, horaInicio);
 });
+
+
 
 
 ipcMain.handle(
