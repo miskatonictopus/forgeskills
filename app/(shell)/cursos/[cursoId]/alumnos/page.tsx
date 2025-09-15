@@ -2,34 +2,41 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { useSnapshot } from "valtio";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Mail, User, ExternalLink, Loader2 } from "lucide-react";
+import { User, ExternalLink, Loader2, Eye, EyeOff, } from "lucide-react";
 
-import { alumnosStore, cargarAlumnosCurso, type Alumno as StoreAlumno } from "@/store/alumnosStore";
+import {
+  alumnosStore,
+  cargarAlumnosCurso,
+  type Alumno as StoreAlumno,
+} from "@/store/alumnosStore";
 import { cursoStore } from "@/store/cursoStore";
 import { Dot } from "@/components/ui/Dot";
 
-// 👇 importa el ranking reutilizable
 import RankingLista from "@/components/RankingLista";
 
 type UIAlumno = StoreAlumno & { mail?: string | null };
 
-// helper visual de notas
 function notaBadge(n?: number) {
   if (n == null || Number.isNaN(n)) return <Badge variant="outline">—</Badge>;
   const v = Number(n);
@@ -49,22 +56,26 @@ export default function AlumnosPorCursoPage() {
 
   const [search, setSearch] = useState("");
   const [loadingMedias, setLoadingMedias] = useState(true);
-  const [colsAsignaturas, setColsAsignaturas] = useState<{ id: string; nombre: string; color: string }[]>([]);
-  const [mediaMap, setMediaMap] = useState<Record<string, Record<string, number>>>({});
+  const [colsAsignaturas, setColsAsignaturas] = useState<
+    { id: string; nombre: string; color: string }[]
+  >([]);
+  const [mediaMap, setMediaMap] = useState<
+    Record<string, Record<string, number>>
+  >({});
 
-  // carga base de alumnos (por si entras directo)
   useEffect(() => {
     if (cursoId) void cargarAlumnosCurso(cursoId);
   }, [cursoId]);
 
-  // carga medias/columnas asignaturas
   useEffect(() => {
     let mounted = true;
     async function load() {
       if (!cursoId) return;
       setLoadingMedias(true);
       try {
-        const res = await (window as any).electronAPI.obtenerMediasAlumnosCurso(cursoId);
+        const res = await (window as any).electronAPI.obtenerMediasAlumnosCurso(
+          cursoId
+        );
         if (!mounted) return;
         setColsAsignaturas(res.asignaturas || []);
         setMediaMap(res.mediaMap || {});
@@ -85,17 +96,17 @@ export default function AlumnosPorCursoPage() {
     [snapCursos.cursos, cursoId]
   );
 
-  // lista mostrada (responde a búsqueda)
   const alumnos: UIAlumno[] = useMemo(() => {
     const lista = (alumnosStore.porCurso[cursoId] ?? []) as UIAlumno[];
     if (!search.trim()) return lista;
     const q = search.toLowerCase();
     return lista.filter((a) =>
-      `${a.apellidos ?? ""} ${a.nombre ?? ""} ${a.mail ?? ""}`.toLowerCase().includes(q)
+      `${a.apellidos ?? ""} ${a.nombre ?? ""} ${a.mail ?? ""}`
+        .toLowerCase()
+        .includes(q)
     );
   }, [snapAlumnos.porCurso, cursoId, search]);
 
-  // items de ranking (globales, no dependen del filtro de búsqueda)
   const rankingItems = useMemo(() => {
     const todos = (alumnosStore.porCurso[cursoId] ?? []) as UIAlumno[];
     return todos.map((al) => {
@@ -103,8 +114,10 @@ export default function AlumnosPorCursoPage() {
       const nums = Object.values(mediasAlumno).filter(
         (v) => typeof v === "number" && !Number.isNaN(v)
       ) as number[];
-      const media = nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : NaN;
-      const nombre = `${al.apellidos ?? ""} ${al.nombre ?? ""}`.trim() || "Sin nombre";
+      const media =
+        nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : NaN;
+      const nombre =
+        `${al.apellidos ?? ""} ${al.nombre ?? ""}`.trim() || "Sin nombre";
       return { id: String(al.id), nombre, media };
     });
   }, [snapAlumnos.porCurso, mediaMap, cursoId]);
@@ -112,67 +125,101 @@ export default function AlumnosPorCursoPage() {
   const isLoadingBase = !!snapAlumnos.loading[cursoId];
   const isLoading = isLoadingBase || loadingMedias;
 
+  function onAbrirAlumno(a: { id: string; nombre: string; apellidos: string }) {
+    // Opciones:
+    // 1) Navegar a la ficha del alumno:
+    // router.push(`/alumnos/${a.id}`)
+
+    // 2) Abrir panel lateral / modal:
+    // setAlumnoExpandido(a.id)
+
+    console.log("abrir alumno", a);
+  }
+
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="flex flex-col gap-2 px-6 pt-4">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link href="/dashboard">Dashboard</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>Alumnos</BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>{curso?.acronimo || "Curso"}</BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+    <main>
+      <div className="p-6 space-y-4">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {curso?.nombre
+                ? `${curso.nombre} — Alumnos`
+                : "Alumnos del curso"}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {isLoading
+                ? "Cargando…"
+                : `${alumnos.length} alumno${alumnos.length === 1 ? "" : "s"}`}
+            </p>
+          </div>
 
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {curso?.nombre ? `${curso.nombre} — Alumnos` : "Alumnos del curso"}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {isLoading ? "Cargando…" : `${alumnos.length} alumno${alumnos.length === 1 ? "" : "s"}`}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Buscar por nombre, apellidos o email…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-72"
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Buscar por nombre, apellidos o email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-72"
+            />
           </div>
         </div>
 
-        {/* ===== Rankings (25% ancho en XL) ===== */}
         <div className="px-6 mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <RankingLista
-  titulo="Top 3"
-  subtitulo="Basado en medias globales por asignatura"
-  items={rankingItems}
-  cantidad={3}
-  orden="mejores"
-  isLoading={isLoading}
-/>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Top 3</CardTitle>
+                <CardDescription>
+                  Basado en medias globales por asignatura
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {rankingItems.slice(0, 3).map((a: any) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="truncate font-bold text-xs">
+                    <div className="flex justify-center items-center">
+                        <User className="h-6 w-6 opacity-70 pr-2 text-emerald-400" />
+                        {a.apellidos} {a.nombre}
+                      </div>
+                    </div>
+                    <Button className="text-xs" size="sm" onClick={() => onAbrirAlumno(a)}>
+                      Abrir
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
 
-<RankingLista
-  titulo="Last 3"
-  items={rankingItems}
-  cantidad={3}
-  orden="peores"
-  isLoading={isLoading}
-/>
-
-
+            <Card>
+              <CardHeader>
+                <CardTitle>Last 3</CardTitle>
+                <CardDescription>Alumnos con peores medias</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {rankingItems.slice(0, 3).map((a: any) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="truncate font-bold text-xs">
+                      <div className="flex justify-center items-center">
+                        <User className="h-6 w-6 opacity-70 pr-2 text-orange-400" />
+                        {a.apellidos} {a.nombre}
+                      </div>
+                    </div>
+                    <Button className="text-xs"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onAbrirAlumno(a)}
+                    >
+                      Abrir
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           </div>
         </div>
 
@@ -189,13 +236,18 @@ export default function AlumnosPorCursoPage() {
                     <TableHead key={asig.id} className="text-center">
                       <div className="flex items-center justify-center gap-2">
                         <Dot color={asig.color} />
-                        <span className="truncate max-w-[180px]" title={asig.nombre}>
+                        <span
+                          className="truncate max-w-[180px]"
+                          title={asig.nombre}
+                        >
                           {asig.nombre}
                         </span>
                       </div>
                     </TableHead>
                   ))}
-                  <TableHead className="w-[10%] text-center">Media global</TableHead>
+                  <TableHead className="w-[10%] text-center">
+                    Media global
+                  </TableHead>
                   <TableHead className="w-[10%] text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -203,7 +255,10 @@ export default function AlumnosPorCursoPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={3 + colsAsignaturas.length + 2} className="py-10 text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={3 + colsAsignaturas.length + 2}
+                      className="py-10 text-center text-muted-foreground"
+                    >
                       <div className="inline-flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Cargando datos…
@@ -212,20 +267,26 @@ export default function AlumnosPorCursoPage() {
                   </TableRow>
                 ) : alumnos.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3 + colsAsignaturas.length + 2} className="py-10 text-center text-muted-foreground">
-                      No hay alumnos para este curso{search ? " con ese criterio de búsqueda" : ""}.
+                    <TableCell
+                      colSpan={3 + colsAsignaturas.length + 2}
+                      className="py-10 text-center text-muted-foreground"
+                    >
+                      No hay alumnos para este curso
+                      {search ? " con ese criterio de búsqueda" : ""}.
                     </TableCell>
                   </TableRow>
                 ) : (
                   alumnos.map((al) => {
-                    const nombreCompleto = `${al.apellidos ?? ""} ${al.nombre ?? ""}`.trim();
+                    const nombreCompleto =
+                      `${al.apellidos ?? ""} ${al.nombre ?? ""}`.trim();
                     const mediasAlumno = mediaMap[al.id] || {};
                     const mediasNumeros = Object.values(mediasAlumno).filter(
                       (v) => typeof v === "number" && !Number.isNaN(v)
                     ) as number[];
                     const mediaGlobal =
                       mediasNumeros.length > 0
-                        ? mediasNumeros.reduce((a, b) => a + b, 0) / mediasNumeros.length
+                        ? mediasNumeros.reduce((a, b) => a + b, 0) /
+                          mediasNumeros.length
                         : undefined;
 
                     return (
@@ -233,13 +294,20 @@ export default function AlumnosPorCursoPage() {
                         <TableCell className="text-xs">
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4 opacity-70" />
-                            <div className="font-medium">{nombreCompleto || "Sin nombre"}</div>
+                            <div className="font-medium">
+                              {nombreCompleto || "Sin nombre"}
+                            </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm">{al.mail || "—"}</TableCell>
+                        <TableCell className="text-sm">
+                          {al.mail || "—"}
+                        </TableCell>
 
                         {colsAsignaturas.map((asig) => (
-                          <TableCell key={asig.id} className="text-center text-xs">
+                          <TableCell
+                            key={asig.id}
+                            className="text-center text-xs"
+                          >
                             {notaBadge(mediasAlumno[asig.id])}
                           </TableCell>
                         ))}
@@ -266,7 +334,7 @@ export default function AlumnosPorCursoPage() {
             </Table>
           </div>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+    </main>
   );
 }

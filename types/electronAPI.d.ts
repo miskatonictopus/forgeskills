@@ -118,7 +118,9 @@ export interface ElectronAPI {
 
   /* ===== Alumnos ===== */
   leerAlumnos: () => Promise<Alumno[]>;
-  leerAlumnosPorCurso: (cursoId: string) => Promise<Alumno[]>;
+  leerAlumnosPorCurso: (cursoId: string) => Promise<
+        { id: string; nombre: string; apellidos: string; mail?: string }[]
+      >;
   guardarAlumno: (alumno: AlumnoEntrada) => Promise<void>;
   obtenerAlumnosPorCurso: (cursoId: string) => Promise<
     { id: string; nombre: string; apellidos: string }[]

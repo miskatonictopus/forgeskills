@@ -1,66 +1,77 @@
 "use client";
-import React from "react";
-import { useEffect, useState } from "react";
+
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Mail, User } from "lucide-react";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Separator } from "@/components/ui/separator";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
+  Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
 } from "@/components/ui/table";
+import { alumnosStore, cargarAlumnosCurso, getAlumnosDeCurso } from "@/store/alumnosStore";
+
+type Alumno = { id: string; nombre: string; apellidos: string; mail?: string };
 
 export default function AlumnosCursoPage() {
-  const params = useParams();
-  const cursoId = params.cursoId as string;
-
-  const [alumnos, setAlumnos] = useState<any[]>([]);
+  const { cursoId } = useParams<{ cursoId: string }>();
   const [alumnoExpandido, setAlumnoExpandido] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // snapshot light: sólo lo necesario
+  const alumnos: Alumno[] = useMemo(() => getAlumnosDeCurso(String(cursoId)), [cursoId]);
+  const loading = alumnosStore.loading[String(cursoId)] ?? false;
 
   useEffect(() => {
-    const fetchAlumnos = async () => {
-      const res = await window.electronAPI.leerAlumnosPorCurso(cursoId);
-      setAlumnos(res);
-    };
-
-    fetchAlumnos();
+    let alive = true;
+    (async () => {
+      try {
+        setError(null);
+        await cargarAlumnosCurso(String(cursoId));
+        // mantener expandido si aún existe
+        if (alive && alumnoExpandido && !getAlumnosDeCurso(String(cursoId)).some(a => a.id === alumnoExpandido)) {
+          setAlumnoExpandido(null);
+        }
+      } catch (e: any) {
+        console.error("[AlumnosCursoPage] cargarAlumnosCurso:", e);
+        if (alive) setError("No se pudieron cargar los alumnos.");
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursoId]);
 
+  const plural = new Intl.PluralRules("es").select(alumnos.length);
+  const sufijo = plural === "one" ? "" : "s";
+
   return (
-
-
-        <main>
-
-        {/* Contenido principal */}
-        <div className="p-6 space-y-4">
+    <main>
+      <div className="p-6 space-y-4">
+        {/* Header */}
         <div className="flex items-center justify-between">
-  <h1 className="text-3xl font-bold tracking-tight">
-    <span className="uppercase">{cursoId}</span>
-  </h1>
-  <span className="flex items-center gap-1 text-muted-foreground text-sm font-light">
-    <User className="w-4 h-4" />
-    <span className="text-white">{alumnos.length}</span> alumno{alumnos.length !== 1 && "s"}
-  </span>
-</div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            <span className="uppercase">{String(cursoId)}</span>
+          </h1>
+          <span className="flex items-center gap-1 text-muted-foreground text-sm font-light">
+            <User className="w-4 h-4" />
+            <span className="text-foreground">{alumnos.length}</span> alumno{sufijo}
+          </span>
+        </div>
 
+        {/* Estados */}
+        {loading && (
+          <div className="text-sm text-muted-foreground italic">Cargando alumnos…</div>
+        )}
+        {error && (
+          <div className="text-sm text-red-500">{error}</div>
+        )}
+        {!loading && !error && alumnos.length === 0 && (
+          <div className="text-sm text-muted-foreground">No hay alumnos en este curso.</div>
+        )}
+
+        {/* Tabla */}
+        {alumnos.length > 0 && (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">
+                <TableHead className="w-[240px]">
                   <div className="flex items-center gap-1">
                     <User className="w-4 h-4 mr-1" />
                     Nombre
@@ -79,35 +90,22 @@ export default function AlumnosCursoPage() {
               {alumnos.map((a) => (
                 <React.Fragment key={a.id}>
                   <TableRow
-                    onClick={() =>
-                      setAlumnoExpandido((prev) =>
-                        prev === a.id ? null : a.id
-                      )
-                    }
-                    className="cursor-pointer hover:bg-muted transition"
+                    onClick={() => setAlumnoExpandido(prev => (prev === a.id ? null : a.id))}
+                    className="cursor-pointer hover:bg-muted/60 transition-colors"
                   >
-                    <TableCell>
-                      {a.apellidos}, {a.nombre}
-                    </TableCell>
-                    <TableCell>{a.mail}</TableCell>
+                    <TableCell>{a.apellidos}, {a.nombre}</TableCell>
+                    <TableCell>{a.mail ?? "—"}</TableCell>
                     <TableCell className="text-right">
-                      <span className="text-muted-foreground italic">
-                        pendiente…
-                      </span>
+                      <span className="text-muted-foreground italic">pendiente…</span>
                     </TableCell>
                   </TableRow>
 
                   {alumnoExpandido === a.id && (
-                    <TableRow className="bg-muted/50 animate-slide-fade-in">
+                    <TableRow className="bg-muted/50">
                       <TableCell colSpan={3}>
-                        <div className="p-4 text-sm text-muted-foreground animate-fade-in">
-                          {/* Aquí irá el panel de datos del alumno */}
-                          <p>
-                            Panel de alumno{" "}
-                            <strong>
-                              {a.nombre} {a.apellidos}
-                            </strong>
-                          </p>
+                        <div className="p-4 text-sm text-muted-foreground">
+                          Panel de alumno <strong>{a.nombre} {a.apellidos}</strong>
+                          {/* aquí podrás cargar notas, actividades, etc. */}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -116,7 +114,8 @@ export default function AlumnosCursoPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
-</main>
+        )}
+      </div>
+    </main>
   );
 }

@@ -3220,3 +3220,13 @@ ipcMain.handle("get-ces-asignatura", (_evt, asignaturaId: string) => {
   return result;
 });
 
+ipcMain.handle("alumnos:obtener-por-curso", (_e, { cursoId }) => {
+  if (!cursoId) return [];
+  const stmt = db.prepare(`
+    SELECT id, nombre, apellidos, mail
+    FROM alumnos
+    WHERE curso_id = ?
+    ORDER BY apellidos COLLATE NOCASE, nombre COLLATE NOCASE
+  `);
+  return stmt.all(cursoId);
+});
