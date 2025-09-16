@@ -313,10 +313,9 @@ const persistTimers = useRef<Record<string, any>>({});
 
   return (
     <>
-      <Card className="min-w-[400px] max-w-[400px] bg-zinc-900 border border-zinc-700 text-white flex flex-col relative">
-        <CardContent className="leading-tight space-y-3 pt-4">
+      <Card className="min-w-[400px] max-w-[400px] bg-zinc-900 border border-zinc-700 text-white flex items-center justify-center">
+        <CardContent className="leading-tight space-y-3">
           <div className="flex items-start gap-3">
-            {/* Info del curso */}
             <div className="grow">
               <p className="text-4xl font-bold truncate uppercase">
                 {curso.acronimo}{curso.nivel}

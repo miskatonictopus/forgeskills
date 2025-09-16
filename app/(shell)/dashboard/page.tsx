@@ -3,16 +3,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSnapshot } from "valtio";
 import NuevoAlumno from "@/components/NuevoAlumno";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { Tabs } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { GraduationCap, BookA, User, Pencil, Search } from "lucide-react";
+import { GraduationCap, BookA, User, Pencil, Search, X } from "lucide-react";
 import { toast } from "sonner";
-
+import { Input } from "@/components/ui/input";
 import { cursoStore } from "@/store/cursoStore";
 import { CursoCard } from "@/components/CursoCard";
 import { AsignaturaCard } from "@/components/AsignaturaCard";
@@ -224,6 +222,16 @@ export default function Page() {
     cerrada: 0,
   });
 
+  const [totalAlumnos, setTotalAlumnos] = useState(0);
+
+useEffect(() => {
+  const cargar = async () => {
+    const datos = await window.electronAPI.leerAlumnos();
+    setTotalAlumnos(datos.length);
+  };
+  cargar();
+}, [refreshKey]);
+
   const cursosBase: CursoPanel[] =
     (cursosParaPanel as CursoPanel[] | undefined)?.map((c) => ({
       id: c.id,
@@ -255,7 +263,7 @@ export default function Page() {
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <GraduationCap className="w-5 h-5" />
             Mis Cursos
-            <span className="bg-white text-black text-lg font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-sm">
+            <span className="bg-white text-black text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-sm">
               {snap.cursos.length}
             </span>
           </h2>
@@ -295,7 +303,7 @@ export default function Page() {
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <BookA className="w-5 h-5" />
             Mis Asignaturas
-            <span className="bg-white text-black text-lg font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-sm">
+            <span className="bg-white text-black text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-sm">
               {asignaturasUI.length}
             </span>
           </h2>
@@ -367,29 +375,56 @@ export default function Page() {
 
       {/* MIS ALUMNOS */}
       <section className="rounded-xl border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden bg-zinc-950">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Mis Alumnos
-          </h2>
+  <div className="flex items-center justify-between gap-3 mb-2">
+    <h2 className="text-xl font-semibold flex items-center gap-2">
+      <User className="w-5 h-5" />
+      Mis Alumnos
+      <span className="bg-white text-black text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-sm">
+        {totalAlumnos}
+      </span>
+    </h2>
 
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="secondary" className="text-xs">+ Añadir alumno/s</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md bg-zinc-800">
-              <DialogHeader><DialogTitle>Nuevo Alumno</DialogTitle></DialogHeader>
-              <NuevoAlumno onSave={() => setRefreshKey((k) => k + 1)} />
-            </DialogContent>
-          </Dialog>
-        </div>
+    {/* Buscador + botón añadir */}
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+        <Input
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          placeholder="Buscar por nombre o apellidos…"
+          className="pl-8 w-[220px] sm:w-[280px] bg-zinc-900 border-zinc-700 text-zinc-100 placeholder:text-zinc-400"
+        />
+        {filtro && (
+          <button
+            type="button"
+            onClick={() => setFiltro("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2"
+            aria-label="Limpiar búsqueda"
+            title="Limpiar"
+          >
+            <X className="w-4 h-4 text-zinc-400 hover:text-zinc-200" />
+          </button>
+        )}
+      </div>
 
-        <Separator className="mt-2 mb-4 bg-zinc-800" />
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="secondary" className="text-xs">+ Añadir alumno/s</Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md bg-zinc-800">
+          <DialogHeader><DialogTitle>Nuevo Alumno</DialogTitle></DialogHeader>
+          <NuevoAlumno onSave={() => setRefreshKey((k) => k + 1)} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  </div>
 
-        <div className="flex-1 overflow-y-auto pr-1">
-          <TablaAlumnos filtro={""} onEmptyChange={setSinAlumnos} refreshKey={refreshKey} />
-        </div>
-      </section>
+  <Separator className="mt-2 mb-4 bg-zinc-800" />
+
+  <div className="flex-1 overflow-y-auto pr-1">
+    <TablaAlumnos filtro={filtro} onEmptyChange={setSinAlumnos} refreshKey={refreshKey} />
+  </div>
+</section>
 
       {/* MIS ACTIVIDADES */}
       <section className="rounded-xl border border-muted bg-muted/10 p-4 flex flex-col overflow-hidden bg-zinc-950">

@@ -98,13 +98,14 @@ const api = {
 
   actualizarColorAsignatura: (id: string, color: string) =>
     ipcRenderer.invoke("actualizar-color-asignatura", id, color),
+    leerAlumnos: () => ipcRenderer.invoke("leer-alumnos"),
   leerColoresAsignaturas: (cursoId: string) =>
     ipcRenderer.invoke("asignaturas:leer-colores-curso", cursoId),
   guardarAsignatura: (asignatura: Asignatura) =>
     ipcRenderer.invoke("guardar-asignatura", asignatura),
   leerAsignatura: (id: string) => ipcRenderer.invoke("leer-asignatura", id),
 
-
+  leerAlumno: (id: string | number) => ipcRenderer.invoke("leer-alumno", id),
   leerAsignaturas: (cursoId: string) =>
     ipcRenderer.invoke("leer-asignaturas-curso", cursoId),
 
@@ -128,7 +129,6 @@ const api = {
   /* ================= ALUMNOS ================= */
   guardarAlumno: (alumno: AlumnoEntrada) =>
     ipcRenderer.invoke("guardar-alumno", alumno),
-  leerAlumnos: () => ipcRenderer.invoke("leer-alumnos"),
   leerAlumnosPorCurso: (cursoId: string) =>
     ipcRenderer.invoke("leer-alumnos-por-curso", cursoId),
   alumnosPorCurso: (cursoId: string) =>

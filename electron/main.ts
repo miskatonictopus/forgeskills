@@ -1063,6 +1063,19 @@ ipcMain.handle("guardar-alumno", async (_event, alumno) => {
   }
 });
 
+ipcMain.handle("leer-alumno", (_e, idRaw: string | number) => {
+  const idNum = Number(idRaw);
+  console.log("[ipc] leer-alumno recibido:", idRaw, "→ num:", idNum);
+
+  if (Number.isNaN(idNum)) return null;
+
+  const stmt = db.prepare("SELECT * FROM alumnos WHERE id = ?");
+  const row = stmt.get(idNum);
+
+  console.log("[ipc] leer-alumno resultado:", row);
+  return row ?? null;
+});
+
 ipcMain.handle("leer-alumnos", () => {
   return db.prepare("SELECT * FROM alumnos").all();
 });
