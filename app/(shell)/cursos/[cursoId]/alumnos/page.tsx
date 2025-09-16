@@ -299,7 +299,7 @@ export default function AlumnosPorCursoPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-xs">
                           {al.mail || "—"}
                         </TableCell>
 
