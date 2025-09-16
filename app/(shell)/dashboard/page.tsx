@@ -377,7 +377,7 @@ export default function Page() {
             <DialogTrigger asChild>
               <Button variant="secondary" className="text-xs">+ Añadir alumno/s</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md bg-zinc-800">
               <DialogHeader><DialogTitle>Nuevo Alumno</DialogTitle></DialogHeader>
               <NuevoAlumno onSave={() => setRefreshKey((k) => k + 1)} />
             </DialogContent>

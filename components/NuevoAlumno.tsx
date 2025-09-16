@@ -59,10 +59,10 @@ export default function NuevoAlumno({ onSave }: Props) {
   
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bg-zinc-800">
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div>
-      <Label htmlFor="apellidos">Apellidos</Label>
+      <Label htmlFor="apellidos" className="mb-2">Apellidos</Label>
       <Input
         id="apellidos"
         value={apellidos}
@@ -71,7 +71,7 @@ export default function NuevoAlumno({ onSave }: Props) {
       />
     </div>
     <div>
-      <Label htmlFor="nombre">Nombre</Label>
+      <Label htmlFor="nombre" className="mb-2">Nombre</Label>
       <Input
         id="nombre"
         value={nombre}
@@ -82,7 +82,7 @@ export default function NuevoAlumno({ onSave }: Props) {
   </div>
 
   <div>
-  <Label htmlFor="curso">Curso</Label>
+  <Label htmlFor="curso" className="mb-2">Curso</Label>
   <Select value={curso} onValueChange={setCurso}>
     <SelectTrigger id="curso">
       <SelectValue placeholder="Selecciona un curso" />
@@ -90,7 +90,7 @@ export default function NuevoAlumno({ onSave }: Props) {
     <SelectContent>
       {cursos.map((c) => (
         <SelectItem key={c.id} value={c.id}>
-          {c.acronimo} - {c.nombre}
+          {c.acronimo}{c.nivel} - {c.nombre}
         </SelectItem>
       ))}
     </SelectContent>
@@ -98,7 +98,7 @@ export default function NuevoAlumno({ onSave }: Props) {
   </div>
 
   <div>
-    <Label htmlFor="mail">Correo electrónico</Label>
+    <Label htmlFor="mail" className="mb-2">Correo electrónico</Label>
     <Input
       type="email"
       id="mail"
