@@ -165,6 +165,9 @@ const api = {
     ipcRenderer.invoke("actualizar-actividad-fecha", id, fecha),
   borrarActividad: (actividadId: string) =>
     ipcRenderer.invoke("borrar-actividad", actividadId),
+    obtenerAlumnosPorCurso: (cursoId: string) =>
+    ipcRenderer.invoke("alumnos:obtener-por-curso", { cursoId }),
+  // alias
 
   /* ================= RA / CE + Análisis ================= */
   obtenerRAPorAsignatura: (asignaturaId: string) =>

@@ -313,7 +313,7 @@ const persistTimers = useRef<Record<string, any>>({});
 
   return (
     <>
-      <Card className="min-w-[300px] bg-zinc-900 border border-zinc-700 text-white flex flex-col relative">
+      <Card className="min-w-[400px] max-w-[400px] bg-zinc-900 border border-zinc-700 text-white flex flex-col relative">
         <CardContent className="leading-tight space-y-3 pt-4">
           <div className="flex items-start gap-3">
             {/* Info del curso */}
@@ -329,7 +329,11 @@ const persistTimers = useRef<Record<string, any>>({});
             </div>
 
             {/* Botones alineados a la derecha */}
-            <div className="ml-auto flex flex-col items-end gap-2 shrink-0">
+            
+          </div>
+
+          <Separator className="my-2" />
+          <div className="ml-auto flex flex-row items-start gap-2 shrink-0">
               {/* Ver alumnos */}
               <Popover open={openAlumnos} onOpenChange={handleOpenChangeAlumnos}>
                 <PopoverTrigger asChild>
@@ -386,7 +390,7 @@ const persistTimers = useRef<Record<string, any>>({});
               <Popover>
                 <PopoverTrigger asChild>
                   <Button size="sm" variant="outline" className="h-8 bg-zinc-800/60 border-zinc-700 text-zinc-100 hover:bg-zinc-700 text-xs">
-                    Ver asignaturas
+                    Ver Asignaturas
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-80 p-0 bg-zinc-800 border border-zinc-700 text-zinc-100 shadow-2xl">
@@ -439,7 +443,7 @@ const persistTimers = useRef<Record<string, any>>({});
                       Seleccionadas: {Object.values(seleccionAsig).filter(Boolean).length}
                     </span>
                   </div>
-                  <ScrollArea className="h-[360px]">
+                  <ScrollArea className="h-[auto]">
                     <ul className="p-2 space-y-1">
                       {catalogoAsig.length === 0 && (
                         <li className="px-3 py-2 text-sm text-zinc-300">
@@ -453,7 +457,7 @@ const persistTimers = useRef<Record<string, any>>({});
                             onCheckedChange={(v) => toggleAsig(a.id, v)}
                             className="border-zinc-600 data-[state=checked]:bg-white data-[state=checked]:text-black"
                           />
-                          <span className="text-sm truncate">{a.nombre}</span>
+                          <span className="text-xs truncate">{a.nombre}</span>
                           <span className="ml-auto text-[11px] text-zinc-400">#{a.id}</span>
                         </li>
                       ))}
@@ -470,10 +474,6 @@ const persistTimers = useRef<Record<string, any>>({});
                 </PopoverContent>
               </Popover>
             </div>
-          </div>
-
-          <Separator className="my-2" />
-
           {/* CTA cuando no hay asignaturas */}
           {!(asignaturas?.length > 0) && (
             <Button
