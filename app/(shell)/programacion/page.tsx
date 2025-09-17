@@ -137,6 +137,7 @@ const METODOLOGIAS: Record<MetodologiaId, { id: MetodologiaId; label: string }> 
   taller: { id: "taller", label: "Taller" },
 };
 
+
 const etiquetaMetodologia: Record<MetodologiaId, string> = Object.fromEntries(
   Object.values(METODOLOGIAS).map(m => [m.id, m.label])
 ) as Record<MetodologiaId, string>;
@@ -238,7 +239,7 @@ function SortableItem({
     useSortable({ id: item._uid });
 
     const style: React.CSSProperties = {
-      transform: CSS.Transform.toString(transform),
+      transform: CSS.Translate.toString(transform),
       transition,
       opacity: isDragging ? 0.6 : 1,
     };
@@ -474,6 +475,19 @@ export default function PageProgramacion() {
   const [preprogramacion, setPreprogramacion] = useState<UISesion[]>([]);
   const [saving, setSaving] = useState(false);
   const [planLLM, setPlanLLM] = useState<LLMPlan | null>(null);
+  const [sugiriendoTodas, setSugiriendoTodas] = useState(false);
+  const [progresoTodas, setProgresoTodas] =
+    useState<{ done: number; total: number }>({ done: 0, total: 0 });
+
+  const linesBusySugerencias = React.useMemo(
+    () => [
+      `Sesiones con CE: ${progresoTodas.total}`,
+      `Progreso: ${progresoTodas.done}/${progresoTodas.total}`,
+      "Aplicando heurísticas si el LLM no sugiere…",
+    ],
+    [progresoTodas.done, progresoTodas.total]
+  );
+
 
   const resumen = useMemo(() => {
     const totalSes = Array.isArray(sesionesFuente)
@@ -483,6 +497,12 @@ export default function PageProgramacion() {
     const totalCE = (detalleAsig?.RA ?? []).reduce((acc, ra) => acc + (ra.CE?.length || 0), 0);
     return { totalSes, totalRA, totalCE };
   }, [detalleAsig, sesionesFuente]);
+
+  const busySave = saving;
+  const busySugerencias = sugiriendoTodas;
+  const busyPlan = cargando;                        
+  const overlayOpen = cargando || saving || sugiriendoTodas;
+  
 
   /* ===== DnD sensors ===== */
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -872,8 +892,6 @@ setPreprogramacion(withUID(sesionesUI));
   }
 
   // === Sugerir todas las metodologías de golpe ===
-const [sugiriendoTodas, setSugiriendoTodas] = useState(false);
-const [progresoTodas, setProgresoTodas] = useState<{done:number,total:number}>({done:0,total:0});
 
 async function sugerirTodasMetodologias() {
   if (sugiriendoTodas) return;
@@ -1100,10 +1118,7 @@ const handleGuardar = async () => {
     doc.save(fileName);
   };
 
-  const busyPlan = cargando;
-const busySave = saving;
-const busySugerencias = sugiriendoTodas;
-const overlayOpen = busyPlan || busySave || busySugerencias;
+
 
 
   /* ===== UI ===== */
@@ -1357,42 +1372,34 @@ const overlayOpen = busyPlan || busySave || busySugerencias;
         </CardContent>
       </Card>
 
-      
 
       <LoaderOverlay
-        open={overlayOpen}
-        // No pases onClose => bloquea clics, teclado y scroll (strictBlock por defecto)
-        title={
-          busySave
-            ? "Guardando y generando el PDF…"
-            : busySugerencias
-            ? "Generando sugerencias de metodologías…"
-            : "Preparando datos y plan con LLM…"
-        }
-        subtitle={
-          busySugerencias
-            ? "Puede tardar unos segundos por sesión."
-            : undefined
-        }
-        lines={
-          busySugerencias
-            ? [
-                `Sesiones con CE: ${progresoTodas.total}`,
-                `Progreso: ${progresoTodas.done}/${progresoTodas.total}`,
-                "Aplicando heurísticas si el LLM no sugiere…",
-              ]
-            : busySave
-            ? ["Serializando programación…", "Exportando HTML…", "Generando PDF…"]
-            : ["Leyendo RA/CE…", "Calculando sesiones…", "Llamando al planificador…", "Construyendo UI…"]
-        }
-        progress={
-          busySugerencias
-            ? { current: progresoTodas.done, total: progresoTodas.total }
-            : null
-        }
-        blur="lg"
-        // strictBlock=true por defecto en el componente blindado
-      />
+  open={overlayOpen}
+  zIndexClassName="z-[9999]"
+  title={
+    busySave
+      ? "Guardando y generando el PDF…"
+      : busySugerencias
+      ? "Generando sugerencias de metodologías…"
+      : detalleAsig
+      ? "Preparando datos y plan con LLM…"
+      : "Preparando datos…"
+  }
+  subtitle={busySugerencias ? "Puede tardar unos segundos por sesión." : undefined}
+  lines={
+    busySugerencias
+      ? linesBusySugerencias
+      : busySave
+      ? ["Serializando programación…", "Exportando HTML…", "Generando PDF…"]
+      : detalleAsig
+      ? ["Leyendo RA/CE…", "Calculando sesiones…", "Llamando al planificador…", "Construyendo UI…"]
+      : ["Cargando asignaturas…"]
+  }
+  progress={busySugerencias ? { current: progresoTodas.done, total: progresoTodas.total } : null}
+  blur="lg"
+/>
+
+
 
     </div>
   );
