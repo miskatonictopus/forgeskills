@@ -1,5 +1,6 @@
 "use client";
 
+import LoaderOverlay from "@/components/LoaderOverlay";
 import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -236,11 +237,12 @@ function SortableItem({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item._uid });
 
-  const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    opacity: isDragging ? 0.6 : 1,
-  };
+    const style: React.CSSProperties = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.6 : 1,
+    };
+    
 
   const isEval = (item as any).tipo === "eval";
   const isLibre = (item as any).tipo === "libre";
@@ -1098,6 +1100,12 @@ const handleGuardar = async () => {
     doc.save(fileName);
   };
 
+  const busyPlan = cargando;
+const busySave = saving;
+const busySugerencias = sugiriendoTodas;
+const overlayOpen = busyPlan || busySave || busySugerencias;
+
+
   /* ===== UI ===== */
   return (
     <div className="p-6">
@@ -1132,7 +1140,7 @@ const handleGuardar = async () => {
                       <SelectLabel>{curso}</SelectLabel>
                       {items.map((a) => (
                         <SelectItem key={`${a.cursoId}:${a.id}`} value={`${a.cursoId}:${a.id}`}>
-                          {a.nombre}
+                          <span className="font-bold">{a.id}</span> - {a.nombre}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -1155,6 +1163,7 @@ const handleGuardar = async () => {
           ) : null}
         </CardContent>
       </Card>
+      
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -1347,6 +1356,44 @@ const handleGuardar = async () => {
           )}
         </CardContent>
       </Card>
+
+      
+
+      <LoaderOverlay
+        open={overlayOpen}
+        // No pases onClose => bloquea clics, teclado y scroll (strictBlock por defecto)
+        title={
+          busySave
+            ? "Guardando y generando el PDF…"
+            : busySugerencias
+            ? "Generando sugerencias de metodologías…"
+            : "Preparando datos y plan con LLM…"
+        }
+        subtitle={
+          busySugerencias
+            ? "Puede tardar unos segundos por sesión."
+            : undefined
+        }
+        lines={
+          busySugerencias
+            ? [
+                `Sesiones con CE: ${progresoTodas.total}`,
+                `Progreso: ${progresoTodas.done}/${progresoTodas.total}`,
+                "Aplicando heurísticas si el LLM no sugiere…",
+              ]
+            : busySave
+            ? ["Serializando programación…", "Exportando HTML…", "Generando PDF…"]
+            : ["Leyendo RA/CE…", "Calculando sesiones…", "Llamando al planificador…", "Construyendo UI…"]
+        }
+        progress={
+          busySugerencias
+            ? { current: progresoTodas.done, total: progresoTodas.total }
+            : null
+        }
+        blur="lg"
+        // strictBlock=true por defecto en el componente blindado
+      />
+
     </div>
   );
 }
