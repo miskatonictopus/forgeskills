@@ -17,6 +17,7 @@ release/
 *.pkg
 *.asar
 *.app
+.next/
 # otros
 node_modules/
 .DS_Store
