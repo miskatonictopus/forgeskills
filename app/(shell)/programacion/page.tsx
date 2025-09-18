@@ -1382,7 +1382,7 @@ const handleGuardar = async () => {
       : busySugerencias
       ? "Generando sugerencias de metodologías…"
       : detalleAsig
-      ? "Preparando datos y plan con LLM…"
+      ? "Preparando programación mediante datos y plan con LLM…"
       : "Preparando datos…"
   }
   subtitle={busySugerencias ? "Puede tardar unos segundos por sesión." : undefined}
@@ -1392,7 +1392,7 @@ const handleGuardar = async () => {
       : busySave
       ? ["Serializando programación…", "Exportando HTML…", "Generando PDF…"]
       : detalleAsig
-      ? ["Leyendo RA/CE…", "Calculando sesiones…", "Llamando al planificador…", "Construyendo UI…"]
+      ? ["Analizando RA/CE…", "Calculando sesiones…","Equilibrando sesiones…", "Conectando mediante API al planificador…", "Revisando sesiones…", "Proceso renderizando correctamente", "Construyendo UI…"]
       : ["Cargando asignaturas…"]
   }
   progress={busySugerencias ? { current: progresoTodas.done, total: progresoTodas.total } : null}
