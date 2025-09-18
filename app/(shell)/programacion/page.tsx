@@ -496,11 +496,12 @@ export default function PageProgramacion() {
     return { totalSes, totalRA, totalCE };
   }, [detalleAsig, sesionesFuente]);
 
+  const [generandoPlan, setGenerandoPlan] = useState(false);
   const busySave = saving;
-  const busySugerencias = sugiriendoTodas;
-  const [generandoPlan, setGenerandoPlan] = useState(false);                  
+  const busySugerencias = sugiriendoTodas;                
   const overlayOpen = cargando || saving || sugiriendoTodas || generandoPlan;
-
+  const [prog, setProg] = useState<{ current: number; total: number; message?: string } | null>(null);
+  const abortRef = React.useRef<AbortController | null>(null);
   
 
   /* ===== DnD sensors ===== */
@@ -756,140 +757,186 @@ export default function PageProgramacion() {
 
   // === Sugerir todas las metodologías de golpe ===
 
-  async function generarProgramacion() {
-    if (!detalleAsig) {
-      toast.message("Selecciona una asignatura primero.");
+  
+
+ async function generarProgramacion() {
+  if (!detalleAsig) {
+    toast.message("Selecciona una asignatura primero.");
+    return;
+  }
+
+  try {
+    setGenerandoPlan(true);
+    setProg({ current: 0, total: 1, message: "Iniciando…" });
+
+    // Construimos el payload exactamente como antes:
+    const defaultMinutos = 55;
+
+    const ces = (detalleAsig.RA ?? []).flatMap((ra) =>
+      (ra.CE ?? []).map((ce) => ({
+        id: `${ra.codigo}::${ce.codigo}`,
+        codigo: ce.codigo,
+        descripcion: ce.descripcion,
+        raCodigo: ra.codigo,
+      }))
+    );
+
+    const sesionesValue = sesionesFuente;
+    const sesiones = Array.isArray(sesionesValue)
+      ? (sesionesValue as string[]).map((fechaISO: string, i: number) => ({
+          id: `S${i + 1}`,
+          fechaISO,
+          minutos: defaultMinutos,
+        }))
+      : Array.from({ length: Number(sesionesValue || 0) }).map((_, i) => ({
+          id: `S${i + 1}`,
+          minutos: defaultMinutos,
+        }));
+
+    if (ces.length === 0) {
+      setPreprogramacion([]);
+      setPlanLLM(null);
+      toast.message("No hay CE registrados en esta asignatura.");
+      setGenerandoPlan(false);
+      setProg(null);
       return;
     }
-  
-    try {
-      setGenerandoPlan(true);
-  
-      const defaultMinutos = 55;
-  
-      const ces: LLMCE[] = (detalleAsig.RA ?? []).flatMap((ra) =>
-        (ra.CE ?? []).map((ce) => ({
-          id: `${ra.codigo}::${ce.codigo}`,
-          codigo: ce.codigo,
-          descripcion: ce.descripcion,
-          raCodigo: ra.codigo,
-        }))
-      );
-  
-      const sesionesValue = sesionesFuente;
-      const sesiones: LLMSesion[] = Array.isArray(sesionesValue)
-        ? (sesionesValue as string[]).map((fechaISO: string, i: number) => ({
-            id: `S${i + 1}`,
-            fechaISO,
-            minutos: defaultMinutos,
-          }))
-        : Array.from({ length: Number(sesionesValue || 0) }).map((_, i) => ({
-            id: `S${i + 1}`,
-            minutos: defaultMinutos,
-          }));
-  
-      if (ces.length === 0) {
-        setPreprogramacion([]);
-        setPlanLLM(null);
-        toast.message("No hay CE registrados en esta asignatura.");
-        return;
-      }
-      if (sesiones.length === 0) {
-        setPreprogramacion([]);
-        setPlanLLM(null);
-        toast.message("No hay sesiones planificadas para esta asignatura.");
-        return;
-      }
-  
-      const resp = await fetch("/api/planificar-ce", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ces,
-          sesiones,
-          opts: {
-            usarLLM: true,
-            insertarEvaluacionRA: true,
-            resolverFaltaHueco: "recortar",
-            estrategia: "intercalado-estricto",
-            maxCEporSesion: 3,
-          },
-        }),
-      });
-  
-      const data = await resp.json();
-      if (!data?.ok) {
-        toast.error(data?.error || "No se pudo generar el plan con LLM.");
-        setPreprogramacion([]);
-        setPlanLLM(null);
-        return;
-      }
-  
-      const plan: LLMPlan = data.plan;
-      setPlanLLM(plan);
-  
-      // === Garantiza 1 evaluación por RA tras el último CE del RA ===
-      function ensureEvaluacionesPorRA(
-        plan: LLMPlan,
-        slots: LLMSesion[],
-        catalogo: Record<string, { raCodigo: string; ceCodigo: string; ceDescripcion: string }>
-      ) {
-        const idxById = new Map(slots.map((s, i) => [s.id, i]));
-        const ultimoCEporRA = new Map<string, number>();
-        for (const it of plan.items) {
-          if (it.tipo === "CE") {
-            const ra = catalogo[(it as any).ceId]?.raCodigo;
-            if (!ra) continue;
-            const idx = idxById.get(it.sesionId);
-            if (typeof idx === "number") {
-              const prev = ultimoCEporRA.get(ra);
-              if (prev == null || idx > prev) ultimoCEporRA.set(ra, idx);
-            }
+    if (sesiones.length === 0) {
+      setPreprogramacion([]);
+      setPlanLLM(null);
+      toast.message("No hay sesiones planificadas para esta asignatura.");
+      setGenerandoPlan(false);
+      setProg(null);
+      return;
+    }
+
+    // Abortar stream previo si lo hubiera
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
+    // Llamamos a la ruta de stream (POST) y leemos el body como stream de texto
+    const res = await fetch("/api/planificar-ce/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ces,
+        sesiones,
+        opts: {
+          usarLLM: true,
+          insertarEvaluacionRA: true,
+          resolverFaltaHueco: "recortar",
+          estrategia: "intercalado-estricto",
+          maxCEporSesion: 3,
+        },
+      }),
+      signal: abortRef.current.signal,
+    });
+
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    // Helpers locales (iguales a los tuyos)
+    function ensureEvaluacionesPorRA(
+      plan: any,
+      slots: { id: string }[],
+      catalogo: Record<string, { raCodigo: string; ceCodigo: string; ceDescripcion: string }>
+    ) {
+      const idxById = new Map(slots.map((s, i) => [s.id, i]));
+      const ultimoCEporRA = new Map<string, number>();
+      for (const it of plan.items) {
+        if (it.tipo === "CE") {
+          const ra = catalogo[(it as any).ceId]?.raCodigo;
+          if (!ra) continue;
+          const idx = idxById.get(it.sesionId);
+          if (typeof idx === "number") {
+            const prev = ultimoCEporRA.get(ra);
+            if (prev == null || idx > prev) ultimoCEporRA.set(ra, idx);
           }
         }
-        const evalPorRA = new Set<string>();
-        for (const it of plan.items) {
-          if (it.tipo === "EVALUACION_RA") evalPorRA.add((it as any).raCodigo);
-        }
-        const nuevos: LLMItem[] = [];
-        for (const [ra, lastIdx] of ultimoCEporRA.entries()) {
-          if (evalPorRA.has(ra)) continue;
-          const sesionId = slots[Math.min(lastIdx, slots.length - 1)].id;
-          nuevos.push({
-            sesionId,
-            tipo: "EVALUACION_RA",
-            raCodigo: ra,
-            minutosOcupados: 15,
-          } as any);
-        }
-        if (nuevos.length) plan.items = [...plan.items, ...nuevos];
       }
-  
-      const catalogo: Record<string, { raCodigo: string; ceCodigo: string; ceDescripcion: string }> = {};
-      (detalleAsig.RA ?? []).forEach((ra) => {
-        (ra.CE ?? []).forEach((ce) => {
-          const ceId = `${ra.codigo}::${ce.codigo}`;
-          catalogo[ceId] = { raCodigo: ra.codigo, ceCodigo: ce.codigo, ceDescripcion: ce.descripcion };
-        });
-      });
-  
-      const slots: SesionSlot[] = Array.isArray(sesionesValue)
-        ? (sesionesValue as string[]).map((fechaISO, i) => ({ id: `S${i + 1}`, fechaISO, minutos: defaultMinutos }))
-        : Array.from({ length: Number(sesionesValue || 0) }).map((_, i) => ({ id: `S${i + 1}`, minutos: defaultMinutos }));
-  
-      ensureEvaluacionesPorRA(plan, sesiones, catalogo);
-  
-      const sesionesUI = planToUI(slots, plan as unknown as Plan, catalogo);
-      setPreprogramacion(withUID(sesionesUI));
-  
-      toast.success("Programación generada.");
-    } catch (e) {
-      console.error(e);
-      toast.error("Error al generar la programación");
-    } finally {
-      setGenerandoPlan(false);
+      const evalPorRA = new Set<string>();
+      for (const it of plan.items) if (it.tipo === "EVALUACION_RA") evalPorRA.add((it as any).raCodigo);
+
+      const nuevos: any[] = [];
+      for (const [ra, lastIdx] of ultimoCEporRA.entries()) {
+        if (evalPorRA.has(ra)) continue;
+        const sesionId = slots[Math.min(lastIdx, slots.length - 1)].id;
+        nuevos.push({ sesionId, tipo: "EVALUACION_RA", raCodigo: ra, minutosOcupados: 15 });
+      }
+      if (nuevos.length) plan.items = [...plan.items, ...nuevos];
     }
+
+    const slots = Array.isArray(sesionesValue)
+      ? (sesionesValue as string[]).map((fechaISO, i) => ({ id: `S${i + 1}`, fechaISO, minutos: defaultMinutos }))
+      : Array.from({ length: Number(sesionesValue || 0) }).map((_, i) => ({ id: `S${i + 1}`, minutos: defaultMinutos }));
+
+    const catalogo: Record<string, { raCodigo: string; ceCodigo: string; ceDescripcion: string }> = {};
+    (detalleAsig.RA ?? []).forEach((ra) =>
+      (ra.CE ?? []).forEach((ce) => {
+        const ceId = `${ra.codigo}::${ce.codigo}`;
+        catalogo[ceId] = { raCodigo: ra.codigo, ceCodigo: ce.codigo, ceDescripcion: ce.descripcion };
+      })
+    );
+
+    // Leemos el stream: vienen líneas "data: {...}\n\n"
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let sepIndex: number;
+      // Procesa todos los bloques completos que haya
+      while ((sepIndex = buffer.indexOf("\n\n")) >= 0) {
+        const chunk = buffer.slice(0, sepIndex).trim();
+        buffer = buffer.slice(sepIndex + 2);
+        if (!chunk.startsWith("data:")) continue;
+
+        const json = chunk.slice(5).trim();
+        if (!json) continue;
+
+        const tick = JSON.parse(json) as { current: number; total: number; message?: string; done?: boolean; plan?: any; error?: string };
+
+        if (tick.error) {
+          setProg(null);
+          setGenerandoPlan(false);
+          toast.error(tick.error);
+          return;
+        }
+
+        if (tick.message) setProg({ current: tick.current, total: tick.total, message: tick.message });
+
+        if (tick.done) {
+          const plan = tick.plan;
+          setPlanLLM(plan);
+          // Inserta evaluaciones y mapea a UI (igual que antes, pero ahora con el plan del stream)
+          ensureEvaluacionesPorRA(plan, slots, catalogo);
+
+          const sesionesUI = planToUI(slots, plan as unknown as any, catalogo);
+          setPreprogramacion(withUID(sesionesUI));
+
+          setProg(null);
+          setGenerandoPlan(false);
+          toast.success("Programación generada.");
+        }
+      }
+    }
+  } catch (e: any) {
+    if (e?.name !== "AbortError") {
+      console.error(e);
+      toast.error("Error en la generación.");
+    }
+  } finally {
+    // nada, los estados se cierran al done o al catch
   }
+}
+
+// Si el usuario cambia de asignatura, aborta cualquier stream en curso
+useEffect(() => {
+  return () => abortRef.current?.abort();
+}, []);
   
 
 async function sugerirTodasMetodologias() {
@@ -1341,7 +1388,7 @@ const handleGuardar = async () => {
           <div className="mt-4 flex items-center gap-2">
             <Button onClick={handleGuardar} disabled={!detalleAsig || preprogramacion.length === 0 || saving}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-              Generar y guardar programación
+              guardar programación en PDF / JSON
             </Button>
             <Separator orientation="vertical" className="h-6" />
             <span className="text-sm text-muted-foreground">
@@ -1397,37 +1444,39 @@ const handleGuardar = async () => {
   open={overlayOpen}
   zIndexClassName="z-[9999]"
   title={
-    saving
+    busySave
       ? "Guardando y generando el PDF…"
-      : sugiriendoTodas
+      : busySugerencias
       ? "Generando sugerencias de metodologías…"
       : generandoPlan
-      ? "Generando programación con LLM…"
+      ? "Generando programación…"
       : detalleAsig
       ? "Preparando datos…"
-      : "Cargando…"
+      : "Preparando datos…"
   }
-  subtitle={
-    sugiriendoTodas
-      ? "Puede tardar unos segundos por sesión."
-      : generandoPlan
-      ? "Equilibrando sesiones y añadiendo evaluaciones…"
-      : undefined
-  }
+  subtitle={busySugerencias ? "Puede tardar unos segundos por sesión." : undefined}
   lines={
-    sugiriendoTodas
+    generandoPlan && prog?.message
+      ? [prog.message] // <- mensaje en tiempo real del stream
+      : busySugerencias
       ? linesBusySugerencias
-      : saving
+      : busySave
       ? ["Serializando programación…", "Exportando HTML…", "Generando PDF…"]
-      : generandoPlan
-      ? ["Analizando RA/CE…", "Calculando sesiones…", "Equilibrando…", "Llamando al planificador…", "Construyendo UI…"]
       : detalleAsig
-      ? ["Datos de asignatura listos."]
+      ? ["Analizando RA/CE…", "Calculando sesiones…", "Conectando al planificador…", "Construyendo UI…"]
       : ["Cargando asignaturas…"]
   }
-  progress={sugiriendoTodas ? { current: progresoTodas.done, total: progresoTodas.total } : null}
+  progress={
+    generandoPlan && prog
+      ? { current: prog.current, total: prog.total } // <- esto activa la barra
+      : busySugerencias
+      ? { current: progresoTodas.done, total: progresoTodas.total }
+      : null
+  }
   blur="lg"
 />
+
+
 
 
 
