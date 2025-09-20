@@ -3205,41 +3205,109 @@ ipcMain.handle("prog:exportar-pdf", async (_evt, html: string, jsonPath: string)
   }
 });
 
-ipcMain.handle("get-ces-asignatura", (_evt, asignaturaId: string) => {
-  console.log("[IPC] get-ces-asignatura", { asignaturaId });
+ipcMain.handle("alumnos:obtener-por-curso", (_e, cursoIdRaw) => {
+  const cursoId = String(cursoIdRaw);
 
-  // Traer los RA de la asignatura
-  const raRows = db.prepare(
-    `SELECT r.id, r.codigo, r.descripcion
-     FROM ra r
-     WHERE r.asignatura_id = ?
-     ORDER BY r.codigo`
-  ).all(asignaturaId) as { id: string; codigo: string; descripcion: string }[];
+  const sql = `
+    SELECT a.id, a.nombre, a.apellidos, a.mail, ca.curso_id AS curso
+    FROM curso_alumno ca
+    JOIN alumnos a ON a.id = ca.alumno_id
+    WHERE ca.curso_id = @cursoId
+    ORDER BY a.apellidos COLLATE NOCASE, a.nombre COLLATE NOCASE;
+  `;
 
-  // CE de cada RA
-  const stmtCE = db.prepare(
-    `SELECT c.codigo, c.descripcion
-     FROM ce c
-     WHERE c.ra_id = ?
-     ORDER BY c.codigo`
-  );
+  return db.prepare(sql).all({ cursoId });
+});
 
-  const result = raRows.map((r) => ({
-    codigo: r.codigo,
-    descripcion: r.descripcion,
-    CE: stmtCE.all(r.id) as { codigo: string; descripcion: string }[],
+type AsignaturaRow = {
+  id: string;
+  nombre: string;
+  color: string | null;
+  promedio: number | null;
+  actividades: number;
+  asistencias: number;
+};
+
+ipcMain.handle("alumno-asignaturas-resumen", (_e, alumnoIdRaw) => {
+  const alumnoId = String(alumnoIdRaw);
+
+  const sql = `
+    SELECT
+      a.id                 AS id,
+      a.nombre             AS nombre,
+      a.color              AS color,
+      ROUND(AVG(n.nota), 2) AS promedio,
+      COUNT(n.ce_codigo)   AS actividades,
+      0                    AS asistencias
+    FROM asignaturas a
+    JOIN curso_asignatura ca
+      ON ca.asignatura_id = a.id
+    -- 👇 clave: enlazamos por alumnos.curso
+    JOIN alumnos al
+      ON al.curso = ca.curso_id
+    LEFT JOIN nota_ce n
+      ON n.alumno_id = al.id
+     AND n.asignatura_id = a.id
+    WHERE al.id = @alumnoId
+    GROUP BY a.id, a.nombre, a.color
+    ORDER BY a.nombre COLLATE NOCASE;
+  `;
+
+  type Row = {
+    id: string; nombre: string; color: string | null;
+    promedio: number | null; actividades: number; asistencias: number;
+  };
+
+  const rows = db.prepare(sql).all({ alumnoId }) as Row[];
+
+  return rows.map(r => ({
+    id: String(r.id),
+    nombre: String(r.nombre ?? ""),
+    color: r.color ?? null,
+    promedio: r.promedio ?? null,
+    actividades: r.actividades ?? 0,
+    asistencias: r.asistencias ?? 0,
   }));
-
-  return result;
 });
 
-ipcMain.handle("alumnos:obtener-por-curso", (_e, { cursoId }) => {
-  if (!cursoId) return [];
-  const stmt = db.prepare(`
-    SELECT id, nombre, apellidos, mail
-    FROM alumnos
-    WHERE curso_id = ?
-    ORDER BY apellidos COLLATE NOCASE, nombre COLLATE NOCASE
-  `);
-  return stmt.all(cursoId);
+ipcMain.handle("get-ces-asignatura", (_e, asignaturaIdRaw: string) => {
+  const asignaturaId = String(asignaturaIdRaw); // en tu BDD coincide con el código (p.ej. "0612")
+
+  const sql = `
+    SELECT
+      ra.id          AS ra_id,
+      ra.codigo      AS ra_codigo,
+      ra.descripcion AS ra_desc,
+      ce.id          AS ce_id,
+      ce.codigo      AS ce_codigo,
+      ce.descripcion AS ce_desc
+    FROM ra
+    LEFT JOIN ce ON ce.ra_id = ra.id
+    WHERE ra.asignatura_id = @asignaturaId
+    ORDER BY ra.codigo, ce.codigo;
+  `;
+
+  type Row = {
+    ra_id: string; ra_codigo: string; ra_desc: string;
+    ce_id: string | null; ce_codigo: string | null; ce_desc: string | null;
+  };
+
+  const rows = db.prepare(sql).all({ asignaturaId }) as Row[];
+
+  const map = new Map<
+    string,
+    { codigo: string; descripcion: string; CE: { codigo: string; descripcion: string }[] }
+  >();
+
+  for (const r of rows) {
+    if (!map.has(r.ra_codigo)) {
+      map.set(r.ra_codigo, { codigo: r.ra_codigo, descripcion: r.ra_desc ?? "", CE: [] });
+    }
+    if (r.ce_codigo) {
+      map.get(r.ra_codigo)!.CE.push({ codigo: r.ce_codigo, descripcion: r.ce_desc ?? "" });
+    }
+  }
+
+  return Array.from(map.values());
 });
+

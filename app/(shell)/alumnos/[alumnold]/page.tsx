@@ -16,10 +16,10 @@ type Alumno = {
 type AsignaturaResumen = {
   id: string;
   nombre: string;
-  color?: string;
-  promedio?: number;
-  actividades?: number;
-  asistencias?: number;
+  color: string | null;
+  promedio: number | null;
+  actividades: number;
+  asistencias: number;
 };
 
 export default function AlumnoPage() {
@@ -60,20 +60,10 @@ export default function AlumnoPage() {
           return;
         }
 
-        // Si es numérico, pásalo como número; si no, como string
         const asNum = Number(alumnoId);
         const idForIPC = Number.isNaN(asNum) ? alumnoId : asNum;
 
-        console.log("[AlumnoPage] leerAlumno()", {
-          alumnoId,
-          idForIPC,
-          apiKeys: Object.keys(api ?? {}),
-        });
-
-        const raw =
-          (await api?.leerAlumno?.(idForIPC)) ??
-          null;
-
+        const raw = (await api?.leerAlumno?.(idForIPC)) ?? null;
         if (!alive) return;
 
         if (!raw) {
@@ -95,9 +85,20 @@ export default function AlumnoPage() {
           curso: raw.curso ?? raw.curso_id ?? raw.cursoAcronimo ?? undefined,
         });
 
-        // Si más adelante cargas asignaturas, usa aquí tus handlers:
-        // const list = await api?.asignaturasDeAlumno?.(raw.id);
-        // setAsignaturas( ...map a AsignaturaResumen y normaliza color con normalizeHex(...) );
+        // 🔹 Cargar asignaturas + medias
+        const list: AsignaturaResumen[] =
+          (await api?.alumnoAsignaturasResumen?.(idForIPC)) ?? [];
+        if (!alive) return;
+
+        setAsignaturas(
+          list.map((x) => ({
+            ...x,
+            color: normalizeHex(x.color || undefined) || null,
+            promedio: x.promedio ?? null,
+            actividades: x.actividades ?? 0,
+            asistencias: x.asistencias ?? 0,
+          }))
+        );
       } catch (e: any) {
         if (alive) setErr(e?.message ?? "No se pudo cargar el alumno");
       } finally {
@@ -114,7 +115,21 @@ export default function AlumnoPage() {
     return `${alumno.apellidos}, ${alumno.nombre}`.trim();
   }, [alumno]);
 
-  if (loading) return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
+  const mediaGlobal = useMemo(() => {
+    const vals = asignaturas
+      .map((a) => a.promedio)
+      .filter((v): v is number => typeof v === "number");
+    if (!vals.length) return null;
+    return Number((vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(2));
+  }, [asignaturas]);
+
+  const actividadesTotales = useMemo(
+    () => asignaturas.reduce((acc, a) => acc + (a.actividades ?? 0), 0),
+    [asignaturas]
+  );
+
+  if (loading)
+    return <div className="p-6 text-sm text-muted-foreground">Cargando…</div>;
   if (err) return <div className="p-6 text-sm text-red-400">{err}</div>;
   if (!alumno) return null;
 
@@ -134,7 +149,9 @@ export default function AlumnoPage() {
           <div>
             <h1 className="text-2xl font-bold">{fullName}</h1>
             <div className="flex items-center gap-3 text-xs text-zinc-400">
-              {alumno.curso && <span className="uppercase">Curso: {alumno.curso}</span>}
+              {alumno.curso && (
+                <span className="uppercase">Curso: {alumno.curso}</span>
+              )}
               {alumno.mail && (
                 <span className="inline-flex items-center gap-1">
                   <Mail className="w-3 h-3" />
@@ -146,46 +163,83 @@ export default function AlumnoPage() {
         </div>
       </div>
 
-      {/* Métricas globales (placeholder) */}
+      <section className="">
+        {/* Grid de cards cuadradas */}
+        <div className="p-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+  {/* Tarjetas de asignaturas */}
+  {asignaturas.map((a) => (
+    <div
+      key={a.id}
+      className="relative rounded-lg p-4 aspect-square flex flex-col text-white border border-zinc-700"
+      style={{
+        background: a.color
+          ? `linear-gradient(to top, ${a.color}80, #0a0a0a)`
+          : "linear-gradient(to top, #333, #0a0a0a)",
+      }}
+      title={a.nombre}
+    >
+      {/* color dot */}
+      <div
+        className="absolute top-3 right-3 h-2.5 w-2.5 rounded-full border border-white/20"
+        style={{ backgroundColor: a.color || "#525252" }}
+      />
+
+      {/* nombre */}
+      <div className="pr-6 tracking-wide">
+        <div className="text-xl font-bold uppercase">{a.id}</div>
+        <div className="text-xs uppercase line-clamp-3">{a.nombre}</div>
+      </div>
+
+      {/* footer métricas */}
+      <div className="mt-auto pt-3">
+        <div className="text-3xl font-bold tabular-nums">
+          {a.promedio != null ? a.promedio.toFixed(2) : "—"}
+        </div>
+        <div className="text-[11px] text-zinc-200">
+          {a.actividades ?? 0} act. · {a.asistencias ?? 0} asis.
+        </div>
+      </div>
+    </div>
+  ))}
+
+  {/* Tarjeta de Media global (a la derecha, sin degradado) */}
+  <div className="relative rounded-lg p-4 aspect-square flex flex-col text-white border border-zinc-700 bg-zinc-900">
+    <div className="pr-6 tracking-wide">
+      <div className="text-xs uppercase">media global</div>
+    </div>
+
+    <div className="mt-auto pt-3">
+      <div className="text-3xl font-bold tabular-nums">
+        {mediaGlobal != null ? mediaGlobal.toFixed(2) : "—"}
+      </div>
+    </div>
+  </div>
+
+  {asignaturas.length === 0 && (
+    <div className="col-span-full text-sm text-zinc-400">
+      Este alumno aún no tiene asignaturas o notas asociadas.
+    </div>
+  )}
+</div>
+
+
+      </section>
+
+      {/* Métricas globales */}
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-lg border border-zinc-700 p-4 bg-zinc-900">
-          <p className="text-xs text-zinc-400">Asistencia global</p>
-          <p className="text-2xl font-semibold">—</p>
-        </div>
-        <div className="rounded-lg border border-zinc-700 p-4 bg-zinc-900">
           <p className="text-xs text-zinc-400">Media global</p>
-          <p className="text-2xl font-semibold">—</p>
+          <p className="text-2xl font-semibold">
+            {mediaGlobal != null ? mediaGlobal.toFixed(2) : "—"}
+          </p>
         </div>
         <div className="rounded-lg border border-zinc-700 p-4 bg-zinc-900">
           <p className="text-xs text-zinc-400">Actividades realizadas</p>
-          <p className="text-2xl font-semibold">—</p>
+          <p className="text-2xl font-semibold">{actividadesTotales}</p>
         </div>
       </section>
 
       {/* Asignaturas del alumno */}
-      <section className="rounded-lg border border-zinc-700 bg-zinc-900">
-        <div className="px-4 py-3 border-b border-zinc-800">
-          <p className="text-xs uppercase tracking-wide text-zinc-400">
-            Asignaturas ({asignaturas.length})
-          </p>
-        </div>
-        <ul className="p-2 divide-y divide-zinc-800">
-          {asignaturas.map((a) => (
-            <li key={a.id} className="flex items-center gap-3 px-2 py-3">
-              <span
-                className={`h-3 w-3 rounded-full border ${
-                  a.color ? "border-white/20" : "border-zinc-600"
-                }`}
-                style={{ backgroundColor: a.color || "transparent" }}
-                title={a.color || "Sin color"}
-              />
-              <div className="flex-1">
-                <p className="text-sm">{a.nombre}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
     </main>
   );
 }

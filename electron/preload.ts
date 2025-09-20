@@ -111,7 +111,8 @@ const api = {
 
   asignaturasDeCurso: (cursoId: string) =>
     ipcRenderer.invoke("asignaturas-de-curso", cursoId),
-
+    alumnoAsignaturasResumen: (alumnoId: string | number) =>
+    ipcRenderer.invoke("alumno-asignaturas-resumen", alumnoId),
   listarColoresAsignaturas: () =>
     ipcRenderer.invoke("asignaturas:listar-colores"),
 

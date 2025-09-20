@@ -5,6 +5,16 @@ import type { Alumno, AlumnoEntrada } from "@/models/alumno";
 import type { Horario } from "@/models/horario";
 import type { Actividad } from "@/store/actividadesPorCurso";
 
+export type AsignaturaResumen = {
+  id: string;
+  nombre: string;
+  color: string | null;
+  promedio: number | null;
+  actividades: number;
+  asistencias: number;
+};
+
+
 /* =============================
  * Tipos base
  * ============================= */
@@ -277,6 +287,8 @@ export interface ElectronAPI {
 
   /* ===== Utilidades UX (opcional pero útil) ===== */
   revelarEnCarpeta?: (fullPath: string) => Promise<void>;
+
+  alumnoAsignaturasResumen: (alumnoId: string | number) => Promise<AsignaturaResumen[]>;
 
   exportarProgramacionPDF(
     html: string,
