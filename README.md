@@ -90,3 +90,5 @@ webPreferences: {
 ---
 
 > Esta guía es obligatoria para futuros desarrolladores. Evita retrocesos innecesarios y asegura estabilidad.
+
+<a href="https://lordicon.com/">Icons by Lordicon.com</a>

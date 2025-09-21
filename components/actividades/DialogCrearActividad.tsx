@@ -1,17 +1,27 @@
 "use client";
 
+import Image from "next/image";
 import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useSnapshot } from "valtio";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "sonner";
-import { WandSparkles, Bot, CalendarDays } from "lucide-react";
+import { WandSparkles, Bot, Undo2, Save, CalendarDays } from "lucide-react";
 
 import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogOverlay, DialogPortal,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogOverlay,
+  DialogPortal,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -28,7 +38,10 @@ import { añadirActividad } from "@/store/actividadesPorCurso";
 import TinyEditor from "@/components/TinyEditor";
 import { CEDetectedList } from "@/components/CEDetectedList";
 import ConfigActividadPopover from "@/components/actividades/ConfigActividadPopover";
-import type { RA, ConfigActividadResult } from "@/components/actividades/ConfigActividadPopover";
+import type {
+  RA,
+  ConfigActividadResult,
+} from "@/components/actividades/ConfigActividadPopover";
 import LoaderOverlay from "@/components/LoaderOverlay";
 
 type Props = {
@@ -44,8 +57,10 @@ type Props = {
 // Para tipar el elemento CE guardado en chips
 type ChipCE = { raCodigo: string; ceCodigo: string; ceDescripcion?: string };
 
-const CEDetectedListAny =
-  CEDetectedList as unknown as React.ComponentType<{ results: any[]; className?: string }>;
+const CEDetectedListAny = CEDetectedList as unknown as React.ComponentType<{
+  results: any[];
+  className?: string;
+}>;
 
 export function DialogCrearActividad({
   open,
@@ -66,24 +81,34 @@ export function DialogCrearActividad({
 
   // Selectores locales si no vienen por props
   const [cursoIdLocal, setCursoIdLocal] = useState<string | undefined>(cursoId);
-  const [asignaturaIdLocal, setAsignaturaIdLocal] = useState<string | undefined>(asignaturaIdProp);
-  const [asignaturaCodigoLocal, setAsignaturaCodigoLocal] = useState<string | undefined>(undefined);
+  const [asignaturaIdLocal, setAsignaturaIdLocal] = useState<
+    string | undefined
+  >(asignaturaIdProp);
+  const [asignaturaCodigoLocal, setAsignaturaCodigoLocal] = useState<
+    string | undefined
+  >(undefined);
 
   const cursoIdEf = cursoId ?? cursoIdLocal;
   const asignaturaIdEf = asignaturaIdProp ?? asignaturaIdLocal;
   const asignaturaCodigoEf = asignaturaCodigoLocal ?? asignaturaIdEf;
 
-  const [ultimaConfig, setUltimaConfig] = useState<ConfigActividadResult | null>(null);
+  const [ultimaConfig, setUltimaConfig] =
+    useState<ConfigActividadResult | null>(null);
 
   const snap = useSnapshot(asignaturasPorCurso);
-  const todasAsignsDelCurso = cursoIdEf ? snap[cursoIdEf] ?? [] : [];
+  const todasAsignsDelCurso = cursoIdEf ? (snap[cursoIdEf] ?? []) : [];
   const asignaturaNombreFromStore =
-    (todasAsignsDelCurso.find((a: any) => a.id === asignaturaIdEf)?.nombre as string) || "";
+    (todasAsignsDelCurso.find((a: any) => a.id === asignaturaIdEf)
+      ?.nombre as string) || "";
   const asignaturaNombreEf = asignaturaNombre ?? asignaturaNombreFromStore;
 
   // Datos iniciales
-  const [cursos, setCursos] = useState<Array<{ id: string; nombre: string }>>([]);
-  const [asigsDeCurso, setAsigsDeCurso] = useState<Array<{ id: string; codigo?: string; nombre: string }>>([]);
+  const [cursos, setCursos] = useState<Array<{ id: string; nombre: string }>>(
+    []
+  );
+  const [asigsDeCurso, setAsigsDeCurso] = useState<
+    Array<{ id: string; codigo?: string; nombre: string }>
+  >([]);
 
   // Dialogs secundarios
   const [showResumen, setShowResumen] = useState(false);
@@ -91,7 +116,9 @@ export function DialogCrearActividad({
 
   // Programación
   const [fechaProgramada, setFechaProgramada] = useState<Date | undefined>();
-  const [fechasDisponibles, setFechasDisponibles] = useState<Set<string>>(new Set()); // "YYYY-MM-DD"
+  const [fechasDisponibles, setFechasDisponibles] = useState<Set<string>>(
+    new Set()
+  ); // "YYYY-MM-DD"
 
   // ====== reset ======
   const resetActividad = (opts?: { keepSelectors?: boolean }) => {
@@ -137,7 +164,9 @@ export function DialogCrearActividad({
     let canceled = false;
     (async () => {
       try {
-        const lista = await (window as any).electronAPI.asignaturasDeCurso(cursoIdEf);
+        const lista = await (window as any).electronAPI.asignaturasDeCurso(
+          cursoIdEf
+        );
         const normalizadas = (lista ?? []).map((a: any) => ({
           id: a.id,
           codigo: a.codigo ?? a.id,
@@ -173,7 +202,9 @@ export function DialogCrearActividad({
     setRaLoading(true);
     (async () => {
       try {
-        const res = await (window as any)?.electronAPI?.getCEsAsignatura?.(asignaturaCodigoEf);
+        const res = await (window as any)?.electronAPI?.getCEsAsignatura?.(
+          asignaturaCodigoEf
+        );
         const raRaw = Array.isArray(res) ? res : (res?.RA ?? res?.ra ?? []);
         const normalized: RA[] = (raRaw ?? []).map((ra: any) => ({
           codigo: String(ra.codigo ?? ra.id ?? ra.code ?? ""),
@@ -257,8 +288,7 @@ export function DialogCrearActividad({
   const buildActividad = (extra?: Partial<any>) => ({
     id: actividadIdRef.current,
     nombre,
-    fecha: (extra?.fecha as string) ??
-      new Date().toISOString().slice(0, 10),
+    fecha: (extra?.fecha as string) ?? new Date().toISOString().slice(0, 10),
     cursoId: cursoIdEf,
     asignaturaId: asignaturaIdEf,
     descripcion: descripcionHtml,
@@ -268,14 +298,20 @@ export function DialogCrearActividad({
 
   const handleGuardar = async () => {
     if (!nombre) return toast.error("Por favor, completa el nombre.");
-    if (!cursoIdEf || !asignaturaIdEf) return toast.error("Selecciona curso y asignatura.");
+    if (!cursoIdEf || !asignaturaIdEf)
+      return toast.error("Selecciona curso y asignatura.");
 
     try {
       setLoading(true);
       const nuevaActividad = buildActividad();
-      const raw = await (window as any).electronAPI.guardarActividad(nuevaActividad as any);
+      const raw = await (window as any).electronAPI.guardarActividad(
+        nuevaActividad as any
+      );
       const res = (raw ?? {}) as { ok?: boolean; error?: string };
-      if (!res.ok) return toast.error(`No se guardó: ${res?.error ?? "Error desconocido"}`);
+      if (!res.ok)
+        return toast.error(
+          `No se guardó: ${res?.error ?? "Error desconocido"}`
+        );
 
       añadirActividad(cursoIdEf!, nuevaActividad as any);
       toast.success("Actividad guardada correctamente.");
@@ -301,7 +337,11 @@ export function DialogCrearActividad({
       const api = (window as any).electronAPI;
       if (api?.fechasDisponibles) {
         const arr: string[] =
-          (await api.fechasDisponibles(cursoIdEf, asignaturaIdEf, ultimaConfig.duracionMin)) ?? [];
+          (await api.fechasDisponibles(
+            cursoIdEf,
+            asignaturaIdEf,
+            ultimaConfig.duracionMin
+          )) ?? [];
         setFechasDisponibles(new Set(arr.map((d) => d.slice(0, 10))));
         return;
       }
@@ -325,13 +365,15 @@ export function DialogCrearActividad({
 
   const openProgramar = async () => {
     if (!nombre) return toast.error("Pon un nombre primero.");
-    if (!cursoIdEf || !asignaturaIdEf) return toast.error("Selecciona curso y asignatura.");
+    if (!cursoIdEf || !asignaturaIdEf)
+      return toast.error("Selecciona curso y asignatura.");
     await cargarFechasDisponibles();
     setShowProgramar(true);
   };
 
   const handleConfirmarProgramacion = async () => {
-    if (!fechaProgramada) return toast.error("Selecciona una fecha disponible.");
+    if (!fechaProgramada)
+      return toast.error("Selecciona una fecha disponible.");
     try {
       setLoading(true);
       const fechaIso = new Date(
@@ -339,7 +381,9 @@ export function DialogCrearActividad({
           fechaProgramada.getFullYear(),
           fechaProgramada.getMonth(),
           fechaProgramada.getDate(),
-          0, 0, 0
+          0,
+          0,
+          0
         )
       ).toISOString();
 
@@ -350,9 +394,14 @@ export function DialogCrearActividad({
         ces: cesDetectados,
       });
 
-      const raw = await (window as any).electronAPI.guardarActividad(actividadProgramada as any);
+      const raw = await (window as any).electronAPI.guardarActividad(
+        actividadProgramada as any
+      );
       const res = (raw ?? {}) as { ok?: boolean; error?: string };
-      if (!res.ok) return toast.error(`No se programó: ${res?.error ?? "Error desconocido"}`);
+      if (!res.ok)
+        return toast.error(
+          `No se programó: ${res?.error ?? "Error desconocido"}`
+        );
 
       añadirActividad(cursoIdEf!, actividadProgramada as any);
       toast.success("📅 Actividad programada.");
@@ -382,12 +431,15 @@ export function DialogCrearActividad({
             className="z-[90] w-[min(95vw,1000px)] sm:max-w-[1000px] max-h-[90vh] overflow-y-auto bg-zinc-900 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2 duration-200"
             onInteractOutside={(e) => {
               const el = e.target as HTMLElement;
-              if (el.closest(".tox, .tox-tinymce-aux, .tox-dialog, .tox-menu")) e.preventDefault();
+              if (el.closest(".tox, .tox-tinymce-aux, .tox-dialog, .tox-menu"))
+                e.preventDefault();
             }}
             onEscapeKeyDown={(e) => e.preventDefault()}
           >
             <DialogHeader>
-              <DialogTitle className="font-bold">Creando Actividad mediante LLM + H</DialogTitle>
+              <DialogTitle className="font-bold">
+                Creando Actividad mediante LLM + H
+              </DialogTitle>
             </DialogHeader>
 
             <Separator className="my-3" />
@@ -427,7 +479,9 @@ export function DialogCrearActividad({
                       <Select
                         disabled={!cursoIdEf || asigsDeCurso.length === 0}
                         value={
-                          asignaturaIdLocal ? `${asignaturaIdLocal}|${asignaturaCodigoLocal ?? ""}` : undefined
+                          asignaturaIdLocal
+                            ? `${asignaturaIdLocal}|${asignaturaCodigoLocal ?? ""}`
+                            : undefined
                         }
                         onValueChange={(v) => {
                           const [id, codigo] = v.split("|");
@@ -437,17 +491,26 @@ export function DialogCrearActividad({
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue
-                            placeholder={cursoIdEf ? "Selecciona asignatura" : "Elige antes un curso"}
+                            placeholder={
+                              cursoIdEf
+                                ? "Selecciona asignatura"
+                                : "Elige antes un curso"
+                            }
                           />
                         </SelectTrigger>
                         <SelectContent className="z-[110]">
                           {asigsDeCurso.length === 0 ? (
                             <div className="px-3 py-2 text-sm text-muted-foreground">
-                              {cursoIdEf ? "No hay asignaturas para este curso." : "Elige antes un curso"}
+                              {cursoIdEf
+                                ? "No hay asignaturas para este curso."
+                                : "Elige antes un curso"}
                             </div>
                           ) : (
                             asigsDeCurso.map((a) => (
-                              <SelectItem key={a.id} value={`${a.id}|${a.codigo ?? a.id}`}>
+                              <SelectItem
+                                key={a.id}
+                                value={`${a.id}|${a.codigo ?? a.id}`}
+                              >
                                 {a.codigo ?? a.id} - {a.nombre}
                               </SelectItem>
                             ))
@@ -470,7 +533,12 @@ export function DialogCrearActividad({
 
                       <ConfigActividadPopover
                         raOptions={raOptions}
-                        disabled={!asignaturaCodigoEf || raLoading || raOptions.length === 0 || loading}
+                        disabled={
+                          !asignaturaCodigoEf ||
+                          raLoading ||
+                          raOptions.length === 0 ||
+                          loading
+                        }
                         onApply={(cfg) => {
                           setUltimaConfig(cfg);
                           setNombre(cfg.suggestedName);
@@ -478,22 +546,38 @@ export function DialogCrearActividad({
                           generarActividadIA(cfg);
                         }}
                       >
-                        <Button type="button" variant="default" className="whitespace-nowrap" disabled={loading}>
-                          <WandSparkles className="w-4 h-4 mr-1" /> Crear Actividad
+                        <Button
+                          type="button"
+                          variant="default"
+                          className="whitespace-nowrap"
+                          disabled={loading}
+                        >
+                          <WandSparkles className="w-4 h-4 mr-1" /> Crear
+                          Actividad
                         </Button>
                       </ConfigActividadPopover>
 
-                      <Button type="button" variant="outline" onClick={() => resetActividad({ keepSelectors: true })}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => resetActividad({ keepSelectors: true })}
+                      >
                         Limpiar
                       </Button>
                     </div>
 
                     {asignaturaCodigoEf && raLoading && (
-                      <p className="mt-1 text-xs text-muted-foreground">Cargando RA/CE…</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Cargando RA/CE…
+                      </p>
                     )}
-                    {asignaturaCodigoEf && !raLoading && raOptions.length === 0 && (
-                      <p className="mt-1 text-xs text-destructive">No se han encontrado RA/CE.</p>
-                    )}
+                    {asignaturaCodigoEf &&
+                      !raLoading &&
+                      raOptions.length === 0 && (
+                        <p className="mt-1 text-xs text-destructive">
+                          No se han encontrado RA/CE.
+                        </p>
+                      )}
                   </div>
                 </div>
               )}
@@ -502,7 +586,9 @@ export function DialogCrearActividad({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="mb-2">Descripción de la actividad</Label>
-                  {dirty && <Badge variant="destructive">● Cambios sin guardar</Badge>}
+                  {dirty && (
+                    <Badge variant="destructive">● Cambios sin guardar</Badge>
+                  )}
                 </div>
 
                 <div
@@ -523,14 +609,26 @@ export function DialogCrearActividad({
                   />
                 </div>
 
-                {!!cesDetectados.length && <CEDetectedListAny results={cesDetectados} className="mt-2" />}
+                {!!cesDetectados.length && (
+                  <CEDetectedListAny results={cesDetectados} className="mt-2" />
+                )}
               </div>
 
               {/* Acciones */}
               <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-                <Button variant="outline" onClick={() => resetActividad({ keepSelectors: true })}>Limpiar</Button>
-                <Button onClick={handleGuardar} disabled={loading} className="px-6">
-                  <Bot className="w-4 h-4 mr-2" /> {loading ? "Guardando..." : "Guardar actividad"}
+                <Button
+                  variant="outline"
+                  onClick={() => resetActividad({ keepSelectors: true })}
+                >
+                  Limpiar
+                </Button>
+                <Button
+                  onClick={handleGuardar}
+                  disabled={loading}
+                  className="px-6"
+                >
+                  <Bot className="w-4 h-4 mr-2" />{" "}
+                  {loading ? "Guardando..." : "Guardar actividad"}
                 </Button>
               </div>
             </div>
@@ -553,7 +651,9 @@ export function DialogCrearActividad({
               </div>
               <div>
                 <p className="text-muted-foreground">Asignatura</p>
-                <p className="font-medium">{asignaturaNombreEf || asignaturaIdEf || "—"}</p>
+                <p className="font-medium">
+                  {asignaturaNombreEf || asignaturaIdEf || "—"}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Nombre</p>
@@ -561,18 +661,29 @@ export function DialogCrearActividad({
               </div>
               <div>
                 <p className="text-muted-foreground">Duración</p>
-                <p className="font-medium">{ultimaConfig?.duracionMin ? `${ultimaConfig.duracionMin} min` : "—"}</p>
+                <p className="font-medium">
+                  {ultimaConfig?.duracionMin
+                    ? `${ultimaConfig.duracionMin} min`
+                    : "—"}
+                </p>
               </div>
             </div>
 
             <Separator />
 
             <div>
-              <p className="text-sm text-muted-foreground mb-2">RA / CE seleccionados</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                RA / CE seleccionados
+              </p>
               <div className="flex flex-wrap gap-2">
-                {cesDetectados.length === 0 && <span className="text-sm">—</span>}
+                {cesDetectados.length === 0 && (
+                  <span className="text-sm">—</span>
+                )}
                 {cesDetectados.map((ce) => (
-                  <Badge key={`${ce.raCodigo}-${ce.ceCodigo}`} variant="secondary">
+                  <Badge
+                    key={`${ce.raCodigo}-${ce.ceCodigo}`}
+                    variant="secondary"
+                  >
                     {ce.raCodigo}.{ce.ceCodigo}
                   </Badge>
                 ))}
@@ -580,9 +691,11 @@ export function DialogCrearActividad({
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowResumen(false)}>Volver</Button>
+              <Button variant="outline" onClick={() => setShowResumen(false)}>
+                Volver
+              </Button>
               <Button onClick={handleGuardar} disabled={loading}>
-                <Bot className="w-4 h-4 mr-2" /> Guardar
+                <Save className="w-4 h-4 mr-2" /> Guardar
               </Button>
               <Button onClick={openProgramar} className="px-6">
                 <CalendarDays className="w-4 h-4 mr-2" /> Programar
@@ -594,76 +707,86 @@ export function DialogCrearActividad({
 
       {/* DIALOG: PROGRAMAR (DATEPICKER) */}
       <Dialog open={showResumen} onOpenChange={setShowResumen}>
-  <DialogPortal>
-    {/* Overlay con z alto */}
-    <DialogOverlay className="fixed inset-0 bg-background/70 backdrop-blur-sm z-[200]" />
+        <DialogPortal>
+          {/* Overlay con z alto */}
+          <DialogOverlay className="fixed inset-0 bg-background/70 backdrop-blur-sm z-[200]" />
 
-    <DialogContent className="sm:max-w-[600px] z-[210]">
-      <DialogHeader>
-        <DialogTitle>Resumen de la actividad</DialogTitle>
-      </DialogHeader>
+          <DialogContent className="sm:max-w-[600px] z-[210]">
+            <DialogHeader className="flex flex-col items-center gap-3 text-center">
+              <Image
+                src="/images/animated-icons/party.gif"
+                alt=""
+                width={64}
+                height={64}
+                priority
+                unoptimized // mantiene la animación del GIF
+                aria-hidden // decorativo
+                className="h-16 w-16"
+              />
+              <DialogTitle className="text-center">
+                Actividad creada con éxito!
+              </DialogTitle>
+            </DialogHeader>
 
-      <div className="space-y-3">
-        <div className="text-sm grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-muted-foreground">Curso</p>
-            <p className="font-medium">{cursoIdEf || "—"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Asignatura</p>
-            <p className="font-medium">
-              {asignaturaNombreEf || asignaturaIdEf || "—"}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Nombre</p>
-            <p className="font-medium">{nombre || "—"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Duración</p>
-            <p className="font-medium">
-              {ultimaConfig?.duracionMin
-                ? `${ultimaConfig.duracionMin} min`
-                : "—"}
-            </p>
-          </div>
-        </div>
+            <div className="space-y-3">
+  {/* Datos centrados, uno debajo de otro */}
+  <div className="text-sm grid grid-cols-1 gap-3 text-center">
+    <div>
+      <p className="text-muted-foreground text-xs uppercase">Curso</p>
+      <p className="font-medium">{cursoIdEf || "—"}</p>
+    </div>
+    <div>
+      <p className="text-muted-foreground text-xs uppercase">Asignatura</p>
+      <p className="font-medium">
+        {asignaturaNombreEf || asignaturaIdEf || "—"}
+      </p>
+    </div>
+    <div>
+      <p className="text-muted-foreground text-xs uppercase">Nombre de la Actividad</p>
+      <p className="font-medium">{nombre || "—"}</p>
+    </div>
+    <div>
+      <p className="text-muted-foreground text-xs uppercase">Duración</p>
+      <p className="font-medium">
+        {ultimaConfig?.duracionMin ? `${ultimaConfig.duracionMin} min` : "—"}
+      </p>
+    </div>
+  </div>
 
-        <Separator />
+  <Separator />
 
-        <div>
-          <p className="text-sm text-muted-foreground mb-2">
-            RA / CE seleccionados
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {cesDetectados.length === 0 && <span className="text-sm">—</span>}
-            {cesDetectados.map((ce) => (
-              <Badge
-                key={`${ce.raCodigo}-${ce.ceCodigo}`}
-                variant="secondary"
-              >
-                {ce.raCodigo}.{ce.ceCodigo}
-              </Badge>
-            ))}
-          </div>
-        </div>
+  {/* RA/CE centrado */}
+  <div className="text-center">
+    <p className="text-muted-foreground text-xs uppercase mb-2">
+      RA / CE seleccionados
+    </p>
+    <div className="flex flex-wrap justify-center gap-2">
+      {cesDetectados.length === 0 && <span className="text-sm">—</span>}
+      {cesDetectados.map((ce) => (
+        <Badge key={`${ce.raCodigo}-${ce.ceCodigo}`} variant="secondary">
+          {ce.raCodigo}.{ce.ceCodigo}
+        </Badge>
+      ))}
+    </div>
+  </div>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={() => setShowResumen(false)}>
-            Volver
-          </Button>
-          <Button onClick={handleGuardar} disabled={loading}>
-            <Bot className="w-4 h-4 mr-2" /> Guardar
-          </Button>
-          <Button onClick={openProgramar} className="px-6">
-            <CalendarDays className="w-4 h-4 mr-2" /> Programar
-          </Button>
-        </div>
-      </div>
-    </DialogContent>
-  </DialogPortal>
-</Dialog>
+  {/* Botones (si también los quieres centrados, deja 'justify-center') */}
+  <div className="flex items-center w-full pt-2">
+  <Button variant="outline" onClick={() => setShowResumen(false)}>
+  <Undo2 className="w-4 h-4 mr-2" /> Volver
+  </Button>
 
+  <div className="ml-auto">
+    <Button onClick={handleGuardar} disabled={loading}>
+      <Save className="w-4 h-4 mr-2" /> Guardar
+    </Button>
+  </div>
+</div>
+</div>
+
+          </DialogContent>
+        </DialogPortal>
+      </Dialog>
 
       {/* LOADER GLOBAL */}
       <LoaderOverlay
