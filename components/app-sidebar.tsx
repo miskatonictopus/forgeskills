@@ -1,3 +1,4 @@
+// app-sidebar.tsx
 "use client"
 
 import * as React from "react"
@@ -8,7 +9,6 @@ import { ChartColumnBig, Settings, PlusCircle, CalendarDays, ListTodo } from "lu
 
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
-import { TeamSwitcher } from "@/components/team-switcher" // si lo usas
 import {
   Sidebar,
   SidebarContent,
@@ -17,16 +17,19 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
+
+// ⬇️ Reemplaza el antiguo DialogCrearActividad por el selector nuevo
+import DialogSelectorActividad from "@/components/DialogSelectorActividad"
+// ⬇️ Tus dos diálogos concretos (pon las rutas donde los tengas)
+import DialogCrearActividadManual from "@/components/actividades/DialogCrearActividadManual";
 import { DialogCrearActividad } from "@/components/actividades/DialogCrearActividad"
 
-// ── IMPORTA TUS LOGOS ──────────────────────────────────────────────
-// Horizontal (ancho)
-import logoLight from "@/public/images/logo-black.png"  // para tema LIGHT
-import logoDark from "@/public/images/logo-white.png"   // para tema DARK
-// Mark (cuadrado). Si no los tienes aún, puedes apuntar a los mismos.
+// ── LOGOS ──────────────────────────────────────────────
+import logoLight from "@/public/images/logo-black.png"
+import logoDark from "@/public/images/logo-white.png"
 import markLight from "@/public/images/mark-black.png"
 import markDark from "@/public/images/mark-white.png"
-// ───────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────
 
 const data = {
   navMain: [
@@ -36,7 +39,7 @@ const data = {
   ],
 }
 
-// helper: ahora redondeado a 30'
+// helper: redondeado a 30'
 function nowRounded30() {
   const d = new Date()
   const minutes = d.getMinutes()
@@ -47,7 +50,13 @@ function nowRounded30() {
 }
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
-  const [openNuevaActividad, setOpenNuevaActividad] = React.useState(false)
+  // Estado del selector inicial
+  const [openSelector, setOpenSelector] = React.useState(false)
+  // Estados de cada flujo
+  const [openManual, setOpenManual] = React.useState(false)
+  const [openLLM, setOpenLLM] = React.useState(false)
+
+  // Si quieres pasar una fecha preseleccionada a los flujos
   const [fechaPreseleccionada, setFechaPreseleccionada] = React.useState<Date | undefined>(undefined)
 
   // Tema para alternar logo
@@ -58,26 +67,23 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
   const handleOpenNuevaActividad = () => {
     setFechaPreseleccionada(nowRounded30())
-    setOpenNuevaActividad(true)
+    setOpenSelector(true) // ← ahora abrimos el selector, no un único diálogo
   }
 
   return (
-    // ⬇️ clave para tener data-attrs de colapso
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="px-3">
         <div className="flex h-12 items-center gap-2 mt-2">
-          {/* Logo horizontal (visible cuando NO está colapsado) */}
           {mounted && (
-             <div className="w-auto flex justify-center group-data-[collapsible=icon]:hidden ml-[auto] mr-[auto]">
-            <Image
-              src={isDark ? logoDark : logoLight}
-              alt="ForgeSkills"
-              priority
-              className="block h-14 w-auto group-data-[collapsible=icon]:hidden"
-            />
+            <div className="w-auto flex justify-center group-data-[collapsible=icon]:hidden ml-[auto] mr-[auto]">
+              <Image
+                src={isDark ? logoDark : logoLight}
+                alt="ForgeSkills"
+                priority
+                className="block h-14 w-auto group-data-[collapsible=icon]:hidden"
+              />
             </div>
           )}
-          {/* Logomark cuadrado (visible en colapsado) */}
           {mounted && (
             <Image
               src={isDark ? markDark : markLight}
@@ -88,19 +94,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           )}
         </div>
 
-        {/* Texto de versión: oculto en colapsado */}
         <p className="text-center text-zinc-400 text-xs group-data-[collapsible=icon]:hidden">
           alpha version 1.0 // 2025 release 1.1
         </p>
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Si usas selector de equipo, ponlo aquí
-        <div className="px-3 pb-2 group-data-[collapsible=icon]:hidden">
-          <TeamSwitcher />
-        </div>
-        */}
-
         <NavMain items={data.navMain} />
 
         {/* Acciones rápidas */}
@@ -140,16 +139,31 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         <NavProjects />
       </SidebarContent>
 
-      <SidebarFooter>
-        {/* Aquí tu NavUser si lo tienes; oculta el nombre en colapsado si quieres */}
-      </SidebarFooter>
-
+      <SidebarFooter>{/* NavUser si lo usas */}</SidebarFooter>
       <SidebarRail />
 
-      {/* Dialog global (sin curso/asignatura preseleccionados) */}
+      {/* 1) Selector de modo */}
+      <DialogSelectorActividad
+        open={openSelector}
+        onOpenChange={setOpenSelector}
+        onSelect={(mode) => {
+          if (mode === "manual") setOpenManual(true)
+          if (mode === "llm") setOpenLLM(true)
+        }}
+        // disableLLM // ← descomenta si aún no quieres habilitar el flujo LLM
+      />
+
+      {/* 2) Diálogo Manual */}
+      <DialogCrearActividadManual
+        open={openManual}
+        onOpenChange={setOpenManual}
+        // fechaInicial={fechaPreseleccionada}
+      />
+
+      {/* 3) Diálogo LLM */}
       <DialogCrearActividad
-        open={openNuevaActividad}
-        onOpenChange={setOpenNuevaActividad}
+        open={openLLM}
+        onOpenChange={setOpenLLM}
         // fechaInicial={fechaPreseleccionada}
       />
     </Sidebar>
