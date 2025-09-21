@@ -38,6 +38,9 @@ import { CEDetectedList } from "@/components/CEDetectedList";
 import ConfigActividadPopover from "@/components/actividades/ConfigActividadPopover";
 import type { RA, ConfigActividadResult } from "@/components/actividades/ConfigActividadPopover";
 
+// ⬇️ LoaderOverlay
+import LoaderOverlay from "@/components/LoaderOverlay";
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -74,6 +77,9 @@ export function DialogCrearActividad({
   const [cesDetectados, setCesDetectados] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
+
+  // ⬇️ loader global mientras genera con LLM
+  const [showLoader, setShowLoader] = useState(false);
 
   const [cursoIdLocal, setCursoIdLocal] = useState<string | undefined>(cursoId);
   const [asignaturaIdLocal, setAsignaturaIdLocal] = useState<string | undefined>(asignaturaIdProp);
@@ -204,7 +210,7 @@ export function DialogCrearActividad({
     setCesDetectados(ceList as any);
   };
 
-  // Generar texto con tu endpoint (sin archivos)
+  // ====== generar (muestra LoaderOverlay) ======
   const generarActividadIA = async (cfg: ConfigActividadResult) => {
     if (!cfg?.duracionMin || !cfg?.seleccion?.length) {
       toast.error("Configura duración y al menos un CE.");
@@ -212,6 +218,8 @@ export function DialogCrearActividad({
     }
     try {
       setLoading(true);
+      setShowLoader(true);
+
       const res = await fetch("/api/generar-actividad", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -239,6 +247,7 @@ export function DialogCrearActividad({
       toast.error("Error generando la actividad.");
     } finally {
       setLoading(false);
+      setShowLoader(false);
     }
   };
 
@@ -285,203 +294,222 @@ export function DialogCrearActividad({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPortal>
-        {/* Overlay 60% + blur + animaciones + z-index alto */}
-        <DialogOverlay
-          className="
-            fixed inset-0 z-[80] bg-background/60 backdrop-blur-sm
-            data-[state=open]:animate-in data-[state=closed]:animate-out
-            data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0
-          "
-        />
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogPortal>
+          {/* Overlay 60% + blur */}
+          <DialogOverlay
+            className="
+              fixed inset-0 z-[80] bg-background/60 backdrop-blur-sm
+              data-[state=open]:animate-in data-[state=closed]:animate-out
+              data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0
+            "
+          />
 
-        <DialogContent
-          className="
-            z-[90] w-[min(95vw,1000px)] sm:max-w-[1000px]
-            max-h-[90vh] overflow-y-auto bg-zinc-900
-            data-[state=open]:animate-in data-[state=closed]:animate-out
-            data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95
-            data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2
-            duration-200
-          "
-          onInteractOutside={(e) => {
-            const el = e.target as HTMLElement;
-            // Evita cierre si se interactúa con popups del editor
-            if (el.closest(".tox, .tox-tinymce-aux, .tox-dialog, .tox-menu")) e.preventDefault();
-          }}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle className="font-bold">
-              Creando Actividad mediante LLM + H
-            </DialogTitle>
-          </DialogHeader>
+          <DialogContent
+            className="
+              z-[90] w-[min(95vw,1000px)] sm:max-w-[1000px]
+              max-h-[90vh] overflow-y-auto bg-zinc-900
+              data-[state=open]:animate-in data-[state=closed]:animate-out
+              data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95
+              data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2
+              duration-200
+            "
+            onInteractOutside={(e) => {
+              const el = e.target as HTMLElement;
+              // Evita cierre si se interactúa con popups del editor
+              if (el.closest(".tox, .tox-tinymce-aux, .tox-dialog, .tox-menu")) e.preventDefault();
+            }}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle className="font-bold">
+                Creando Actividad mediante LLM + H
+              </DialogTitle>
+            </DialogHeader>
 
-          <Separator className="my-3" />
+            <Separator className="my-3" />
 
-          <div className="space-y-4">
-            {/* Curso + Asignatura */}
-            {(!cursoId || !asignaturaIdProp) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {!cursoId && (
-                  <div>
-                    <Label className="mb-2">Curso</Label>
-                    <Select
-                      value={cursoIdLocal}
-                      onValueChange={(v) => {
-                        setCursoIdLocal(v);
-                        setAsignaturaIdLocal(undefined);
-                        setAsignaturaCodigoLocal(undefined);
-                      }}
-                    >
-                       <SelectTrigger className="w-full">
-    <SelectValue placeholder="Selecciona curso" />
-  </SelectTrigger>
-  {/* ⬇️ súbele el z-index */}
-  <SelectContent className="z-[110]">
-    {cursos.map((c) => (
-      <SelectItem key={c.id} value={c.id}>
-        {c.id} - {c.nombre}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
-                  </div>
-                )}
-
-                {!asignaturaIdProp && (
-                  <div>
-                    <Label className="mb-2">Asignatura</Label>
-                    <Select
-                      disabled={!cursoIdEf || asigsDeCurso.length === 0}
-                      value={
-                        asignaturaIdLocal ? `${asignaturaIdLocal}|${asignaturaCodigoLocal ?? ""}` : undefined
-                      }
-                      onValueChange={(v) => {
-                        const [id, codigo] = v.split("|");
-                        setAsignaturaIdLocal(id);
-                        setAsignaturaCodigoLocal(codigo || id);
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue
-                          placeholder={cursoIdEf ? "Selecciona asignatura" : "Elige antes un curso"}
-                        />
-                      </SelectTrigger>
-                      <SelectContent className="z-[110]">
-                        {asigsDeCurso.length === 0 ? (
-                          <div className="px-3 py-2 text-sm text-muted-foreground">
-                            {cursoIdEf ? "No hay asignaturas para este curso." : "Elige antes un curso"}
-                          </div>
-                        ) : (
-                          asigsDeCurso.map((a) => (
-                            <SelectItem key={a.id} value={`${a.id}|${a.codigo ?? a.id}`}>
-                              {a.codigo ?? a.id} - {a.nombre}
+            <div className="space-y-4">
+              {/* Curso + Asignatura */}
+              {(!cursoId || !asignaturaIdProp) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {!cursoId && (
+                    <div>
+                      <Label className="mb-2">Curso</Label>
+                      <Select
+                        value={cursoIdLocal}
+                        onValueChange={(v) => {
+                          setCursoIdLocal(v);
+                          setAsignaturaIdLocal(undefined);
+                          setAsignaturaCodigoLocal(undefined);
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecciona curso" />
+                        </SelectTrigger>
+                        {/* menú por encima del overlay del dialog */}
+                        <SelectContent className="z-[110]">
+                          {cursos.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.id} - {c.nombre}
                             </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-                {/* Nombre + generar */}
-                <div className="md:col-span-2">
-                  <Label className="mb-2 block">Nombre de la actividad</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={nombre}
-                      onChange={(e) => setNombre(e.target.value)}
-                      placeholder="Ej: Práctica 1"
-                      className="flex-1"
-                    />
+                  {!asignaturaIdProp && (
+                    <div>
+                      <Label className="mb-2">Asignatura</Label>
+                      <Select
+                        disabled={!cursoIdEf || asigsDeCurso.length === 0}
+                        value={
+                          asignaturaIdLocal ? `${asignaturaIdLocal}|${asignaturaCodigoLocal ?? ""}` : undefined
+                        }
+                        onValueChange={(v) => {
+                          const [id, codigo] = v.split("|");
+                          setAsignaturaIdLocal(id);
+                          setAsignaturaCodigoLocal(codigo || id);
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue
+                            placeholder={cursoIdEf ? "Selecciona asignatura" : "Elige antes un curso"}
+                          />
+                        </SelectTrigger>
+                        <SelectContent className="z-[110]">
+                          {asigsDeCurso.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">
+                              {cursoIdEf ? "No hay asignaturas para este curso." : "Elige antes un curso"}
+                            </div>
+                          ) : (
+                            asigsDeCurso.map((a) => (
+                              <SelectItem key={a.id} value={`${a.id}|${a.codigo ?? a.id}`}>
+                                {a.codigo ?? a.id} - {a.nombre}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-                    <ConfigActividadPopover
-                      raOptions={raOptions}
-                      disabled={!asignaturaCodigoEf || raLoading || raOptions.length === 0 || loading}
-                      onApply={(cfg) => {
-                        setUltimaConfig(cfg);
-                        setNombre(cfg.suggestedName);
-                        setChipsDesdeSeleccion(cfg);
-                        generarActividadIA(cfg);
-                      }}
-                    >
-                      <Button type="button" variant="default" className="whitespace-nowrap" disabled={loading}>
-                        <WandSparkles className="w-4 h-4 mr-1" /> Crear Actividad
+                  {/* Nombre + generar */}
+                  <div className="md:col-span-2">
+                    <Label className="mb-2 block">Nombre de la actividad</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={nombre}
+                        onChange={(e) => setNombre(e.target.value)}
+                        placeholder="Ej: Práctica 1"
+                        className="flex-1"
+                      />
+
+                      <ConfigActividadPopover
+                        raOptions={raOptions}
+                        disabled={!asignaturaCodigoEf || raLoading || raOptions.length === 0 || loading}
+                        onApply={(cfg) => {
+                          setUltimaConfig(cfg);
+                          setNombre(cfg.suggestedName);
+                          setChipsDesdeSeleccion(cfg);
+                          generarActividadIA(cfg);
+                        }}
+                      >
+                        <Button type="button" variant="default" className="whitespace-nowrap" disabled={loading}>
+                          <WandSparkles className="w-4 h-4 mr-1" /> Crear Actividad
+                        </Button>
+                      </ConfigActividadPopover>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => resetActividad({ keepSelectors: true })}
+                      >
+                        Limpiar
                       </Button>
-                    </ConfigActividadPopover>
+                    </div>
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => resetActividad({ keepSelectors: true })}
-                    >
-                      Limpiar
-                    </Button>
+                    {asignaturaCodigoEf && raLoading && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Cargando RA/CE de la asignatura seleccionada…
+                      </p>
+                    )}
+                    {asignaturaCodigoEf && !raLoading && raOptions.length === 0 && (
+                      <p className="mt-1 text-xs text-destructive">
+                        No se han encontrado RA/CE para esta asignatura.
+                      </p>
+                    )}
                   </div>
-
-                  {asignaturaCodigoEf && raLoading && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Cargando RA/CE de la asignatura seleccionada…
-                    </p>
-                  )}
-                  {asignaturaCodigoEf && !raLoading && raOptions.length === 0 && (
-                    <p className="mt-1 text-xs text-destructive">
-                      No se han encontrado RA/CE para esta asignatura.
-                    </p>
-                  )}
                 </div>
-              </div>
-            )}
-
-            {/* Descripción */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="mb-2">Descripción de la actividad</Label>
-                {dirty && <Badge variant="destructive">● Cambios sin guardar</Badge>}
-              </div>
-
-              <div
-                className="rounded-md border bg-white"
-                onDrop={(e) => e.preventDefault()}     // bloquea drop accidental
-                onDragOver={(e) => e.preventDefault()}
-              >
-                <TinyEditor
-                  value={descripcionHtml}
-                  onChange={(html) => {
-                    setDescripcionHtml(html);
-                    setDirty(true);
-                  }}
-                  onDirtyChange={setDirty}
-                  placeholder="Describe la actividad con todo detalle…"
-                  autoresize
-                  forceLight
-                />
-              </div>
-
-              {Array.isArray(cesDetectados) && cesDetectados.length > 0 && (
-                <CEDetectedListAny results={cesDetectados} className="mt-2" />
               )}
-            </div>
 
-            {/* Acciones */}
-            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => resetActividad({ keepSelectors: true })}
-              >
-                Limpiar
-              </Button>
+              {/* Descripción */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="mb-2">Descripción de la actividad</Label>
+                  {dirty && <Badge variant="destructive">● Cambios sin guardar</Badge>}
+                </div>
 
-              <Button onClick={handleGuardar} disabled={loading} className="px-6">
-                <Bot className="w-4 h-4 mr-2" /> {loading ? "Guardando..." : "Guardar actividad"}
-              </Button>
+                <div
+                  className="rounded-md border bg-white"
+                  onDrop={(e) => e.preventDefault()}     // bloquea drop accidental
+                  onDragOver={(e) => e.preventDefault()}
+                >
+                  <TinyEditor
+                    value={descripcionHtml}
+                    onChange={(html) => {
+                      setDescripcionHtml(html);
+                      setDirty(true);
+                    }}
+                    onDirtyChange={setDirty}
+                    placeholder="Describe la actividad con todo detalle…"
+                    autoresize
+                    forceLight
+                  />
+                </div>
+
+                {Array.isArray(cesDetectados) && cesDetectados.length > 0 && (
+                  <CEDetectedListAny results={cesDetectados} className="mt-2" />
+                )}
+              </div>
+
+              {/* Acciones */}
+              <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => resetActividad({ keepSelectors: true })}
+                >
+                  Limpiar
+                </Button>
+
+                <Button onClick={handleGuardar} disabled={loading} className="px-6">
+                  <Bot className="w-4 h-4 mr-2" /> {loading ? "Guardando..." : "Guardar actividad"}
+                </Button>
+              </div>
             </div>
-          </div>
-        </DialogContent>
-      </DialogPortal>
-    </Dialog>
+          </DialogContent>
+        </DialogPortal>
+      </Dialog>
+
+      {/* Loader global sobre todo mientras se genera con LLM */}
+      <LoaderOverlay
+        open={showLoader}
+        title="Creando actividad…"
+        subtitle="Generando propuesta con LLM y preparando el editor"
+        lines={[
+          "Recopilando RA/CE seleccionados…",
+          "Generando estructura de la actividad…",
+          "Redactando instrucciones y criterios…",
+          "Aplicando formato al editor…",
+        ]}
+        zIndexClassName="z-[3000]"
+        blur="lg"
+        loaderSize="lg"
+        strictBlock
+      />
+    </>
   );
 }
