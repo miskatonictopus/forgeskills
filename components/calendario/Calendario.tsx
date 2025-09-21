@@ -50,6 +50,11 @@ type Props = {
 
   // ⭐ nueva prop: te dejo decidir el título final con acceso a tu store
   resolveTitle?: (e: FCEvent) => string;
+
+  // ✅ props nativas para controlar solapes/orden
+  eventOverlap?: boolean | ((stillEvent: any, movingEvent: any) => boolean);
+  eventOrder?: string | ((a: any, b: any) => number);
+  slotEventOverlap?: boolean;
 };
 
 /* ===================== Helpers ===================== */
@@ -148,6 +153,11 @@ export default function Calendario({
   onEventMove,
   onEventResize,
   resolveTitle, // ⭐
+
+  // ✅ nuevas props (opcionales)
+  eventOverlap,
+  eventOrder,
+  slotEventOverlap,
 }: Props) {
   const setPermitidos = React.useMemo(
     () => (diasPermitidos && diasPermitidos.length > 0 ? new Set(diasPermitidos) : null),
@@ -234,6 +244,12 @@ export default function Calendario({
         editable
         eventStartEditable
         eventDurationEditable
+
+        /* ✅ nuevas opciones pasadas tal cual a FullCalendar */
+        eventOverlap={eventOverlap}
+        eventOrder={eventOrder}
+        slotEventOverlap={slotEventOverlap}
+
         dateClick={(info) => {
           if (setPermitidos && !setPermitidos.has(info.date.getDay())) return;
           if (!dentroDeRango(info.date)) return;
@@ -302,7 +318,7 @@ export default function Calendario({
         eventContent={(arg: any) => {
           // No personalizamos los background events
           if (arg.event.display === "background") return undefined;
-        
+
           const ep = (arg.event.extendedProps ?? {}) as any;
           const raw =
             ep.__color ||
@@ -311,23 +327,21 @@ export default function Calendario({
             "";
           const hex = normalizeHex(raw);
           const fg = hex ? textOn(hex) : undefined;
-        
+
           // Partimos el title que viene como: "Asignatura · CURSO_TAG"
           const title = String(arg.event.title || "");
           const parts = title.split(" · ");
           const asignatura = parts.length > 1 ? parts[0] : title;
-const cursoTag = parts.length > 1 ? parts.slice(1).join(" · ") : "";
-        
+          const cursoTag = parts.length > 1 ? parts.slice(1).join(" · ") : "";
+
           // Contenedor
           const wrap = document.createElement("div");
           wrap.style.height = "100%";
           wrap.style.display = "flex";
           wrap.style.flexDirection = "column";
           wrap.style.alignItems = "flex-start";
-          wrap.style.alignItems = "flex-start";
-wrap.style.justifyContent = "flex-start";  
-wrap.style.padding = "8px 8px 6px 8px";    
-wrap.style.gap = "4px";
+          wrap.style.justifyContent = "flex-start";
+          wrap.style.gap = "4px";
           wrap.style.padding = "4px 6px";
           wrap.style.borderRadius = "8px";
           wrap.style.boxSizing = "border-box";
@@ -336,13 +350,10 @@ wrap.style.gap = "4px";
             wrap.style.border = `1px solid ${hex}`;
             wrap.style.color = fg!;
           }
-        
+
           // Curso (arriba izq., más grande y negrita)
           const top = document.createElement("div");
           top.textContent = cursoTag || "";
-          top.style.fontSize = "18px";     // curso (acrónimo+nivel)
-
-
           top.style.fontWeight = "700";
           top.style.fontSize = "18px";
           top.style.lineHeight = "1.1";
@@ -351,10 +362,9 @@ wrap.style.gap = "4px";
           top.style.whiteSpace = "nowrap";
           top.style.overflow = "hidden";
           top.style.textOverflow = "ellipsis";
-        
+
           // Asignatura (debajo, más pequeña)
           const bottom = document.createElement("div");
-          bottom.style.fontSize = "13px";  // asignatura
           bottom.textContent = asignatura;
           bottom.style.fontSize = "13px";
           bottom.style.lineHeight = "1.1";
@@ -364,83 +374,82 @@ wrap.style.gap = "4px";
           bottom.style.whiteSpace = "nowrap";
           bottom.style.overflow = "hidden";
           bottom.style.textOverflow = "ellipsis";
-        
+
           // Si por lo que sea no hay cursoTag, mostramos solo el título
           wrap.appendChild(top.textContent ? top : bottom);
           if (top.textContent) wrap.appendChild(bottom);
-        
+
           return { domNodes: [wrap] };
         }}
-        
       />
 
-<style jsx global>{`
-  /* Sin sombras ni filtros en TODO lo que vaya dentro de un evento */
-  .fc .fc-event,
-  .fc .fc-event * {
-    text-shadow: none !important;
-    -webkit-text-stroke: 0 !important;
-    filter: none !important;
-  }
+      <style jsx global>{`
+        /* Sin sombras ni filtros en TODO lo que vaya dentro de un evento */
+        .fc .fc-event,
+        .fc .fc-event * {
+          text-shadow: none !important;
+          -webkit-text-stroke: 0 !important;
+          filter: none !important;
+        }
 
-  /* Por si tu tema añade estilos más específicos */
-  .fc .fc-timegrid-event .fc-event-main,
-  .fc .fc-daygrid-event .fc-event-main,
-  .fc .fc-event-title,
-  .fc .fc-event-time,
-  .fc .fc-event-main-frame {
-    text-shadow: none !important;
-    filter: none !important;
-  }
+        /* Por si tu tema añade estilos más específicos */
+        .fc .fc-timegrid-event .fc-event-main,
+        .fc .fc-daygrid-event .fc-event-main,
+        .fc .fc-event-title,
+        .fc .fc-event-time,
+        .fc .fc-event-main-frame {
+          text-shadow: none !important;
+          filter: none !important;
+        }
 
-  .fc .fct-bg {
-    background: #a3a3a3 !important; /* morado claro */
-    opacity: 1 !important;
-    margin: 4px !important;
-    border-radius: 10px !important;
-  }
-  
-  .fc .fct-bg::after {
-    content: "FCT";
-    position: absolute;
-    top: 3px;
-    left: 5px;
-    font-size: 13px;
-    font-weight: 400;
-    color: #111;
-  }
+        .fc .fct-bg {
+          background: #a3a3a3 !important;
+          opacity: 1 !important;
+          margin: 4px !important;
+          border-radius: 10px !important;
+        }
 
-  /* (lo que ya tenías) */
-  .fc .fc-event,
-  .fc .fc-timegrid-event,
-  .fc .fc-timegrid-event .fc-event-main,
-  .fc .fc-daygrid-event,
-  .fc .fc-daygrid-event .fc-event-main {
-    border: none !important;
-    border-color: transparent !important;
-    box-shadow: none !important;
-  }
-  .fc .presencial-bg {
-    background: #e5e5e5 !important;
-    opacity: 1 !important;
-    border: none !important;
-    border-radius: 10px !important;
-  }
-  .fc .presencial-bg .fc-event-main {
-    color: #111 !important;
-  }
-  .fc .presencial-bg::after {
-    content: "PRESENCIALIDAD";
-    position: absolute;
-    top: 3px;
-    left: 5px;
-    font-size: 13px;
-    font-weight: 400;
-    color: #111;
-  }
-  .fc .presencial-bg{margin:4px !important}
-  .fc .fc-timegrid-slot { height: 3em !important; }
-`}</style>
+        .fc .fct-bg::after {
+          content: "FCT";
+          position: absolute;
+          top: 3px;
+          left: 5px;
+          font-size: 13px;
+          font-weight: 400;
+          color: #111;
+        }
+
+        /* (lo que ya tenías) */
+        .fc .fc-event,
+        .fc .fc-timegrid-event,
+        .fc .fc-timegrid-event .fc-event-main,
+        .fc .fc-daygrid-event,
+        .fc .fc-daygrid-event .fc-event-main {
+          border: none !important;
+          border-color: transparent !important;
+          box-shadow: none !important;
+        }
+        .fc .presencial-bg {
+          background: #e5e5e5 !important;
+          opacity: 1 !important;
+          border: none !important;
+          border-radius: 10px !important;
+        }
+        .fc .presencial-bg .fc-event-main {
+          color: #111 !important;
+        }
+        .fc .presencial-bg::after {
+          content: "PRESENCIALIDAD";
+          position: absolute;
+          top: 3px;
+          left: 5px;
+          font-size: 13px;
+          font-weight: 400;
+          color: #111;
+        }
+        .fc .presencial-bg { margin: 4px !important; }
+        .fc .fc-timegrid-slot { height: 3em !important; }
+      `}</style>
     </>
   );
 }

@@ -1,44 +1,34 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSnapshot } from "valtio";
 import { v4 as uuidv4 } from "uuid";
-import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { WandSparkles, Bot, CalendarDays } from "lucide-react";
 
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogOverlay,
-  DialogPortal,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogOverlay, DialogPortal,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Bot, WandSparkles } from "lucide-react";
+
+// ⬇️ shadcn Calendar
+import { Calendar } from "@/components/ui/calendar";
 
 import { asignaturasPorCurso } from "@/store/asignaturasPorCurso";
 import { añadirActividad } from "@/store/actividadesPorCurso";
 
 import TinyEditor from "@/components/TinyEditor";
 import { CEDetectedList } from "@/components/CEDetectedList";
-
 import ConfigActividadPopover from "@/components/actividades/ConfigActividadPopover";
 import type { RA, ConfigActividadResult } from "@/components/actividades/ConfigActividadPopover";
-
-// ⬇️ LoaderOverlay
 import LoaderOverlay from "@/components/LoaderOverlay";
 
 type Props = {
@@ -51,16 +41,9 @@ type Props = {
   fechaInicial?: Date;
 };
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.2 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-};
+// Para tipar el elemento CE guardado en chips
+type ChipCE = { raCodigo: string; ceCodigo: string; ceDescripcion?: string };
 
-// Flex para el componente de resultados
 const CEDetectedListAny =
   CEDetectedList as unknown as React.ComponentType<{ results: any[]; className?: string }>;
 
@@ -74,19 +57,17 @@ export function DialogCrearActividad({
 }: Props) {
   const [nombre, setNombre] = useState("");
   const [descripcionHtml, setDescripcionHtml] = useState<string>("");
-  const [cesDetectados, setCesDetectados] = useState<any[]>([]);
+  const [cesDetectados, setCesDetectados] = useState<ChipCE[]>([]);
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  // ⬇️ loader global mientras genera con LLM
+  // Loader mientras genera con LLM
   const [showLoader, setShowLoader] = useState(false);
 
+  // Selectores locales si no vienen por props
   const [cursoIdLocal, setCursoIdLocal] = useState<string | undefined>(cursoId);
   const [asignaturaIdLocal, setAsignaturaIdLocal] = useState<string | undefined>(asignaturaIdProp);
   const [asignaturaCodigoLocal, setAsignaturaCodigoLocal] = useState<string | undefined>(undefined);
-
-  const [cursos, setCursos] = useState<Array<{ id: string; nombre: string }>>([]);
-  const [asigsDeCurso, setAsigsDeCurso] = useState<Array<{ id: string; codigo?: string; nombre: string }>>([]);
 
   const cursoIdEf = cursoId ?? cursoIdLocal;
   const asignaturaIdEf = asignaturaIdProp ?? asignaturaIdLocal;
@@ -100,6 +81,18 @@ export function DialogCrearActividad({
     (todasAsignsDelCurso.find((a: any) => a.id === asignaturaIdEf)?.nombre as string) || "";
   const asignaturaNombreEf = asignaturaNombre ?? asignaturaNombreFromStore;
 
+  // Datos iniciales
+  const [cursos, setCursos] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [asigsDeCurso, setAsigsDeCurso] = useState<Array<{ id: string; codigo?: string; nombre: string }>>([]);
+
+  // Dialogs secundarios
+  const [showResumen, setShowResumen] = useState(false);
+  const [showProgramar, setShowProgramar] = useState(false);
+
+  // Programación
+  const [fechaProgramada, setFechaProgramada] = useState<Date | undefined>();
+  const [fechasDisponibles, setFechasDisponibles] = useState<Set<string>>(new Set()); // "YYYY-MM-DD"
+
   // ====== reset ======
   const resetActividad = (opts?: { keepSelectors?: boolean }) => {
     setNombre("");
@@ -107,6 +100,9 @@ export function DialogCrearActividad({
     setCesDetectados([]);
     setUltimaConfig(null);
     setDirty(false);
+    setShowResumen(false);
+    setShowProgramar(false);
+    setFechaProgramada(undefined);
     if (!opts?.keepSelectors) {
       setCursoIdLocal(undefined);
       setAsignaturaIdLocal(undefined);
@@ -200,17 +196,17 @@ export function DialogCrearActividad({
     };
   }, [asignaturaCodigoEf]);
 
-  // CE seleccionados desde el Popover
+  // CE seleccionados desde Popover
   const setChipsDesdeSeleccion = (cfg: ConfigActividadResult) => {
-    const ceList = cfg.seleccion.map((s) => ({
+    const ceList: ChipCE[] = cfg.seleccion.map((s) => ({
       raCodigo: s.raCodigo,
       ceCodigo: s.ceCodigo,
       ceDescripcion: s.ceDescripcion,
     }));
-    setCesDetectados(ceList as any);
+    setCesDetectados(ceList);
   };
 
-  // ====== generar (muestra LoaderOverlay) ======
+  // ====== generar ======
   const generarActividadIA = async (cfg: ConfigActividadResult) => {
     if (!cfg?.duracionMin || !cfg?.seleccion?.length) {
       toast.error("Configura duración y al menos un CE.");
@@ -242,6 +238,9 @@ export function DialogCrearActividad({
       setDescripcionHtml(html);
       setDirty(true);
       toast.success("✨ Actividad generada en el editor.");
+
+      // abrir resumen automáticamente
+      setShowResumen(true);
     } catch (e) {
       console.error(e);
       toast.error("Error generando la actividad.");
@@ -252,37 +251,36 @@ export function DialogCrearActividad({
   };
 
   // ====== guardar ======
-  const handleGuardar = async () => {
-    if (!nombre) {
-      toast.error("Por favor, completa el nombre.");
-      return;
-    }
-    if (!cursoIdEf || !asignaturaIdEf) {
-      toast.error("Selecciona curso y asignatura.");
-      return;
-    }
+  // Nota: generamos id aquí para reutilizarlo si se programa.
+  const actividadIdRef = React.useRef<string>(uuidv4());
 
-    const nuevaActividad = {
-      id: uuidv4(),
-      nombre,
-      fecha: new Date().toISOString().slice(0, 10),
-      cursoId: cursoIdEf,
-      asignaturaId: asignaturaIdEf,
-      descripcion: descripcionHtml,
-      estado: "borrador",
-    };
+  const buildActividad = (extra?: Partial<any>) => ({
+    id: actividadIdRef.current,
+    nombre,
+    fecha: (extra?.fecha as string) ??
+      new Date().toISOString().slice(0, 10),
+    cursoId: cursoIdEf,
+    asignaturaId: asignaturaIdEf,
+    descripcion: descripcionHtml,
+    estado: extra?.estado ?? "borrador",
+    ...extra,
+  });
+
+  const handleGuardar = async () => {
+    if (!nombre) return toast.error("Por favor, completa el nombre.");
+    if (!cursoIdEf || !asignaturaIdEf) return toast.error("Selecciona curso y asignatura.");
 
     try {
       setLoading(true);
+      const nuevaActividad = buildActividad();
       const raw = await (window as any).electronAPI.guardarActividad(nuevaActividad as any);
       const res = (raw ?? {}) as { ok?: boolean; error?: string };
-      if (!res.ok) {
-        toast.error(`No se guardó: ${res?.error ?? "Error desconocido"}`);
-        return;
-      }
-      añadirActividad(cursoIdEf, nuevaActividad as any);
+      if (!res.ok) return toast.error(`No se guardó: ${res?.error ?? "Error desconocido"}`);
+
+      añadirActividad(cursoIdEf!, nuevaActividad as any);
       toast.success("Actividad guardada correctamente.");
       setDirty(false);
+      setShowResumen(false);
       onOpenChange(false);
       resetActividad({ keepSelectors: true });
       setRefreshKey?.((k) => k + 1);
@@ -293,39 +291,103 @@ export function DialogCrearActividad({
     }
   };
 
+  // ====== programar ======
+  const cargarFechasDisponibles = React.useCallback(async () => {
+    // Intenta API real
+    try {
+      if (!cursoIdEf || !asignaturaIdEf) return setFechasDisponibles(new Set());
+      if (!ultimaConfig?.duracionMin) return setFechasDisponibles(new Set());
+
+      const api = (window as any).electronAPI;
+      if (api?.fechasDisponibles) {
+        const arr: string[] =
+          (await api.fechasDisponibles(cursoIdEf, asignaturaIdEf, ultimaConfig.duracionMin)) ?? [];
+        setFechasDisponibles(new Set(arr.map((d) => d.slice(0, 10))));
+        return;
+      }
+    } catch (e) {
+      console.warn("fechasDisponibles no disponible, usando fallback…");
+    }
+
+    // Fallback: próximos 60 días, solo laborables
+    const set = new Set<string>();
+    const today = new Date();
+    for (let i = 0; i < 60; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      const dow = d.getDay(); // 0 dom ... 6 sáb
+      if (dow !== 0 && dow !== 6) {
+        set.add(d.toISOString().slice(0, 10));
+      }
+    }
+    setFechasDisponibles(set);
+  }, [cursoIdEf, asignaturaIdEf, ultimaConfig?.duracionMin]);
+
+  const openProgramar = async () => {
+    if (!nombre) return toast.error("Pon un nombre primero.");
+    if (!cursoIdEf || !asignaturaIdEf) return toast.error("Selecciona curso y asignatura.");
+    await cargarFechasDisponibles();
+    setShowProgramar(true);
+  };
+
+  const handleConfirmarProgramacion = async () => {
+    if (!fechaProgramada) return toast.error("Selecciona una fecha disponible.");
+    try {
+      setLoading(true);
+      const fechaIso = new Date(
+        Date.UTC(
+          fechaProgramada.getFullYear(),
+          fechaProgramada.getMonth(),
+          fechaProgramada.getDate(),
+          0, 0, 0
+        )
+      ).toISOString();
+
+      const actividadProgramada = buildActividad({
+        estado: "programada",
+        fecha: fechaIso,
+        duracionMin: ultimaConfig?.duracionMin,
+        ces: cesDetectados,
+      });
+
+      const raw = await (window as any).electronAPI.guardarActividad(actividadProgramada as any);
+      const res = (raw ?? {}) as { ok?: boolean; error?: string };
+      if (!res.ok) return toast.error(`No se programó: ${res?.error ?? "Error desconocido"}`);
+
+      añadirActividad(cursoIdEf!, actividadProgramada as any);
+      toast.success("📅 Actividad programada.");
+      setDirty(false);
+      setShowProgramar(false);
+      setShowResumen(false);
+      onOpenChange(false);
+      resetActividad({ keepSelectors: true });
+      setRefreshKey?.((k) => k + 1);
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al programar la actividad.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==== RENDER ====
   return (
     <>
+      {/* DIALOG PRINCIPAL */}
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogPortal>
-          {/* Overlay 60% + blur */}
-          <DialogOverlay
-            className="
-              fixed inset-0 z-[80] bg-background/60 backdrop-blur-sm
-              data-[state=open]:animate-in data-[state=closed]:animate-out
-              data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0
-            "
-          />
+          <DialogOverlay className="fixed inset-0 z-[80] bg-background/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
 
           <DialogContent
-            className="
-              z-[90] w-[min(95vw,1000px)] sm:max-w-[1000px]
-              max-h-[90vh] overflow-y-auto bg-zinc-900
-              data-[state=open]:animate-in data-[state=closed]:animate-out
-              data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95
-              data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2
-              duration-200
-            "
+            className="z-[90] w-[min(95vw,1000px)] sm:max-w-[1000px] max-h-[90vh] overflow-y-auto bg-zinc-900 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2 duration-200"
             onInteractOutside={(e) => {
               const el = e.target as HTMLElement;
-              // Evita cierre si se interactúa con popups del editor
               if (el.closest(".tox, .tox-tinymce-aux, .tox-dialog, .tox-menu")) e.preventDefault();
             }}
             onEscapeKeyDown={(e) => e.preventDefault()}
           >
             <DialogHeader>
-              <DialogTitle className="font-bold">
-                Creando Actividad mediante LLM + H
-              </DialogTitle>
+              <DialogTitle className="font-bold">Creando Actividad mediante LLM + H</DialogTitle>
             </DialogHeader>
 
             <Separator className="my-3" />
@@ -348,7 +410,6 @@ export function DialogCrearActividad({
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Selecciona curso" />
                         </SelectTrigger>
-                        {/* menú por encima del overlay del dialog */}
                         <SelectContent className="z-[110]">
                           {cursos.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
@@ -422,24 +483,16 @@ export function DialogCrearActividad({
                         </Button>
                       </ConfigActividadPopover>
 
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => resetActividad({ keepSelectors: true })}
-                      >
+                      <Button type="button" variant="outline" onClick={() => resetActividad({ keepSelectors: true })}>
                         Limpiar
                       </Button>
                     </div>
 
                     {asignaturaCodigoEf && raLoading && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Cargando RA/CE de la asignatura seleccionada…
-                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">Cargando RA/CE…</p>
                     )}
                     {asignaturaCodigoEf && !raLoading && raOptions.length === 0 && (
-                      <p className="mt-1 text-xs text-destructive">
-                        No se han encontrado RA/CE para esta asignatura.
-                      </p>
+                      <p className="mt-1 text-xs text-destructive">No se han encontrado RA/CE.</p>
                     )}
                   </div>
                 </div>
@@ -454,7 +507,7 @@ export function DialogCrearActividad({
 
                 <div
                   className="rounded-md border bg-white"
-                  onDrop={(e) => e.preventDefault()}     // bloquea drop accidental
+                  onDrop={(e) => e.preventDefault()}
                   onDragOver={(e) => e.preventDefault()}
                 >
                   <TinyEditor
@@ -470,21 +523,12 @@ export function DialogCrearActividad({
                   />
                 </div>
 
-                {Array.isArray(cesDetectados) && cesDetectados.length > 0 && (
-                  <CEDetectedListAny results={cesDetectados} className="mt-2" />
-                )}
+                {!!cesDetectados.length && <CEDetectedListAny results={cesDetectados} className="mt-2" />}
               </div>
 
               {/* Acciones */}
               <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => resetActividad({ keepSelectors: true })}
-                >
-                  Limpiar
-                </Button>
-
+                <Button variant="outline" onClick={() => resetActividad({ keepSelectors: true })}>Limpiar</Button>
                 <Button onClick={handleGuardar} disabled={loading} className="px-6">
                   <Bot className="w-4 h-4 mr-2" /> {loading ? "Guardando..." : "Guardar actividad"}
                 </Button>
@@ -494,7 +538,134 @@ export function DialogCrearActividad({
         </DialogPortal>
       </Dialog>
 
-      {/* Loader global sobre todo mientras se genera con LLM */}
+      {/* DIALOG: RESUMEN TRAS GENERAR */}
+      <Dialog open={showResumen} onOpenChange={setShowResumen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Resumen de la actividad</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="text-sm grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-muted-foreground">Curso</p>
+                <p className="font-medium">{cursoIdEf || "—"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Asignatura</p>
+                <p className="font-medium">{asignaturaNombreEf || asignaturaIdEf || "—"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Nombre</p>
+                <p className="font-medium">{nombre || "—"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Duración</p>
+                <p className="font-medium">{ultimaConfig?.duracionMin ? `${ultimaConfig.duracionMin} min` : "—"}</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">RA / CE seleccionados</p>
+              <div className="flex flex-wrap gap-2">
+                {cesDetectados.length === 0 && <span className="text-sm">—</span>}
+                {cesDetectados.map((ce) => (
+                  <Badge key={`${ce.raCodigo}-${ce.ceCodigo}`} variant="secondary">
+                    {ce.raCodigo}.{ce.ceCodigo}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowResumen(false)}>Volver</Button>
+              <Button onClick={handleGuardar} disabled={loading}>
+                <Bot className="w-4 h-4 mr-2" /> Guardar
+              </Button>
+              <Button onClick={openProgramar} className="px-6">
+                <CalendarDays className="w-4 h-4 mr-2" /> Programar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: PROGRAMAR (DATEPICKER) */}
+      <Dialog open={showResumen} onOpenChange={setShowResumen}>
+  <DialogPortal>
+    {/* Overlay con z alto */}
+    <DialogOverlay className="fixed inset-0 bg-background/70 backdrop-blur-sm z-[200]" />
+
+    <DialogContent className="sm:max-w-[600px] z-[210]">
+      <DialogHeader>
+        <DialogTitle>Resumen de la actividad</DialogTitle>
+      </DialogHeader>
+
+      <div className="space-y-3">
+        <div className="text-sm grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-muted-foreground">Curso</p>
+            <p className="font-medium">{cursoIdEf || "—"}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Asignatura</p>
+            <p className="font-medium">
+              {asignaturaNombreEf || asignaturaIdEf || "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Nombre</p>
+            <p className="font-medium">{nombre || "—"}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Duración</p>
+            <p className="font-medium">
+              {ultimaConfig?.duracionMin
+                ? `${ultimaConfig.duracionMin} min`
+                : "—"}
+            </p>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div>
+          <p className="text-sm text-muted-foreground mb-2">
+            RA / CE seleccionados
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {cesDetectados.length === 0 && <span className="text-sm">—</span>}
+            {cesDetectados.map((ce) => (
+              <Badge
+                key={`${ce.raCodigo}-${ce.ceCodigo}`}
+                variant="secondary"
+              >
+                {ce.raCodigo}.{ce.ceCodigo}
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={() => setShowResumen(false)}>
+            Volver
+          </Button>
+          <Button onClick={handleGuardar} disabled={loading}>
+            <Bot className="w-4 h-4 mr-2" /> Guardar
+          </Button>
+          <Button onClick={openProgramar} className="px-6">
+            <CalendarDays className="w-4 h-4 mr-2" /> Programar
+          </Button>
+        </div>
+      </div>
+    </DialogContent>
+  </DialogPortal>
+</Dialog>
+
+
+      {/* LOADER GLOBAL */}
       <LoaderOverlay
         open={showLoader}
         title="Creando actividad…"
@@ -503,6 +674,8 @@ export function DialogCrearActividad({
           "Recopilando RA/CE seleccionados…",
           "Generando estructura de la actividad…",
           "Redactando instrucciones y criterios…",
+          "Pensando...",
+          "Pensando todavía más...",
           "Aplicando formato al editor…",
         ]}
         zIndexClassName="z-[3000]"

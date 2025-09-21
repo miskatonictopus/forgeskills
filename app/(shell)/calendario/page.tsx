@@ -17,7 +17,6 @@ import type { Festivo, Presencialidad, FCTTramo } from "@/types/electronAPI";
 /* ---------- utils ---------- */
 const cursoTag = (c: any) => {
   const acr = c?.acronimo || c?.acr || c?.acronym || "";
-  const nivelRaw = c?.nivel ?? "";
   const nivel = c?.nivel ? `${c.nivel}` : "";
   if (!acr && !nivel) return c?.nombre || "";
   return [acr, nivel].filter(Boolean).join("");
@@ -42,18 +41,8 @@ const textOn = (hex: string) => {
 type AsigLite = {
   id: string;
   nombre: string;
-  codigo?: string;   // a veces viene, a veces no
-  color?: string;    // puede venir si tu consulta ya lo incluye
-};
-
-
-const hexToRgba = (hex?: string, a = 0.28) => {
-  const h = normalizeHex(hex);
-  if (!h) return undefined;
-  const r = parseInt(h.slice(1, 3), 16);
-  const g = parseInt(h.slice(3, 5), 16);
-  const b = parseInt(h.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
+  codigo?: string;
+  color?: string;
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -105,15 +94,11 @@ const expandirHorariosEnRango = (
     const dow = cursor.getDay();
     horarios.forEach((h) => {
       if (dow === h.diaSemana && !esDiaFestivo(cursor, festivos)) {
-        const fecha = ymdLocal(cursor); // YYYY-MM-DD
-
-        // normalizamos HH:mm → HH:mm:ss
+        const fecha = ymdLocal(cursor);
         const hi = h.horaInicio.length === 5 ? `${h.horaInicio}:00` : h.horaInicio;
         const hf = h.horaFin.length === 5 ? `${h.horaFin}:00` : h.horaFin;
 
         const hex = normalizeHex(colorHex);
-        const bg  = hexToRgba(hex, 0.28);
-        const fg  = hex ? textOn(hex) : undefined;
 
         out.push({
           id: `horario-${cursoId}-${asigId}-${fecha}-${h.horaInicio}`,
@@ -122,15 +107,11 @@ const expandirHorariosEnRango = (
           end:   `${fecha}T${hf}`,
           classNames: ["horario-event"],
           editable: false,
-        
-          // 👇 fuerza colores nativos de FullCalendar
-          backgroundColor: colorHex || undefined,
-          borderColor: colorHex || undefined,
-          textColor: colorHex ? textOn(colorHex) : undefined,
-        
-          extendedProps: { __color: colorHex || "" },
+          backgroundColor: hex || undefined,
+          borderColor: hex || undefined,
+          textColor: hex ? textOn(hex) : undefined,
+          extendedProps: { __color: hex || "", orden: 1 }, // 👉 horarios detrás
         });
-        
       }
     });
     cursor.setDate(cursor.getDate() + 1);
@@ -148,10 +129,10 @@ const expandirTramosBG = (
   const out: FCEvent[] = [];
   const cursor = new Date(start);
   while (cursor <= end) {
-    const dow = cursor.getDay(); // 0..6
+    const dow = cursor.getDay();
     const fecha = ymdLocal(cursor);
     tramos.forEach((t, i) => {
-      const jsDow = t.diaSemana % 7; // 1..5 -> 1..5
+      const jsDow = t.diaSemana % 7;
       if (dow === jsDow) {
         out.push({
           id: `${className}-${fecha}-${i}`,
@@ -161,11 +142,9 @@ const expandirTramosBG = (
           editable: false,
           classNames: [className],
           backgroundColor:
-  className === "fct-bg"
-    ? "rgba(200,120,255,1)"
-    : className === "presencial-bg"
-    ? "#ffffff"   // 👈 blanco sólido
-    : undefined,
+            className === "fct-bg" ? "rgba(200,120,255,1)"
+            : className === "presencial-bg" ? "#ffffff"
+            : undefined,
           title: "",
         });
       }
@@ -204,7 +183,6 @@ export default function CalendarioGlobalPage() {
         for (const c of cursos) {
           const asigs = (await window.electronAPI.asignaturasDeCurso(c.id)) as AsigLite[];
           if (!alive) return;
-          // guardamos color si viene ya en la consulta
           asignaturasPorCurso[c.id] = (asigs || []).map((a: any) => ({
             id: a.id,
             nombre: a.nombre,
@@ -304,10 +282,10 @@ export default function CalendarioGlobalPage() {
 
               const titulo = `${a.nombre} · ${cursoTag(c)}`;
               const colorHex =
-              normalizeHex((a as any)?.color) ||
-              colorMapCurso[String(a.id)] ||
-              normalizeHex(((await window.electronAPI.leerAsignatura?.(a.id)) as any)?.color) ||
-              "";
+                normalizeHex((a as any)?.color) ||
+                colorMapCurso[String(a.id)] ||
+                normalizeHex(((await window.electronAPI.leerAsignatura?.(a.id)) as any)?.color) ||
+                "";
 
               eventosHorarios.push(
                 ...expandirHorariosEnRango(
@@ -347,20 +325,13 @@ export default function CalendarioGlobalPage() {
                 let end   = endFromDb;
 
                 if (!start) {
-                  if (a.start_ms) {
-                    start = toLocalISO(new Date(a.start_ms));
-                  } else if (a.fecha && a.horaInicio) {
-                    start = `${a.fecha}T${a.horaInicio}:00`;
-                  } else if (a.fecha) {
-                    start = `${a.fecha}T08:00:00`;
-                  }
+                  if (a.start_ms)      start = toLocalISO(new Date(a.start_ms));
+                  else if (a.fecha && a.horaInicio) start = `${a.fecha}T${a.horaInicio}:00`;
+                  else if (a.fecha)    start = `${a.fecha}T08:00:00`;
                 }
                 if (!end) {
-                  if (a.end_ms) {
-                    end = toLocalISO(new Date(a.end_ms));
-                  } else if (a.fecha && a.horaFin) {
-                    end = `${a.fecha}T${a.horaFin}:00`;
-                  }
+                  if (a.end_ms)        end = toLocalISO(new Date(a.end_ms));
+                  else if (a.fecha && a.horaFin) end = `${a.fecha}T${a.horaFin}:00`;
                 }
 
                 return {
@@ -369,7 +340,8 @@ export default function CalendarioGlobalPage() {
                   start,
                   end,
                   allDay: false,
-                  extendedProps: { estado: a.estado },
+                  classNames: ["actividad-event"],
+                  extendedProps: { estado: a.estado, orden: 0 }, // 👉 actividades delante
                 } as Evento;
               });
           })
@@ -531,6 +503,9 @@ export default function CalendarioGlobalPage() {
           slotMinTime="08:00:00"
           slotMaxTime="20:00:00"
           height="auto"
+          // 👇 ya aceptado por el wrapper
+          eventOverlap={false}
+          eventOrder="extendedProps.orden,title"
           validRange={
             rangoValido && lectivoStartISO && lectivoEndISO
               ? { start: lectivoStartISO, end: lectivoEndISO }
@@ -547,7 +522,7 @@ export default function CalendarioGlobalPage() {
         />
       </div>
 
-      {/* Estilos de refuerzo para que el tema no pise los inline */}
+      {/* Estilos de refuerzo y jerarquía visual */}
       <style jsx global>{`
         .fc .festivo-background { background: rgba(80, 200, 120, 0.12); }
         .fc .presencial-bg    { background: rgba(120, 160, 255, 0.12); }
@@ -558,6 +533,24 @@ export default function CalendarioGlobalPage() {
           background-color: inherit !important;
           border-color: inherit !important;
           color: inherit !important;
+        }
+
+        /* Horario como bloque base */
+        .fc .horario-event .fc-event-main {
+          font-weight: 700;
+          line-height: 1.1;
+        }
+
+        /* Actividad tipo chip para no tapar el horario */
+        .fc .actividad-event { z-index: 3; }
+        .fc .actividad-event .fc-event-main {
+          background: rgba(0,0,0,0.28);
+          padding: 2px 6px;
+          border-radius: 9999px;
+          font-size: 11px;
+          font-weight: 600;
+          line-height: 1.1;
+          backdrop-filter: saturate(1.05) blur(1px);
         }
       `}</style>
     </main>

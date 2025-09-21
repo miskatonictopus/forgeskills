@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { WandSparkles, Bot, ClipboardPen, Wifi } from "lucide-react";
+import { WandSparkles, ClipboardPen, Wifi } from "lucide-react";
 
 type SelectorProps = {
   open: boolean;
