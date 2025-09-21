@@ -144,14 +144,18 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
       {/* 1) Selector de modo */}
       <DialogSelectorActividad
-        open={openSelector}
-        onOpenChange={setOpenSelector}
-        onSelect={(mode) => {
-          if (mode === "manual") setOpenManual(true)
-          if (mode === "llm") setOpenLLM(true)
-        }}
-        // disableLLM // ← descomenta si aún no quieres habilitar el flujo LLM
-      />
+  open={openSelector}
+  onOpenChange={setOpenSelector}
+  onSelect={(mode) => {
+    // 1) Cierra el selector
+    setOpenSelector(false)
+    // 2) Abre el siguiente en el siguiente frame para que el overlay se desmonte
+    requestAnimationFrame(() => {
+      if (mode === "manual") setOpenManual(true)
+      if (mode === "llm") setOpenLLM(true)
+    })
+  }}
+/>
 
       {/* 2) Diálogo Manual */}
       <DialogCrearActividadManual
