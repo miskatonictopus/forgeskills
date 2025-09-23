@@ -3205,19 +3205,63 @@ ipcMain.handle("prog:exportar-pdf", async (_evt, html: string, jsonPath: string)
   }
 });
 
-ipcMain.handle("alumnos:obtener-por-curso", (_e, cursoIdRaw) => {
-  const cursoId = String(cursoIdRaw);
+// Tipado opcional de la fila devuelta
+type AlumnoRow = {
+  id: string | number;
+  nombre: string;
+  apellidos: string;
+  mail?: string | null;
+  curso: string;
+};
 
-  const sql = `
-    SELECT a.id, a.nombre, a.apellidos, a.mail, ca.curso_id AS curso
-    FROM curso_alumno ca
-    JOIN alumnos a ON a.id = ca.alumno_id
-    WHERE ca.curso_id = @cursoId
-    ORDER BY a.apellidos COLLATE NOCASE, a.nombre COLLATE NOCASE;
-  `;
+// Resuelve por id o acrónimo; si algo falla, devuelve el input tal cual
+function resolveCursoIdLoose(input: string): string {
+  try {
+    const row = db
+      .prepare(
+        `SELECT id FROM cursos WHERE id = @v OR acronimo = @v LIMIT 1`
+      )
+      .get({ v: input }) as { id?: string } | undefined;
+    return row?.id ?? input;
+  } catch {
+    // Si la tabla no existe o hay cualquier error, seguimos con el input
+    return input;
+  }
+}
 
-  return db.prepare(sql).all({ cursoId });
-});
+ipcMain.handle(
+  "alumnos:obtener-por-curso",
+  (_e, cursoIdRaw: string): AlumnoRow[] => {
+    const input = String(cursoIdRaw ?? "").trim();
+    const cursoId = resolveCursoIdLoose(input);
+
+    try {
+      // Un único SELECT contra alumnos.curso, admitiendo id o acrónimo
+      const sql = `
+        SELECT a.id, a.nombre, a.apellidos, a.mail, a.curso AS curso
+        FROM alumnos a
+        LEFT JOIN cursos c ON c.id = a.curso
+        WHERE
+          a.curso = @cid
+          OR c.acronimo = @input
+          OR c.id = @input
+        ORDER BY a.apellidos COLLATE NOCASE, a.nombre COLLATE NOCASE
+      `;
+
+      const rows = db.prepare(sql).all({ cid: cursoId, input }) as AlumnoRow[];
+
+      console.log(
+        `[IPC alumnos:obtener-por-curso] input="${input}" -> cursoId="${cursoId}" => ${rows.length} alumnos`
+      );
+
+      return rows;
+    } catch (err) {
+      console.error("[IPC alumnos:obtener-por-curso] ERROR", err);
+      return [];
+    }
+  }
+);
+
 
 type AsignaturaRow = {
   id: string;
