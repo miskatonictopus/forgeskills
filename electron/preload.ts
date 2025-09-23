@@ -11,6 +11,37 @@ import type {
   GuardarActividadResult,
 } from "../types/electronAPI";
 
+type AnalizarPayload = {
+  actividadId?: string;        // modo B: analizar actividad guardada
+  texto?: string;              // modo A: analizar texto suelto (html o plano)
+  asignaturaCodigo?: string;   // requerido si usas 'texto'
+};
+
+async function analizarDescripcionCompat(
+  a?: any,
+  b?: any
+): Promise<any> {
+  // Soporta 3 formas:
+  // 1) objeto { actividadId? , texto? , asignaturaCodigo? }
+  // 2) (actividadId: string)
+  // 3) (texto: string, asignaturaId: string)  ← firma antigua "desde texto"
+  let payload: AnalizarPayload;
+
+  if (typeof a === "object" && a !== null) {
+    payload = a as AnalizarPayload;
+  } else if (typeof a === "string" && typeof b === "string") {
+    // firma antigua: (texto, asignaturaId)
+    payload = { texto: a, asignaturaCodigo: b };
+  } else if (typeof a === "string" && !b) {
+    // firma antigua: (actividadId)
+    payload = { actividadId: a };
+  } else {
+    throw new Error("analizarDescripcion: parámetros inválidos");
+  }
+
+  return ipcRenderer.invoke("analizar-descripcion", payload);
+}
+
 /* ========= Tipos locales necesarios ========= */
 type GuardarHorarioIn = {
   cursoId: string;
@@ -171,19 +202,21 @@ const api = {
     ipcRenderer.invoke("listar-actividades-global"),
   actualizarActividadFecha: (id: string, fecha: string) =>
     ipcRenderer.invoke("actualizar-actividad-fecha", id, fecha),
-  borrarActividad: (actividadId: string) =>
-    ipcRenderer.invoke("borrar-actividad", actividadId),
   // alias
+  borrarActividad: (actividadId: string) =>
+    ipcRenderer.invoke("actividades:borrar", actividadId),
 
   /* ================= RA / CE + Análisis ================= */
   obtenerRAPorAsignatura: (asignaturaId: string) =>
     ipcRenderer.invoke("obtener-ra-por-asignatura", asignaturaId),
   obtenerCEPorRA: (raId: string) =>
     ipcRenderer.invoke("obtener-ce-por-ra", raId),
-  analizarDescripcion: (actividadId: string) =>
-    ipcRenderer.invoke("analizar-descripcion", actividadId),
+    analizarDescripcion: (payload: AnalizarPayload) =>
+    ipcRenderer.invoke("analizar-descripcion", payload),
+
+  // ✅ COMPAT: redirige a la nueva ruta normalizada
   analizarDescripcionDesdeTexto: (texto: string, asignaturaId: string) =>
-    ipcRenderer.invoke("analizar-descripcion-desde-texto", texto, asignaturaId),
+    analizarDescripcionCompat(texto, asignaturaId),
   guardarInformePDF: (data: Uint8Array, sugerido: string) =>
     ipcRenderer.invoke("guardar-informe-pdf", data, sugerido),
 

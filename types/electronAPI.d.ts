@@ -156,7 +156,7 @@ export interface ElectronAPI {
     horaFin?: string | null;
   }>>;
   actualizarActividadFecha: (id: string, fecha: string) => Promise<{ ok: boolean }>;
-  borrarActividad: (actividadId: string) => Promise<void>;
+  borrarActividad: (actividadId: string) => Promise<{ ok?: boolean; error?: string }>;
   evaluarActividad: (
     actividadId: string,
     notas: { alumnoId: string; nota: number }[]

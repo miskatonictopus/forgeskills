@@ -14,6 +14,10 @@ import {
   CheckCircle2,
   ListChecks,
   Undo2,
+  FileUp,
+  FileText,
+  Plus,
+  X,
 } from "lucide-react";
 
 import {
@@ -59,7 +63,7 @@ type Props = {
   fechaInicial?: Date;
 };
 
-// Chip local CE
+// Chip local CE editable
 type ChipCE = { raCodigo: string; ceCodigo: string; ceDescripcion?: string };
 const CEDetectedListAny = CEDetectedList as unknown as React.ComponentType<{
   results: any[];
@@ -80,6 +84,11 @@ export default function DialogCrearActividadManual({
   const [cesSeleccionados, setCesSeleccionados] = useState<ChipCE[]>([]);
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
+
+  // PDF
+  const [pdfNombre, setPdfNombre] = useState<string>("");
+  const [pdfTexto, setPdfTexto] = useState<string>("");
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Selectores si no vienen por props
   const [cursoIdLocal, setCursoIdLocal] = useState<string | undefined>(cursoId);
@@ -128,6 +137,8 @@ export default function DialogCrearActividadManual({
     setNombre("");
     setDescripcionHtml("");
     setCesSeleccionados([]);
+    setPdfNombre("");
+    setPdfTexto("");
     setDirty(false);
     setShowProgramar(false);
     setFechaProgramada(undefined);
@@ -232,18 +243,40 @@ export default function DialogCrearActividadManual({
       ceCodigo: s.ceCodigo,
       ceDescripcion: s.ceDescripcion,
     }));
-    setCesSeleccionados(ceList);
+    setCesSeleccionados(mergeCEs(cesSeleccionados, ceList));
     if (cfg.suggestedName && !nombre) setNombre(cfg.suggestedName);
   };
 
-  // ====== sugerir RA/CE (opcional) ======
-  const sugerirRAyCE = async () => {
+  // ====== helper: merge sin duplicados ======
+  function mergeCEs(prev: ChipCE[], add: ChipCE[]) {
+    const seen = new Set(prev.map((x) => `${x.raCodigo}::${x.ceCodigo}`));
+    const out = [...prev];
+    for (const c of add) {
+      const key = `${c.raCodigo}::${c.ceCodigo}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(c);
+      }
+    }
+    return out;
+  }
+
+  // ====== sugerir RA/CE (desde descripción o PDF) ======
+  const sugerirRAyCE = async (source: "descripcion" | "pdf" = "descripcion") => {
     if (!asignaturaCodigoEf) {
       toast.error("Selecciona la asignatura primero.");
       return;
     }
-    if (!descripcionHtml || descripcionHtml.trim().length < 10) {
-      toast.error("Añade una descripción para poder sugerir RA/CE.");
+
+    const textoBase =
+      source === "pdf" ? pdfTexto : stripHtml(descripcionHtml);
+
+    if (!textoBase || textoBase.length < 10) {
+      toast.error(
+        source === "pdf"
+          ? "El PDF no contiene texto suficiente."
+          : "Añade una descripción para poder sugerir RA/CE."
+      );
       return;
     }
 
@@ -251,60 +284,203 @@ export default function DialogCrearActividadManual({
     try {
       const api = (window as any).electronAPI;
 
-      // Preferimos IPC local si existe
-      if (api?.detectarCEsActividad || api?.analizarDescripcion || api?.sugerirCEs) {
-        const fn =
-          api.detectarCEsActividad ??
-          api.analizarDescripcion ??
-          api.sugerirCEs;
+      // 1) Preferido: analizarDescripcionDesdeTexto(texto, asignaturaCodigo)
+      let res: any = null;
+      if (api?.analizarDescripcionDesdeTexto) {
+        try {
+          res = await api.analizarDescripcionDesdeTexto(textoBase, asignaturaCodigoEf!);
+        } catch {}
+      }
 
-        const res =
-          (await fn({
+      // 2) Alternativa: analizarDescripcion({ asignaturaCodigo, texto })
+      if (!res && api?.analizarDescripcion) {
+        try {
+          res = await api.analizarDescripcion({
+            asignaturaCodigo: asignaturaCodigoEf!,
+            texto: textoBase,
+          });
+        } catch {}
+      }
+
+      // 3) Fallback HTTP: /api/detectar-ce
+      if (!res) {
+        const http = await fetch("/api/detectar-ce", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             asignaturaCodigo: asignaturaCodigoEf,
-            descripcionHtml,
-          })) ?? [];
+            texto: textoBase,
+          }),
+        });
+        res = await http.json();
+      }
 
-        const sugeridos: ChipCE[] = (res ?? []).map((r: any) => ({
-          raCodigo: String(r.raCodigo ?? r.ra ?? r.RA ?? r.ra_code ?? ""),
-          ceCodigo: String(r.ceCodigo ?? r.ce ?? r.CE ?? r.ce_code ?? ""),
+      // ---- Parseo robusto de resultados ----
+      const rawList = pickArray(res);
+      const THRESHOLD = 0.42;
+
+      const normalizados = rawList
+        .map((r: any) => ({
+          raCodigo: String(
+            r.raCodigo ?? r.ra ?? r.RA ?? r.ra_code ?? r.raId ?? r.ra_id ?? ""
+          ).trim(),
+          ceCodigo: String(
+            r.ceCodigo ?? r.ce ?? r.CE ?? r.ce_code ?? r.codigo ?? r.code ?? ""
+          ).trim(),
           ceDescripcion: r.ceDescripcion ?? r.descripcion ?? r.desc ?? "",
-        }));
-        if (sugeridos.length) {
-          setCesSeleccionados(sugeridos);
-          toast.success("RA/CE sugeridos aplicados.");
-        } else {
-          toast.message("No se detectaron RA/CE en el texto.");
-        }
-        return;
-      }
+          score: typeof r.score === "number" ? r.score : undefined,
+        }))
+        .filter((x: any) => x.ceCodigo);
 
-      // Fallback HTTP en caso de no tener IPC
-      const resp = await fetch("/api/detectar-ce", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          asignaturaCodigo: asignaturaCodigoEf,
-          html: descripcionHtml,
-        }),
+      const conUmbral =
+        normalizados.some((x: any) => typeof x.score === "number")
+          ? normalizados.filter((x: any) => (x.score ?? 0) >= THRESHOLD)
+          : normalizados;
+
+      const inferidos = conUmbral.map((x: any) => {
+        if (!x.raCodigo) {
+          const m = /^CE(\d+)\./i.exec(x.ceCodigo);
+          if (m) return { ...x, raCodigo: `RA${m[1]}` };
+        }
+        return x;
       });
-      const data = await resp.json();
-      const sugeridos: ChipCE[] = (data?.resultado ?? data ?? []).map((r: any) => ({
-        raCodigo: String(r.raCodigo ?? r.ra ?? r.RA ?? ""),
-        ceCodigo: String(r.ceCodigo ?? r.ce ?? r.CE ?? ""),
-        ceDescripcion: r.ceDescripcion ?? r.descripcion ?? "",
+
+      const sugeridos: ChipCE[] = inferidos.map((x: any) => ({
+        raCodigo: x.raCodigo,
+        ceCodigo: x.ceCodigo,
+        ceDescripcion: x.ceDescripcion,
       }));
+
       if (sugeridos.length) {
-        setCesSeleccionados(sugeridos);
-        toast.success("RA/CE sugeridos aplicados.");
+        setCesSeleccionados((prev) => mergeCEs(prev, sugeridos));
+        toast.success(
+          source === "pdf"
+            ? `RA/CE sugeridos desde PDF: ${sugeridos.length}`
+            : `RA/CE sugeridos: ${sugeridos.length}`
+        );
       } else {
-        toast.message("No se detectaron RA/CE en el texto.");
+        console.debug("[sugerirRAyCE] sin items tras parseo", { res, rawList, normalizados });
+        toast.message("No se detectaron RA/CE relevantes.");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error("No se pudieron sugerir RA/CE.");
+      toast.error(e?.message || "No se pudieron sugerir RA/CE.");
     } finally {
       setShowLoader(false);
     }
+  };
+
+  function pickArray(x: any): any[] {
+    if (Array.isArray(x)) return x;
+    if (!x || typeof x !== "object") return [];
+    return x.ces || x.matches || x.resultados || x.items || x.data || [];
+  }
+
+  // ========== PDF: abrir / leer / extraer ==========
+  const abrirDialogoPDF = async () => {
+    try {
+      const api = (window as any).electronAPI;
+      if (api?.abrirDialogoPDF) {
+        const path: string | null = await api.abrirDialogoPDF();
+        if (!path) return;
+        setPdfNombre(path.split(/[\\/]/).pop() || "documento.pdf");
+        const texto: string = (await api.extraerTextoPDF?.(path)) ?? "";
+        setPdfTexto(texto ?? "");
+        if (!texto) toast.message("No se pudo leer texto del PDF.");
+        else toast.success("PDF cargado y texto extraído.");
+        return;
+      }
+      fileInputRef.current?.click();
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo abrir el PDF.");
+    }
+  };
+
+  const onFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setPdfNombre(f.name);
+
+    try {
+      const api = (window as any).electronAPI;
+
+      if (api?.extraerTextoPDF && typeof api.extraerTextoPDF === "function") {
+        try {
+          const ab = await f.arrayBuffer();
+          const textoIPC = await api.extraerTextoPDF(ab);
+          if (typeof textoIPC === "string") {
+            setPdfTexto(textoIPC ?? "");
+            if (textoIPC) toast.success("PDF cargado y texto extraído (IPC).");
+            else toast.message("No se pudo leer texto del PDF (IPC).");
+            return;
+          }
+        } catch {
+          if (typeof (f as any).path === "string") {
+            const textoIPC = await api.extraerTextoPDF((f as any).path);
+            setPdfTexto(textoIPC ?? "");
+            if (textoIPC) toast.success("PDF cargado y texto extraído (IPC).");
+            else toast.message("No se pudo leer texto del PDF (IPC).");
+            return;
+          }
+        }
+      }
+
+      const form = new FormData();
+      form.append("file", f);
+      const resp = await fetch("/api/extract-pdf", { method: "POST", body: form });
+      const data = await parseResponseSafe(resp);
+      const texto = (data?.text ?? "") as string;
+
+      setPdfTexto(texto);
+      if (!texto) toast.message("No se pudo leer texto del PDF.");
+      else toast.success("PDF cargado y texto extraído.");
+    } catch (err) {
+      console.error("[onFileInputChange] error:", err);
+      toast.error(err instanceof Error ? err.message : "Error leyendo el PDF");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const insertarTextoPdfEnDescripcion = () => {
+    if (!pdfTexto?.trim()) return toast.message("No hay texto extraído del PDF.");
+    const htmlSafe = `<p>${escapeHtml(pdfTexto)
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join("</p><p>")}</p>`;
+    setDescripcionHtml((prev) => (prev ? `${prev}<hr/>${htmlSafe}` : htmlSafe));
+    setDirty(true);
+  };
+
+  // ====== añadir/quitar CE manual ======
+  const [raManual, setRaManual] = useState<string>("");
+  const [ceManual, setCeManual] = useState<string>("");
+
+  const opcionesCEdeRA = useMemo(() => {
+    const ra = raOptions.find((r) => r.codigo === raManual);
+    return ra?.CE ?? [];
+  }, [raOptions, raManual]);
+
+  const añadirCEManual = () => {
+    if (!raManual || !ceManual) {
+      toast.message("Selecciona RA y CE para añadir.");
+      return;
+    }
+    const ce = opcionesCEdeRA.find((c) => c.codigo === ceManual);
+    const nuevo: ChipCE = {
+      raCodigo: raManual,
+      ceCodigo: ceManual,
+      ceDescripcion: ce?.descripcion,
+    };
+    setCesSeleccionados((prev) => mergeCEs(prev, [nuevo]));
+  };
+
+  const quitarCE = (raCod: string, ceCod: string) => {
+    setCesSeleccionados((prev) =>
+      prev.filter((c) => !(c.raCodigo === raCod && c.ceCodigo === ceCod))
+    );
   };
 
   // ====== guardar ======
@@ -318,6 +494,7 @@ export default function DialogCrearActividadManual({
     descripcion: descripcionHtml,
     estado: extra?.estado ?? "borrador",
     ces: cesSeleccionados,
+    fuentePdf: pdfNombre || undefined,
     ...extra,
   });
 
@@ -373,7 +550,6 @@ export default function DialogCrearActividadManual({
       console.warn("fechasDisponibles no disponible, usando fallback…");
     }
 
-    // Fallback: próximos 60 días laborables
     const set = new Set<string>();
     const today = new Date();
     for (let i = 0; i < 60; i++) {
@@ -432,6 +608,49 @@ export default function DialogCrearActividadManual({
     }
   };
 
+  // ==== helpers HTML / texto plano / fetch seguro =====
+  async function parseResponseSafe(resp: Response) {
+    const ct = resp.headers.get("content-type") || "";
+    const isJson = ct.includes("application/json");
+
+    let body: any = null;
+    try {
+      body = isJson ? await resp.json() : await resp.text();
+    } catch {
+      body = null;
+    }
+
+    if (!resp.ok) {
+      const prefix = `${resp.status} ${resp.statusText}`;
+      if (typeof body === "string" && body.trim().startsWith("<")) {
+        throw new Error(`${prefix} — ver logs del servidor`);
+      }
+      throw new Error(
+        typeof body === "string"
+          ? `${prefix}: ${body.slice(0, 200)}`
+          : body?.error || prefix
+      );
+    }
+
+    if (typeof body === "string") {
+      try { return JSON.parse(body); } catch { return { text: "" }; }
+    }
+    return body ?? { text: "" };
+  }
+
+  function stripHtml(html: string) {
+    if (!html) return "";
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    return (div.textContent || div.innerText || "").replace(/\s+/g, " ").trim();
+  }
+  function escapeHtml(str: string) {
+    return str
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+  }
+
   // ==== RENDER ====
   return (
     <>
@@ -440,7 +659,7 @@ export default function DialogCrearActividadManual({
         <DialogPortal>
           <DialogOverlay className="fixed inset-0 z-[80] bg-background/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
           <DialogContent
-            className="z-[90] w-[min(95vw,1000px)] sm:max-w-[1000px] max-h-[90vh] overflow-y-auto bg-zinc-900 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2 duration-200"
+            className="z-[90] w-[min(95vw,1050px)] sm:max-w-[1050px] max-h-[90vh] overflow-y-auto bg-zinc-900 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2 duration-200"
             onInteractOutside={(e) => {
               const el = e.target as HTMLElement;
               if (el.closest(".tox, .tox-tinymce-aux, .tox-dialog, .tox-menu"))
@@ -456,7 +675,7 @@ export default function DialogCrearActividadManual({
 
             <Separator className="my-3" />
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               {/* Curso + Asignatura */}
               {(!cursoId || !asignaturaIdProp) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -544,7 +763,52 @@ export default function DialogCrearActividadManual({
                 />
               </div>
 
-              {/* RA/CE selección + sugerencia */}
+              {/* Subida PDF + acciones */}
+              <div className="rounded-2xl border border-zinc-800 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label className="mr-auto">Archivo PDF (opcional)</Label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={onFileInputChange}
+                  />
+                  <Button variant="secondary" type="button" onClick={abrirDialogoPDF}>
+                    <FileUp className="w-4 h-4 mr-2" /> Subir PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={insertarTextoPdfEnDescripcion}
+                    disabled={!pdfTexto}
+                    title={!pdfTexto ? "Primero carga un PDF con texto" : "Insertar en descripción"}
+                  >
+                    <FileText className="w-4 h-4 mr-2" /> Volcar texto a descripción
+                  </Button>
+                  <Button
+                    variant="default"
+                    type="button"
+                    onClick={() => sugerirRAyCE("pdf")}
+                    disabled={!asignaturaCodigoEf || !pdfTexto || raLoading}
+                    title={!pdfTexto ? "Primero carga un PDF con texto" : "Analizar PDF para sugerir RA/CE"}
+                  >
+                    <WandSparkles className="w-4 h-4 mr-2" /> Sugerir RA/CE desde PDF
+                  </Button>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {pdfNombre ? (
+                    <>
+                      <span className="font-medium">{pdfNombre}</span>{" "}
+                      {pdfTexto ? `— ${Math.min(pdfTexto.length, 2000)} chars` : "— sin texto extraído"}
+                    </>
+                  ) : (
+                    <span>No se ha seleccionado PDF.</span>
+                  )}
+                </div>
+              </div>
+
+              {/* RA/CE selección + sugerencia desde descripción */}
               <div className="flex flex-wrap gap-2">
                 <ConfigActividadPopover
                   raOptions={raOptions}
@@ -560,11 +824,11 @@ export default function DialogCrearActividadManual({
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={sugerirRAyCE}
-                  disabled={!asignaturaCodigoEf || loading || !descripcionHtml}
+                  onClick={() => sugerirRAyCE("descripcion")}
+                  disabled={!asignaturaCodigoEf || loading || !stripHtml(descripcionHtml)}
                 >
                   <WandSparkles className="w-4 h-4 mr-2" />
-                  Sugerir RA/CE (IA)
+                  Sugerir RA/CE (desde descripción)
                 </Button>
 
                 {!!cesSeleccionados.length && (
@@ -572,6 +836,65 @@ export default function DialogCrearActividadManual({
                     {cesSeleccionados.length} CE seleccionados
                   </span>
                 )}
+              </div>
+
+              {/* Lista de CE con quitar */}
+              {!!cesSeleccionados.length && (
+                <div className="flex flex-wrap gap-2">
+                  {cesSeleccionados.map((ce) => (
+                    <Badge
+                      key={`${ce.raCodigo}-${ce.ceCodigo}`}
+                      variant="secondary"
+                      className="flex items-center gap-1"
+                    >
+                      {ce.raCodigo}.{ce.ceCodigo}
+                      <button
+                        type="button"
+                        onClick={() => quitarCE(ce.raCodigo, ce.ceCodigo)}
+                        title="Quitar"
+                        className="ml-1 opacity-70 hover:opacity-100"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {/* Añadir CE manualmente */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <Label className="mb-1 block">RA</Label>
+                  <Select value={raManual} onValueChange={setRaManual} disabled={!raOptions.length}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona RA" /></SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      {raOptions.map((r) => (
+                        <SelectItem key={r.codigo} value={r.codigo}>
+                          {r.codigo} — {r.descripcion}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="mb-1 block">CE</Label>
+                  <Select value={ceManual} onValueChange={setCeManual} disabled={!raManual}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona CE" /></SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      {opcionesCEdeRA.map((c) => (
+                        <SelectItem key={c.codigo} value={c.codigo}>
+                          {c.codigo} — {c.descripcion}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end">
+                  <Button type="button" onClick={añadirCEManual} className="w-full">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Añadir CE
+                  </Button>
+                </div>
               </div>
 
               {!!cesSeleccionados.length && (
@@ -630,66 +953,66 @@ export default function DialogCrearActividadManual({
       <Dialog open={showProgramar} onOpenChange={setShowProgramar}>
         <DialogPortal>
           <DialogOverlay className="fixed inset-0 bg-background/70 backdrop-blur-sm z-[200]" />
-          <DialogContent className="sm:max-w-[600px] z-[210]">
-            <DialogHeader className="flex flex-col items-center gap-3 text-center">
-              <Image
-                src="/images/animated-icons/party.gif"
-                alt=""
-                width={64}
-                height={64}
-                priority
-                unoptimized
-                aria-hidden
-                className="h-16 w-16"
-              />
-              <DialogTitle className="text-center">
-                Programar actividad
-              </DialogTitle>
-            </DialogHeader>
+        </DialogPortal>
+        <DialogContent className="sm:max-w-[600px] z-[210]">
+          <DialogHeader className="flex flex-col items-center gap-3 text-center">
+            <Image
+              src="/images/animated-icons/party.gif"
+              alt=""
+              width={64}
+              height={64}
+              priority
+              unoptimized
+              aria-hidden
+              className="h-16 w-16"
+            />
+            <DialogTitle className="text-center">
+              Programar actividad
+            </DialogTitle>
+          </DialogHeader>
 
-            <div className="space-y-3">
-              <div className="text-sm grid grid-cols-1 gap-3 text-center">
-                <div>
-                  <p className="text-muted-foreground text-xs uppercase">Curso</p>
-                  <p className="font-medium">{cursoIdEf || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs uppercase">Asignatura</p>
-                  <p className="font-medium">{asignaturaNombreEf || asignaturaIdEf || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs uppercase">Nombre</p>
-                  <p className="font-medium">{nombre || "—"}</p>
-                </div>
+          <div className="space-y-3">
+            <div className="text-sm grid grid-cols-1 gap-3 text-center">
+              <div>
+                <p className="text-muted-foreground text-xs uppercase">Curso</p>
+                <p className="font-medium">{cursoIdEf || "—"}</p>
               </div>
-
-              <Separator />
-
-              <div className="flex justify-center">
-                <Calendar
-                  mode="single"
-                  selected={fechaProgramada}
-                  onSelect={setFechaProgramada}
-                  disabled={(date) => {
-                    const key = date.toISOString().slice(0, 10);
-                    return !fechasDisponibles.has(key);
-                  }}
-                  className="rounded-md border"
-                />
+              <div>
+                <p className="text-muted-foreground text-xs uppercase">Asignatura</p>
+                <p className="font-medium">{asignaturaNombreEf || asignaturaIdEf || "—"}</p>
               </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setShowProgramar(false)}>
-                  Volver
-                </Button>
-                <Button onClick={handleConfirmarProgramacion}>
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Confirmar
-                </Button>
+              <div>
+                <p className="text-muted-foreground text-xs uppercase">Nombre</p>
+                <p className="font-medium">{nombre || "—"}</p>
               </div>
             </div>
-          </DialogContent>
-        </DialogPortal>
+
+            <Separator />
+
+            <div className="flex justify-center">
+              <Calendar
+                mode="single"
+                selected={fechaProgramada}
+                onSelect={setFechaProgramada}
+                disabled={(date) => {
+                  const key = date.toISOString().slice(0, 10);
+                  return !fechasDisponibles.has(key);
+                }}
+                className="rounded-md border"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowProgramar(false)}>
+                Volver
+              </Button>
+              <Button onClick={handleConfirmarProgramacion}>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
       </Dialog>
 
       {/* LOADER GLOBAL */}

@@ -3,7 +3,6 @@
  * ==========================================================================*/
 import { openDbSingleton, closeDbSingleton, getDb } from "../src/main/db/singleton";
 import { BackupManager } from "../main/backup";
-
 // asumiendo db singleton ya creado
 import * as dotenv from "dotenv";
 dotenv.config();
@@ -1282,19 +1281,94 @@ ipcMain.handle("obtener-ce-por-ra", (_event, raId: string) => {
   return stmt.all(raId);
 });
 
-ipcMain.handle("analizar-descripcion", async (_e, actividadId: string) => {
-  const resultado = await analizarDescripcionActividad(actividadId);
-  return resultado;
+function stripHtml(html: string) {
+  return (html ?? "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Handler unificado y tolerante:
+ * - analizarDescripcion("actividadId")
+ * - analizarDescripcion("texto", "asignaturaId")
+ * - analizarDescripcion({ actividadId?, texto?, asignaturaCodigo? })
+ */
+ipcMain.handle("analizar-descripcion", async (_event, a?: any, b?: any) => {
+  try {
+    // Caso 1: firma moderna con objeto
+    if (a && typeof a === "object") {
+      const payload = a as {
+        actividadId?: string;
+        texto?: string;
+        asignaturaCodigo?: string;
+      };
+
+      if (payload.actividadId) {
+        // modo actividad existente
+        const r = await analizarDescripcionActividad(payload.actividadId);
+        return r;
+      }
+
+      if (payload.texto && payload.asignaturaCodigo) {
+        const textoPlano = stripHtml(String(payload.texto));
+        const r = await analizarTextoPlano(textoPlano, String(payload.asignaturaCodigo));
+        return r;
+      }
+
+      throw new Error(
+        "Parámetros insuficientes: se requiere { actividadId } o { texto, asignaturaCodigo }"
+      );
+    }
+
+    // Caso 2: compat antigua (texto, asignaturaId) — dos strings
+    if (typeof a === "string" && typeof b === "string") {
+      const textoPlano = stripHtml(a);
+      const asignaturaId = b;
+      const r = await analizarTextoPlano(textoPlano, asignaturaId);
+      return r;
+    }
+
+    // Caso 3: compat antigua (actividadId) — un string
+    if (typeof a === "string" && b == null) {
+      const actividadId = a;
+      const r = await analizarDescripcionActividad(actividadId);
+      return r;
+    }
+
+    throw new Error("Firma no soportada en analizar-descripcion");
+  } catch (err) {
+    console.error("Error occurred in handler for 'analizar-descripcion':", err);
+    // Lanza error normal para que el renderer lo capture con try/catch
+    throw new Error(
+      err instanceof Error ? err.message : typeof err === "string" ? err : "Error desconocido"
+    );
+  }
 });
 
+/**
+ * Mantén el canal antiguo pero haz que sea estricto y con limpieza de HTML.
+ * (Si quieres, puedes incluso redirigir al unificado de arriba.)
+ */
 ipcMain.handle(
   "analizar-descripcion-desde-texto",
   async (_event, texto: string, asignaturaId: string) => {
-    const resultado = await analizarTextoPlano(texto, asignaturaId);
-    return resultado;
+    try {
+      if (typeof texto !== "string" || typeof asignaturaId !== "string") {
+        throw new Error("Parámetros inválidos: (texto: string, asignaturaId: string)");
+      }
+      const textoPlano = stripHtml(texto);
+      return await analizarTextoPlano(textoPlano, asignaturaId);
+    } catch (err) {
+      console.error("Error occurred in handler for 'analizar-descripcion-desde-texto':", err);
+      throw new Error(
+        err instanceof Error ? err.message : typeof err === "string" ? err : "Error desconocido"
+      );
+    }
   }
 );
-
 ipcMain.handle("extraer-texto-pdf", async (_event, filePath: string) => {
   app.whenReady().then(() => {
     createWindow();
@@ -3354,4 +3428,24 @@ ipcMain.handle("get-ces-asignatura", (_e, asignaturaIdRaw: string) => {
 
   return Array.from(map.values());
 });
+
+ipcMain.handle("actividades:borrar", (_e, actividadId: string) => {
+  try {
+    db.prepare("BEGIN").run();
+
+    // si no tienes ON DELETE CASCADE:
+    try { db.prepare(`DELETE FROM actividad_nota WHERE actividad_id = ?`).run(actividadId); } catch {}
+    try { db.prepare(`DELETE FROM actividad_ce   WHERE actividad_id = ?`).run(actividadId); } catch {}
+    try { db.prepare(`DELETE FROM actividades    WHERE id = ?`).run(actividadId); } catch {}
+
+    db.prepare("COMMIT").run();
+    return { ok: true };
+  } catch (e) {
+    try { db.prepare("ROLLBACK").run(); } catch {}
+    console.error("[IPC actividades:borrar] ERROR", e);
+    return { ok: false, error: String(e) };
+  }
+});
+
+
 
