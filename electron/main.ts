@@ -3354,7 +3354,11 @@ function handleOnce(channel: string, handler: Parameters<typeof ipcMain.handle>[
   try { ipcMain.removeHandler(channel); } catch {}
   ipcMain.handle(channel, handler);
 }
-const normCE = (s: string) => String(s ?? "").toUpperCase().replace(/\s+/g, "");
+const normCE = (s: string) =>
+  String(s ?? "")
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/^RA\d+\./, "");
 const clamp10 = (n: number) => Math.max(0, Math.min(10, Number(n) || 0));
 
 const toISO = (d: string | Date) => new Date(d).toISOString();
@@ -3554,21 +3558,124 @@ handleOnce("actividad:guardar-analisis", (_e, args: {
   }
 });
 
-ipcMain.handle("leer-notas-detalle-asignatura", (_e, asignaturaId: string) => {
-  const rows = db.prepare(`
-    SELECT 
-      ac.alumno_id,
-      ac.ce_codigo,
-      ac.actividad_id,
-      a.fecha   AS actividad_fecha,
-      a.nombre  AS actividad_nombre,
-      ac.nota   AS nota
-    FROM alumno_ce ac
-    JOIN actividades a
-      ON a.id = ac.actividad_id
-    WHERE a.asignatura_id = ?
-    ORDER BY a.fecha ASC, ac.ce_codigo, ac.alumno_id
-  `).all(asignaturaId);
+type NotaDetallada = {
+  alumno_id: string;
+  ce_codigo: string;
+  actividad_id?: string | null;
+  actividad_fecha?: string | null;
+  actividad_nombre?: string | null;
+  nota: number | null;
+};
 
-  return { ok: true, rows };
+// CE normalizado: mayúsculas, sin espacios, sin prefijo "RAx."
+
+const asArray = (data: any): any[] => {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.rows)) return data.rows;
+  return [];
+};
+
+// ✅ normalizador seguro
+const normDetalle = (data: any): NotaDetallada[] => {
+  const list = asArray(data);
+
+  return list.map((n: any) => ({
+    alumno_id: String(n.alumno_id),
+    ce_codigo: normCE(n.ce_codigo ?? ""),
+    actividad_id: n.actividad_id ?? null,
+    actividad_fecha: n.actividad_fecha ?? null,
+    actividad_nombre: n.actividad_nombre ?? null,
+    nota: n.nota === null || n.nota === undefined || isNaN(Number(n.nota))
+      ? null
+      : Number(n.nota),
+  }));
+};
+
+
+ipcMain.handle("leer-notas-detalle-asignatura", (_e, asignaturaId: string) => {
+  try {
+    // --- introspección mínima para saber si puedo mapear id numérico -> id del front ---
+    const alumnoCols = (() => {
+      try {
+        return db.prepare("PRAGMA table_info(alumnos);").all().map((r: any) => r.name);
+      } catch {
+        return [];
+      }
+    })();
+    const hasAlumnos = alumnoCols.length > 0;
+    const hasLegacyId = alumnoCols.includes("legacy_id");
+
+    // --- 1) Esquema actual: NOTAS EN nota_ce (no hay actividad_id) ---
+    let rows: any[] = [];
+    try {
+      if (hasAlumnos) {
+        // Dual-join: intenta mapear por legacy_id y, si no, por CAST(id AS INTEGER)
+        rows = db.prepare(
+          `
+          SELECT
+            COALESCE(a1.id, a2.id, nc.alumno_id)         AS alumno_id,      -- id que usa el front (o numérico si no hay mapeo)
+            nc.ce_codigo                                  AS ce_codigo,
+            NULL                                          AS actividad_id,
+            nc.updated_at                                 AS actividad_fecha,
+            NULL                                          AS actividad_nombre,
+            nc.nota                                       AS nota
+          FROM nota_ce nc
+          LEFT JOIN alumnos a1 ON ${hasLegacyId ? "a1.legacy_id = nc.alumno_id" : "1=0"}
+          LEFT JOIN alumnos a2 ON CAST(a2.id AS INTEGER) = nc.alumno_id
+          WHERE nc.asignatura_id = ?
+          ORDER BY COALESCE(a1.apellidos, a2.apellidos) NULLS LAST,
+                   COALESCE(a1.nombre, a2.nombre) NULLS LAST,
+                   nc.ce_codigo, nc.updated_at;
+          `
+        ).all(asignaturaId);
+      } else {
+        // Sin tabla alumnos: devuelve el numérico tal cual
+        rows = db.prepare(
+          `
+          SELECT
+            nc.alumno_id                                  AS alumno_id,
+            nc.ce_codigo                                  AS ce_codigo,
+            NULL                                          AS actividad_id,
+            nc.updated_at                                 AS actividad_fecha,
+            NULL                                          AS actividad_nombre,
+            nc.nota                                       AS nota
+          FROM nota_ce nc
+          WHERE nc.asignatura_id = ?
+          ORDER BY nc.alumno_id, nc.ce_codigo, nc.updated_at;
+          `
+        ).all(asignaturaId);
+      }
+    } catch {
+      // Si nota_ce no existe, rows se queda vacío y pasamos al fallback
+      rows = [];
+    }
+
+    // Si hemos encontrado notas en nota_ce, devolvemos ya
+    if (rows.length > 0) {
+      return { ok: true, rows };
+    }
+
+    // --- 2) Fallback: esquema antiguo alumno_ce + actividades ---
+    // (tu SELECT original)
+    const fallback = db.prepare(
+      `
+      SELECT 
+        ac.alumno_id,
+        ac.ce_codigo,
+        ac.actividad_id,
+        a.fecha   AS actividad_fecha,
+        a.nombre  AS actividad_nombre,
+        ac.nota   AS nota
+      FROM alumno_ce ac
+      JOIN actividades a ON a.id = ac.actividad_id
+      WHERE a.asignatura_id = ?
+      ORDER BY a.fecha ASC, ac.ce_codigo, ac.alumno_id;
+      `
+    ).all(asignaturaId);
+
+    return { ok: true, rows: fallback };
+  } catch (err: any) {
+    return { ok: false, error: String(err?.message || err) };
+  }
 });
+

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSnapshot } from "valtio";
 import { cursoStore } from "@/store/cursoStore";
 import { Dot } from "@/components/ui/Dot";
-import TablaNotasCEAlumnos from "@/components/TablaNotasCEAlumnos";
+import TablaNotasCEAlumnos, { type NotaDetallada } from "@/components/TablaNotasCEAlumnos";
 
 // 👇 store de actividades
 import {
@@ -29,16 +29,6 @@ type Asignatura = {
 };
 type Curso = { id: string; acronimo: string; nombre: string; nivel: string; grado: string };
 
-// Notas detalladas: UNA fila por actividad
-type NotaDetallada = {
-  alumno_id: string;
-  ce_codigo: string;
-  actividad_id: string;
-  actividad_fecha?: string | null;
-  actividad_nombre?: string | null;
-  nota: number | null;
-};
-
 // Badge/Dot de estado
 function EstadoDot({ estado }: { estado?: string }) {
   const map: Record<string, string> = {
@@ -52,16 +42,34 @@ function EstadoDot({ estado }: { estado?: string }) {
   return <span className={`inline-block h-2 w-2 rounded-full ${map[estado ?? "borrador"]}`} />;
 }
 
+/* ===== Helpers robustos ===== */
+
+// normaliza CE: mayúsculas, sin espacios, sin prefijo "RAx."
+const normCE = (s: string) =>
+  String(s ?? "")
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/^RA\d+\./, "");
+
+// extrae un array tanto si recibes rows directas como { ok, rows }
+const asArray = (data: any): any[] => {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.rows)) return data.rows;
+  return [];
+};
+
 // ⇥ normalizador para las filas que vienen del IPC/SQLite
-const normDetalle = (list: any[]): NotaDetallada[] =>
-  (list ?? []).map((n: any) => ({
+const normDetalle = (data: any): NotaDetallada[] => {
+  const list = Array.isArray(data) ? data : data?.rows ?? [];
+  return list.map((n: any) => ({
     alumno_id: String(n.alumno_id),
     ce_codigo: String(n.ce_codigo ?? "").toUpperCase().replace(/\s+/g, ""),
-    actividad_id: String(n.actividad_id),
+    actividad_id: n.actividad_id != null ? String(n.actividad_id) : null,
     actividad_fecha: n.actividad_fecha ? String(n.actividad_fecha).replace(" ", "T") : null,
     actividad_nombre: n.actividad_nombre ?? null,
     nota: n.nota != null ? Number(n.nota) : null,
   }));
+};
 
 export default function AsignaturaPage() {
   const { cursoId, asignaturaId } = useParams<{ cursoId: string; asignaturaId: string }>();
@@ -99,36 +107,43 @@ export default function AsignaturaPage() {
     if (cursoId) cargarActividades(cursoId);
   }, [cursoId]);
 
-  // Carga + normaliza notas detalladas (una por actividad)
-  const cargarNotasDetalle = async () => {
-    try {
-      setCargandoNotas(true);
-      const list =
-        (await (window as any).electronAPI.leerNotasDetalleAsignatura?.(asignaturaId)) ?? [];
-        console.log("🔥 notasDetalle crudas desde IPC", list);
-      const norm = normDetalle(list);
-      // DEBUG opcional:
-      // console.table(norm.slice(0, 8));
-      setNotasDetalle(norm);
-    } catch (e) {
-      console.error("❌ Error al leer notas detalladas:", e);
-      setNotasDetalle([]);
-    } finally {
-      setCargandoNotas(false);
-    }
-  };
+  // 🚀 Carga + normaliza notas detalladas (una por actividad)
+  async function cargarNotasDetalle(asigId: string) {
+    const res =
+      (await (window as any).electronAPI.leerNotasDetalleAsignatura?.(asigId)) ??
+      (await (window as any).electronAPI.invoke?.("leer-notas-detalle-asignatura", asigId)) ??
+      [];
+    // console.log("🔥 notasDetalle crudas desde IPC", res);
+    return normDetalle(res);
+  }
 
   useEffect(() => {
-    cargarNotasDetalle();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let alive = true;
+    (async () => {
+      try {
+        setCargandoNotas(true);
+        const norm = await cargarNotasDetalle(asignaturaId);
+        if (alive) setNotasDetalle(norm);
+      } catch (e) {
+        console.error("❌ Error al leer notas detalladas:", e);
+        if (alive) setNotasDetalle([]);
+      } finally {
+        if (alive) setCargandoNotas(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, [asignaturaId]);
 
   // Auto-refresco tras evaluar (lo emites al guardar evaluación)
   useEffect(() => {
-    const onEval = () => cargarNotasDetalle();
+    const onEval = () => {
+      cargarNotasDetalle(asignaturaId).then(setNotasDetalle).catch(() => {});
+    };
     window.addEventListener("actividad:evaluada", onEval);
     return () => window.removeEventListener("actividad:evaluada", onEval);
-  }, []);
+  }, [asignaturaId]);
 
   // Actividades de ESTA asignatura (ya en memoria)
   const actividadesAsignatura = useMemo(() => {
