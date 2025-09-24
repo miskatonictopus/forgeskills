@@ -521,6 +521,35 @@ export default function DialogCrearActividadManual({
         toast.error(`No se guardó: ${res?.error ?? "Error desconocido"}`);
         return;
       }
+/* 👇 NUEVO: persistir los CE seleccionados como análisis de la actividad */
+try {
+  const ces = Array.from(
+    new Map(
+      cesSeleccionados.map(c => [c.ceCodigo.toUpperCase().replace(/\s+/g, ""), c])
+    ).values()
+  ).map(c => ({
+    codigo: c.ceCodigo,     // el main lo normaliza (REPLACE(UPPER..))
+    puntuacion: 1,          // 1 = incluido; no usamos score aquí
+    reason: "manual",       // opcional
+    evidencias: [],         // opcional
+  }));
+
+  const rAnalisis = await (window as any).electronAPI.guardarAnalisisActividad(
+    nueva.id,
+    0,      // umbral (no aplica para selección manual)
+    ces
+  );
+
+  if (!rAnalisis?.ok) {
+    console.warn("[guardarAnalisisActividad] fallo:", rAnalisis);
+    toast.message("Actividad guardada, pero no se guardaron los CE (análisis).");
+  }
+} catch (e) {
+  console.error("[guardarAnalisisActividad] error:", e);
+  toast.message("Actividad guardada, pero falló guardar los CE.");
+}
+
+
       añadirActividad(cursoIdEf!, nueva as any);
       toast.success("Actividad guardada.");
       setDirty(false);
@@ -592,6 +621,32 @@ export default function DialogCrearActividadManual({
       if (!res.ok) {
         toast.error(`No se programó: ${res?.error ?? "Error desconocido"}`);
         return;
+      }
+      try {
+        const ces = Array.from(
+          new Map(
+            cesSeleccionados.map(c => [c.ceCodigo.toUpperCase().replace(/\s+/g, ""), c])
+          ).values()
+        ).map(c => ({
+          codigo: c.ceCodigo,
+          puntuacion: 1,
+          reason: "manual",
+          evidencias: [],
+        }));
+      
+        const rAnalisis = await (window as any).electronAPI.guardarAnalisisActividad(
+          a.id,
+          0,
+          ces
+        );
+      
+        if (!rAnalisis?.ok) {
+          console.warn("[guardarAnalisisActividad] fallo:", rAnalisis);
+          toast.message("Actividad programada, pero no se guardaron los CE.");
+        }
+      } catch (e) {
+        console.error("[guardarAnalisisActividad] error:", e);
+        toast.message("Actividad programada, pero falló guardar los CE.");
       }
       añadirActividad(cursoIdEf!, a as any);
       toast.success("📅 Actividad programada.");

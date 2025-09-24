@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useSnapshot } from "valtio";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-
 import {
   Card,
   CardHeader,
@@ -23,7 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { User, ExternalLink, Loader2, Eye, EyeOff, } from "lucide-react";
+import { User, ExternalLink, Loader2 } from "lucide-react";
 
 import {
   alumnosStore,
@@ -32,8 +31,6 @@ import {
 } from "@/store/alumnosStore";
 import { cursoStore } from "@/store/cursoStore";
 import { Dot } from "@/components/ui/Dot";
-
-import RankingLista from "@/components/RankingLista";
 
 type UIAlumno = StoreAlumno & { mail?: string | null };
 
@@ -63,29 +60,36 @@ export default function AlumnosPorCursoPage() {
     Record<string, Record<string, number>>
   >({});
 
+  // 1) Cargar alumnos del curso
   useEffect(() => {
-    if (cursoId) void cargarAlumnosCurso(cursoId);
+    if (!cursoId) return;
+    void cargarAlumnosCurso(cursoId);
   }, [cursoId]);
 
+  // 2) Cargar medias por alumno/asignatura
   useEffect(() => {
+    if (!cursoId) return;
     let mounted = true;
-    async function load() {
-      if (!cursoId) return;
+    (async () => {
       setLoadingMedias(true);
       try {
-        const res = await (window as any).electronAPI.obtenerMediasAlumnosCurso(
-          cursoId
-        );
+        const res =
+          (await (window as any)?.electronAPI?.obtenerMediasAlumnosCurso?.(
+            cursoId
+          )) ?? {};
         if (!mounted) return;
-        setColsAsignaturas(res.asignaturas || []);
-        setMediaMap(res.mediaMap || {});
+        setColsAsignaturas(res.asignaturas ?? []);
+        setMediaMap(res.mediaMap ?? {});
       } catch (e) {
         console.error("obtenerMediasAlumnosCurso error", e);
+        if (mounted) {
+          setColsAsignaturas([]);
+          setMediaMap({});
+        }
       } finally {
         if (mounted) setLoadingMedias(false);
       }
-    }
-    load();
+    })();
     return () => {
       mounted = false;
     };
@@ -96,6 +100,7 @@ export default function AlumnosPorCursoPage() {
     [snapCursos.cursos, cursoId]
   );
 
+  // 3) Filtro de alumnos
   const alumnos: UIAlumno[] = useMemo(() => {
     const lista = (alumnosStore.porCurso[cursoId] ?? []) as UIAlumno[];
     if (!search.trim()) return lista;
@@ -107,7 +112,9 @@ export default function AlumnosPorCursoPage() {
     );
   }, [snapAlumnos.porCurso, cursoId, search]);
 
-  const rankingItems = useMemo(() => {
+  // 4) Ranking (Top / Last)
+  type RankingItem = { id: string; nombre: string; media: number };
+  const rankingItems: RankingItem[] = useMemo(() => {
     const todos = (alumnosStore.porCurso[cursoId] ?? []) as UIAlumno[];
     return todos.map((al) => {
       const mediasAlumno = mediaMap[al.id] || {};
@@ -116,8 +123,7 @@ export default function AlumnosPorCursoPage() {
       ) as number[];
       const media =
         nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : NaN;
-      const nombre =
-        `${al.apellidos ?? ""} ${al.nombre ?? ""}`.trim() || "Sin nombre";
+      const nombre = `${al.apellidos ?? ""} ${al.nombre ?? ""}`.trim() || "Sin nombre";
       return { id: String(al.id), nombre, media };
     });
   }, [snapAlumnos.porCurso, mediaMap, cursoId]);
@@ -125,15 +131,8 @@ export default function AlumnosPorCursoPage() {
   const isLoadingBase = !!snapAlumnos.loading[cursoId];
   const isLoading = isLoadingBase || loadingMedias;
 
-  function onAbrirAlumno(a: { id: string; nombre: string; apellidos: string }) {
-    // Opciones:
-    // 1) Navegar a la ficha del alumno:
-    // router.push(`/alumnos/${a.id}`)
-
-    // 2) Abrir panel lateral / modal:
-    // setAlumnoExpandido(a.id)
-
-    console.log("abrir alumno", a);
+  function onAbrirAlumno(a: { id: string }) {
+    router.push(`/alumnos/${a.id}`);
   }
 
   return (
@@ -142,9 +141,7 @@ export default function AlumnosPorCursoPage() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
-              {curso?.nombre
-                ? `${curso.nombre} — Alumnos`
-                : "Alumnos del curso"}
+              {curso?.nombre ? `${curso.nombre} — Alumnos` : "Alumnos del curso"}
             </h1>
             <p className="text-sm text-muted-foreground">
               {isLoading
@@ -168,27 +165,26 @@ export default function AlumnosPorCursoPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Top 3</CardTitle>
-                <CardDescription>
-                  Basado en medias globales por asignatura
-                </CardDescription>
+                <CardDescription>Basado en medias globales por asignatura</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {rankingItems.slice(0, 3).map((a: any) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="truncate font-bold text-xs">
-                    <div className="flex justify-center items-center">
-                        <User className="h-6 w-6 opacity-70 pr-2 text-emerald-400" />
-                        {a.apellidos} {a.nombre}
+                {rankingItems
+                  .slice()
+                  .sort((a, b) => (isNaN(b.media) ? -1 : b.media - a.media))
+                  .slice(0, 3)
+                  .map((it) => (
+                    <div key={it.id} className="flex items-center justify-between">
+                      <div className="truncate font-bold text-xs">
+                        <div className="flex items-center">
+                          <User className="h-6 w-6 opacity-70 pr-2 text-emerald-400" />
+                          {it.nombre}
+                        </div>
                       </div>
+                      <Button className="text-xs" size="sm" onClick={() => onAbrirAlumno(it)}>
+                        Abrir
+                      </Button>
                     </div>
-                    <Button className="text-xs" size="sm" onClick={() => onAbrirAlumno(a)}>
-                      Abrir
-                    </Button>
-                  </div>
-                ))}
+                  ))}
               </CardContent>
             </Card>
 
@@ -198,26 +194,28 @@ export default function AlumnosPorCursoPage() {
                 <CardDescription>Alumnos con peores medias</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {rankingItems.slice(0, 3).map((a: any) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="truncate font-bold text-xs">
-                      <div className="flex justify-center items-center">
-                        <User className="h-6 w-6 opacity-70 pr-2 text-orange-400" />
-                        {a.apellidos} {a.nombre}
+                {rankingItems
+                  .slice()
+                  .sort((a, b) => (isNaN(a.media) ? 1 : a.media - b.media))
+                  .slice(0, 3)
+                  .map((it) => (
+                    <div key={it.id} className="flex items-center justify-between">
+                      <div className="truncate font-bold text-xs">
+                        <div className="flex items-center">
+                          <User className="h-6 w-6 opacity-70 pr-2 text-orange-400" />
+                          {it.nombre}
+                        </div>
                       </div>
+                      <Button
+                        className="text-xs"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => onAbrirAlumno(it)}
+                      >
+                        Abrir
+                      </Button>
                     </div>
-                    <Button className="text-xs"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => onAbrirAlumno(a)}
-                    >
-                      Abrir
-                    </Button>
-                  </div>
-                ))}
+                  ))}
               </CardContent>
             </Card>
           </div>
@@ -236,18 +234,13 @@ export default function AlumnosPorCursoPage() {
                     <TableHead key={asig.id} className="text-center">
                       <div className="flex items-center justify-center gap-2">
                         <Dot color={asig.color} />
-                        <span
-                          className="truncate max-w-[180px]"
-                          title={asig.nombre}
-                        >
+                        <span className="truncate max-w-[180px]" title={asig.nombre}>
                           {asig.nombre}
                         </span>
                       </div>
                     </TableHead>
                   ))}
-                  <TableHead className="w-[10%] text-center">
-                    Media global
-                  </TableHead>
+                  <TableHead className="w-[10%] text-center">Media global</TableHead>
                   <TableHead className="w-[10%] text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -285,8 +278,7 @@ export default function AlumnosPorCursoPage() {
                     ) as number[];
                     const mediaGlobal =
                       mediasNumeros.length > 0
-                        ? mediasNumeros.reduce((a, b) => a + b, 0) /
-                          mediasNumeros.length
+                        ? mediasNumeros.reduce((a, b) => a + b, 0) / mediasNumeros.length
                         : undefined;
 
                     return (
@@ -299,15 +291,10 @@ export default function AlumnosPorCursoPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs">
-                          {al.mail || "—"}
-                        </TableCell>
+                        <TableCell className="text-xs">{al.mail || "—"}</TableCell>
 
                         {colsAsignaturas.map((asig) => (
-                          <TableCell
-                            key={asig.id}
-                            className="text-center text-xs"
-                          >
+                          <TableCell key={asig.id} className="text-center text-xs">
                             {notaBadge(mediasAlumno[asig.id])}
                           </TableCell>
                         ))}

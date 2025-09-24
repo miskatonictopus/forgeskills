@@ -121,6 +121,8 @@ export interface ElectronAPI {
     { codigo: string; descripcion: string; CE: { codigo: string; descripcion: string }[] }[]
   >;
 
+  
+
   /* ===== Eventos/IPC de actividades ===== */
   onActividadesActualizadas: (
     callback: (payload: { count: number }) => void
@@ -161,7 +163,9 @@ export interface ElectronAPI {
     actividadId: string,
     notas: { alumnoId: string; nota: number }[]
   ) => Promise<{ ok: boolean }>;
-  evaluarYPropagarActividad: (actividadId: string) => Promise<{ ok: boolean }>;
+  evaluarYPropagarActividad: (
+    actividadId: string
+  ) => Promise<{ ok: true } | { ok: false; code?: string; error: string }>;
   guardarNotasActividad: (actividadId: string, notas: { alumnoId: string; nota: number }[]) => Promise<{ ok: true }>;
 
   /* ===== RA/CE ===== */
@@ -238,10 +242,26 @@ export interface ElectronAPI {
   guardarAnalisisActividad: (
     actividadId: string,
     umbral: number,
-    ces: { codigo: string; puntuacion: number; reason?: "evidence" | "high_sim" | "lang_rule"; evidencias?: string[] }[]
-  ) => Promise<{ ok: boolean }>;
+    ces: Array<{ codigo: string; puntuacion: number; reason?: string; evidencias?: string[] }>
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
   leerAnalisisActividad: (actividadId: string) => Promise<AnalisisActividadSnapshot>;
+  guardarNotasActividad: (
+    actividadId: string,
+    payload: Array<{ alumnoId: string; nota: number }>
+  ) => Promise<{ ok: true; count: number } | { ok: false; error: string }>;
 
+  evaluarYPropagarActividad: (
+    actividadId: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+
+  actividadProgramar: (args: {
+    actividadId: string;
+    startISO: string;      // ISO-8601
+    duracionMin: number;
+  }) => Promise<{ ok: true } | { ok: false; error: string }>;
+  evaluarYPropagar: (
+    actividadId: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
   /* ===== Planificación Didáctica ===== */
   calcularHorasReales: (opts?: {
     cursoId?: string;

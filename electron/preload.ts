@@ -107,6 +107,12 @@ type ProgGuardarResult =
 /* ====== Render PDF (HTML→PDF ya lo manejas con 'informe:generar-html') ====== */
 type RenderResult = { ok: true; path: string } | { ok: false; error: string };
 
+export type NotaActividadPayload = Array<{
+  alumnoId: string;
+  notas: Array<{ ceCodigo: string; nota: number }>;
+}>;
+
+
 /* ========= API expuesta ========= */
 const api = {
   /* ================= NOMBRES / PRUEBAS ================= */
@@ -203,9 +209,12 @@ const api = {
   actualizarActividadFecha: (id: string, fecha: string) =>
     ipcRenderer.invoke("actualizar-actividad-fecha", id, fecha),
   // alias
+  leerNotasDetalleAsignatura: (asignaturaId: string) =>
+    ipcRenderer.invoke("leer-notas-detalle-asignatura", asignaturaId),
   borrarActividad: (actividadId: string) =>
     ipcRenderer.invoke("actividades:borrar", actividadId),
-
+    leerNotasDetalleCEPorAsignatura: (asignaturaId: string) =>
+    ipcRenderer.invoke("notas:detalle-por-asignatura", { asignaturaId }),
   /* ================= RA / CE + Análisis ================= */
   obtenerRAPorAsignatura: (asignaturaId: string) =>
     ipcRenderer.invoke("obtener-ra-por-asignatura", asignaturaId),
@@ -226,21 +235,34 @@ const api = {
     return () => ipcRenderer.removeListener("actividades.actualizadas", h);
   },
 
-  guardarAnalisisActividad: (actividadId: string, umbral: number, ces: any[]) =>
-    ipcRenderer.invoke("actividad.guardar-analisis", {
-      actividadId,
-      umbral,
-      ces,
-    }),
+  guardarAnalisisActividad: (
+    actividadId: string,
+    umbral: number,
+    ces: Array<{
+      codigo: string;
+      puntuacion: number;
+      reason?: string;
+      evidencias?: string[];
+    }>
+  ) => ipcRenderer.invoke("actividad:guardar-analisis", { actividadId, umbral, ces }),
+
   leerAnalisisActividad: (actividadId: string) =>
     ipcRenderer.invoke("actividad.leer-analisis", actividadId),
 
+    guardarNotasActividad: (
+    actividadId: string,
+    payload: Array<{ alumnoId: string; nota: number }>
+  ) => ipcRenderer.invoke("actividad:guardar-notas", { actividadId, payload }),
+
+  // Propagar y marcar evaluada (ojo al nombre: EvaluarActividad llama a evaluarYPropagarActividad)
+  evaluarYPropagarActividad: (actividadId: string) =>
+  ipcRenderer.invoke("actividad:evaluar-y-propagar", { actividadId }),
+
+
+    
   /* ================= PROGRAMAR / DESPROGRAMAR ================= */
-  actividadProgramar: (payload: {
-    actividadId: string;
-    startISO: string;
-    duracionMin: number;
-  }) => ipcRenderer.invoke("actividad:programar", payload),
+  actividadProgramar: (args: { actividadId: string; startISO: string; duracionMin: number }) =>
+  ipcRenderer.invoke("actividad:programar", args),
 
   /* ================= LECTIVO / FESTIVOS / PRESENCIALIDAD / FCT ================= */
   leerRangoLectivo: () => ipcRenderer.invoke("lectivo:leer"),
@@ -295,6 +317,10 @@ const api = {
     }>,
   exportarProgramacionPDF: (html: string, jsonPath: string) =>
     ipcRenderer.invoke("pdf:exportProgramacion", { html, jsonPath }),
+
+
+  evaluarYPropagar: (actividadId: string) =>
+    ipcRenderer.invoke("actividad:evaluar-y-propagar", { actividadId }),
 
   /* ================= MISC ================= */
   obtenerMediasAlumnosCurso: (cursoId: string) =>

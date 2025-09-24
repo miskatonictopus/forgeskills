@@ -1,3 +1,7 @@
+declare module "pdf-parse" {
+    export interface PDFParseResult { text: string; [k: string]: any }
+    export default function pdfParse(data: Buffer): Promise<PDFParseResult>;
+  }
 // types/pdf-parse.d.ts
 declare module "pdf-parse" {
     export interface PDFParseOptions {

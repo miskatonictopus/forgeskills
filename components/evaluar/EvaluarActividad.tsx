@@ -53,12 +53,24 @@ export default function EvaluarActividad({
     setNotas(next);
   };
 
+
+
   const setNota = (alumnoId: string, value: number | null) => {
     setNotas((prev) => ({ ...prev, [alumnoId]: value ?? 0 }));
   };
 
   const handleSave = async () => {
     if (saving) return;
+
+    const r2 = await window.electronAPI.evaluarYPropagarActividad(actividadId);
+    if (!r2?.ok) {
+      if (r2?.code === "SIN_CE_GUARDADOS") {
+        toast.error("La actividad no tiene CE guardados. Ve a 'Guardar análisis' y vuelve a evaluar.");
+      } else {
+        toast.error(r2?.error ?? "No se pudo propagar la evaluación");
+      }
+      return;
+    }
 
     const payload: NotaPayload[] = Object.entries(notas)
       .filter(([, n]) => Number.isFinite(n))

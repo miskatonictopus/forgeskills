@@ -52,6 +52,17 @@ function EstadoDot({ estado }: { estado?: string }) {
   return <span className={`inline-block h-2 w-2 rounded-full ${map[estado ?? "borrador"]}`} />;
 }
 
+// ⇥ normalizador para las filas que vienen del IPC/SQLite
+const normDetalle = (list: any[]): NotaDetallada[] =>
+  (list ?? []).map((n: any) => ({
+    alumno_id: String(n.alumno_id),
+    ce_codigo: String(n.ce_codigo ?? "").toUpperCase().replace(/\s+/g, ""),
+    actividad_id: String(n.actividad_id),
+    actividad_fecha: n.actividad_fecha ? String(n.actividad_fecha).replace(" ", "T") : null,
+    actividad_nombre: n.actividad_nombre ?? null,
+    nota: n.nota != null ? Number(n.nota) : null,
+  }));
+
 export default function AsignaturaPage() {
   const { cursoId, asignaturaId } = useParams<{ cursoId: string; asignaturaId: string }>();
   const snapCursos = useSnapshot(cursoStore);
@@ -88,27 +99,36 @@ export default function AsignaturaPage() {
     if (cursoId) cargarActividades(cursoId);
   }, [cursoId]);
 
-  // Carga notas detalladas (una por actividad)
+  // Carga + normaliza notas detalladas (una por actividad)
+  const cargarNotasDetalle = async () => {
+    try {
+      setCargandoNotas(true);
+      const list =
+        (await (window as any).electronAPI.leerNotasDetalleAsignatura?.(asignaturaId)) ?? [];
+        console.log("🔥 notasDetalle crudas desde IPC", list);
+      const norm = normDetalle(list);
+      // DEBUG opcional:
+      // console.table(norm.slice(0, 8));
+      setNotasDetalle(norm);
+    } catch (e) {
+      console.error("❌ Error al leer notas detalladas:", e);
+      setNotasDetalle([]);
+    } finally {
+      setCargandoNotas(false);
+    }
+  };
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setCargandoNotas(true);
-        // Handler nuevo del main: leer-notas-detalle-asignatura
-        const list =
-          (await (window as any).electronAPI.leerNotasDetalleAsignatura?.(asignaturaId)) ?? [];
-        if (!cancelled) setNotasDetalle(list);
-      } catch (e) {
-        console.error("❌ Error al leer notas detalladas:", e);
-        if (!cancelled) setNotasDetalle([]);
-      } finally {
-        if (!cancelled) setCargandoNotas(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    cargarNotasDetalle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asignaturaId]);
+
+  // Auto-refresco tras evaluar (lo emites al guardar evaluación)
+  useEffect(() => {
+    const onEval = () => cargarNotasDetalle();
+    window.addEventListener("actividad:evaluada", onEval);
+    return () => window.removeEventListener("actividad:evaluada", onEval);
+  }, []);
 
   // Actividades de ESTA asignatura (ya en memoria)
   const actividadesAsignatura = useMemo(() => {
@@ -188,11 +208,13 @@ export default function AsignaturaPage() {
             {cargandoNotas && <span className="text-xs text-muted-foreground">cargando notas…</span>}
           </div>
 
-          {/* 👇 ahora pasamos notasDetalle */}
-          <TablaNotasCEAlumnos alumnos={alumnos} ra={asignatura.ra} notasDetalle={notasDetalle} />
+          <TablaNotasCEAlumnos
+            alumnos={alumnos}
+            ra={asignatura.ra}          // catálogo CE (descripciones)
+            notasDetalle={notasDetalle} // YA normalizado
+          />
         </div>
       )}
     </div>
   );
 }
-
