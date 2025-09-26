@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 /* =========================
  * Config
  * ========================= */
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? "";
 const MODEL = process.env.LLM_SUGERENCIAS_MODEL ?? "gpt-4o";
 const USE_LLM = !!OPENAI_API_KEY && /^sk-/.test(OPENAI_API_KEY);
@@ -27,6 +30,10 @@ type Recomendacion = { metodologia: MetodologiaId; score: number; motivo: string
 type ReqBody = {
   sesion: { id: string; minutos: number; metodologias?: MetodologiaId[] };
   ces: Array<{ codigo: string; descripcion: string; raCodigo: string; minutos?: number; dificultad?: number }>;
+  opts?: {
+    /** Por defecto true. Si false, fuerza uso del heurístico y no llama al LLM. */
+    usarLLM?: boolean;
+  };
 };
 
 /* =========================
@@ -356,26 +363,39 @@ export async function POST(request: NextRequest) {
   try {
     const req = (await request.json()) as ReqBody;
 
+    // Decisión de uso de LLM (por defecto true)
+    const usarLLM = req?.opts?.usarLLM ?? true;
+
+    // Guard 501: si se solicita LLM pero falta la clave → 501
+    if (usarLLM && !OPENAI_API_KEY) {
+      return NextResponse.json(
+        { ok: false, error: "OPENAI_API_KEY missing" },
+        { status: 501 }
+      );
+    }
+
     let fuente: "llm" | "chat" | "fallback" = "fallback";
     let modelo: string | null = null;
     let usage: any = {};
     let out: { recs: Recomendacion[]; sug: SugerenciaSesion[] } | null = null;
 
-    // Plan A: Responses + schema (con retries)
-    const r1 = await callLLM_Responses(req);
-    if (r1 && r1.sug.length) {
-      fuente = "llm";
-      modelo = r1.modelo ?? MODEL;
-      usage = r1.usage ?? {};
-      out = { recs: r1.recs, sug: r1.sug };
-    } else {
-      // Plan B: Chat JSON
-      const r2 = await callLLM_Chat(req);
-      if (r2 && r2.sug.length) {
-        fuente = "chat";
-        modelo = r2.modelo ?? MODEL;
-        usage = r2.usage ?? {};
-        out = { recs: r2.recs, sug: r2.sug };
+    if (usarLLM && USE_LLM) {
+      // Plan A: Responses + schema (con retries)
+      const r1 = await callLLM_Responses(req);
+      if (r1 && r1.sug.length) {
+        fuente = "llm";
+        modelo = r1.modelo ?? MODEL;
+        usage = r1.usage ?? {};
+        out = { recs: r1.recs, sug: r1.sug };
+      } else {
+        // Plan B: Chat JSON
+        const r2 = await callLLM_Chat(req);
+        if (r2 && r2.sug.length) {
+          fuente = "chat";
+          modelo = r2.modelo ?? MODEL;
+          usage = r2.usage ?? {};
+          out = { recs: r2.recs, sug: r2.sug };
+        }
       }
     }
 
@@ -402,7 +422,7 @@ export async function POST(request: NextRequest) {
           fuente,
           modelo,
           usage,
-          input: safe({ sesion: req.sesion, ces: req.ces }),
+          input: safe({ sesion: req.sesion, ces: req.ces, usarLLM }),
           output: safe({ recs: recsBoost, sugerencias: out.sug }),
         },
         null,

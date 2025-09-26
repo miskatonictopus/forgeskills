@@ -1,12 +1,8 @@
-import OpenAI from "openai";
+import { ensureOpenAI } from "@/lib/openai";
 import { NextResponse } from "next/server";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Opcional: si usas Next.js en Node runtime (recomendado para OpenAI SDK)
-// export const runtime = "nodejs";
+export const runtime = "nodejs";        // recomendado para el SDK de OpenAI
+export const dynamic = "force-dynamic"; // evita cacheo en Vercel
 
 export async function POST(req: Request) {
   try {
@@ -16,6 +12,14 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { resultado: [], error: "Falta 'prompt' (string no vacío)" },
         { status: 400 }
+      );
+    }
+
+    const openai = ensureOpenAI();          // ✅ aquí inicializamos
+    if (!openai) {
+      return NextResponse.json(
+        { resultado: [], error: "OPENAI_API_KEY missing" },
+        { status: 501 }
       );
     }
 
@@ -50,14 +54,12 @@ Requisitos de salida:
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Defensa final (debería ser raro con response_format)
       return NextResponse.json(
         { resultado: [], error: "Formato inválido del modelo" },
         { status: 400 }
       );
     }
 
-    // Validación mínima: { resultado: string[] }
     const arr = (parsed as any)?.resultado;
     if (!Array.isArray(arr) || !arr.every((x) => typeof x === "string")) {
       return NextResponse.json(

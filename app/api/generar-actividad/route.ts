@@ -2,21 +2,22 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function stripFences(raw: string) {
-    if (!raw) return "";
-    let s = raw.trim();
-  
-    // ```html ... ```  o  ``` ... ```
-    s = s.replace(/^```(?:html|md|markdown)?\s*/i, "");
-    s = s.replace(/\s*```$/i, "");
-  
-    // Si viniera un documento completo, quédate con el <body>
-    const bodyMatch = s.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    if (bodyMatch) s = bodyMatch[1].trim();
-  
-    return s;
-  }
+  if (!raw) return "";
+  let s = raw.trim();
+
+  // ```html ... ```  o  ``` ... ```
+  s = s.replace(/^```(?:html|md|markdown)?\s*/i, "");
+  s = s.replace(/\s*```$/i, "");
+
+  // Si viniera un documento completo, quédate con el <body>
+  const bodyMatch = s.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyMatch) s = bodyMatch[1].trim();
+
+  return s;
+}
 
 type SeleccionItem = {
   raCodigo: string;
@@ -24,7 +25,6 @@ type SeleccionItem = {
   ceCodigo: string;
   ceDescripcion: string;
 };
-
 
 export async function POST(req: Request) {
   try {
@@ -69,9 +69,9 @@ Eres un profesor experto en FP que diseña actividades de aula.
 Devuelve SIEMPRE HTML limpio (solo <h2>, <h3>, <p>, <ul>, <ol>, <li>, <table>, <thead>, <tbody>, <tr>, <th>, <td>, <blockquote>, <strong>, <em>, <code>, <hr>, <br/>).
 No uses estilos inline. No uses <style>. Nada de scripts.
 Redacta en ${idioma}, tono ${tono}.
-`;
+`.trim();
 
-const userPrompt = `
+    const userPrompt = `
 Genera una ACTIVIDAD **EVALUABLE** (tipo prueba/examen individual) para la asignatura${
   asignaturaNombre ? ` "${asignaturaNombre}"` : ""
 }, con **tiempo límite real de ${etiquetaDuracion}**, alineada estrictamente a los siguientes Criterios de Evaluación:
@@ -123,25 +123,26 @@ ${ceLista}
 - Referencia cada CE siempre por su **código** (RAx.CEy).
 - Sé conciso y operativo; evita muletillas.
 - No inventes normativa externa; céntrate en los CE y en hacer la prueba evaluable y corregible.
-`;
+`.trim();
 
-
-    // ==== Llamada a OpenAI (fetch directo para no requerir SDK) ====
+    // Guard: si falta la API Key, devolver 501 (no bloquea build)
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "OPENAI_API_KEY no configurada en el servidor." },
-        { status: 500 }
+        { error: "OPENAI_API_KEY missing" },
+        { status: 501 }
       );
     }
 
+    // Llamada a OpenAI (fetch directo para no requerir SDK)
     const payload = {
-      model: "gpt-4o", // o "gpt-4o-mini" si prefieres más rápido/económico
+      model: "gpt-4o", // o "gpt-4o-mini"
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       temperature: 0.3,
+      // si quieres asegurar formato estricto JSON/HTML, puedes añadir response_format en modelos que lo soporten
     };
 
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -154,7 +155,7 @@ ${ceLista}
     });
 
     if (!resp.ok) {
-      const errTxt = await resp.text();
+      const errTxt = await resp.text().catch(() => "");
       return NextResponse.json(
         { error: `OpenAI error: ${resp.status} ${errTxt}` },
         { status: 500 }
@@ -162,13 +163,16 @@ ${ceLista}
     }
 
     const data = await resp.json();
-    let html =
-  (data?.choices?.[0]?.message?.content ?? "<p>No se pudo generar contenido.</p>").toString().trim();
+    let html = (data?.choices?.[0]?.message?.content ??
+      "<p>No se pudo generar contenido.</p>").toString().trim();
 
-    html = stripFences(html); // 👈 sanea aquí
+    html = stripFences(html);
 
     return NextResponse.json({ html });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Error inesperado" }, { status: 500 });
+    return NextResponse.json(
+      { error: e?.message || "Error inesperado" },
+      { status: 500 }
+    );
   }
 }
