@@ -2,12 +2,10 @@
     "version": 2,
     "functions": {
       "api/**/*.ts": {
-        "runtime": "nodejs20.x",
-        "regions": ["fra1"]
+        "runtime": "nodejs20.x"
       }
     },
     "env": {
       "NEXT_TELEMETRY_DISABLED": "1"
     }
   }
-  
