@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "node scripts/fetch-fullcalendar-css.js",
     "generar:asignaturas": "ts-node scripts/generar-asignaturas.ts",
     "agent:inf": "ts-node -P tsconfig.tools.json tools/agent/run_informatica.ts",
     "asig:parse-multi": "ts-node -P tsconfig.tools.json tools/asignaturas/parse_xtec_multi.ts",
